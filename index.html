@@ -1257,7 +1257,12 @@ async function fetchFd(path,cacheKey,ttl=FD_TTL){
   }catch{return null;}
 }
 async function getFdStandings(){return fetchFd('/competitions/WC/standings?season=2026','copa2026_fd_standings_v1');}
-async function getFdMatches(){return fetchFd('/competitions/WC/matches?season=2026','copa2026_fd_matches_v1',15*60*1000);}
+async function getFdMatches(){
+  // /v4/matches with competition filter + date window — more efficient than full-season endpoint
+  const from=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const to=new Date(Date.now()+21*864e5).toISOString().slice(0,10);
+  return fetchFd(`/matches?competitions=WC&dateFrom=${from}&dateTo=${to}`,'copa2026_fd_matches_v1',15*60*1000);
+}
 function formatFdContext(standings,matches){
   const lines=[];
   if(standings?.standings?.length){

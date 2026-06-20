@@ -1248,12 +1248,38 @@ async function fetchTournamentCtxFromApi(){
 }
 
 // ─── football-data.org integration ───────────────────────────────────────
+let _fdRateLeft=Infinity,_fdRateReset=0; // throttle state (X-RequestsAvailable / X-RequestCounter-Reset)
 function getFdKey(){try{return localStorage.getItem(FD_KEY_STORE)||'';}catch{return'';}}
+function _parseFdHeaders(res){
+  const left=parseInt(res.headers.get('X-RequestsAvailable')||'',10);
+  const reset=parseInt(res.headers.get('X-RequestCounter-Reset')||'',10);
+  if(!isNaN(left))_fdRateLeft=left;
+  if(!isNaN(reset))_fdRateReset=Date.now()+reset*1000;
+}
 async function fetchFd(path,cacheKey,ttl=FD_TTL){
   try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
   const key=getFdKey();if(!key)return null;
+  // Pre-wait if rate limit exhausted
+  if(_fdRateLeft<=0&&_fdRateReset>Date.now()){
+    const ms=_fdRateReset-Date.now()+300;
+    updateFdStatus('','aguardando rate limit…');
+    await new Promise(r=>setTimeout(r,ms));
+  }
   try{
     const res=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
+    _parseFdHeaders(res);
+    if(res.status===429){
+      // Rate limited — wait for reset then retry once
+      const wait=(_fdRateReset>Date.now()?_fdRateReset-Date.now():60000)+300;
+      updateFdStatus('err',`rate limit · retry em ${Math.ceil(wait/1000)}s`);
+      await new Promise(r=>setTimeout(r,wait));
+      const r2=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
+      _parseFdHeaders(r2);
+      if(!r2.ok){updateFdStatus('err',`Erro ${r2.status}`);return null;}
+      const d2=await r2.json();
+      try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data:d2}));}catch{}
+      return d2;
+    }
     if(!res.ok){updateFdStatus('err',`Erro ${res.status}`);return null;}
     const data=await res.json();
     try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}

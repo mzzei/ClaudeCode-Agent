@@ -547,6 +547,8 @@ let _history      = [];
 const HIST_KEY    = 'copa2026_history';
 const SCHED_STORE = 'copa2026_sched_v2';
 const SCHED_TTL   = 6 * 60 * 60 * 1000;
+const CTX_STORE   = 'copa2026_ctx_v1';
+const CTX_TTL     = 4 * 60 * 60 * 1000;
 const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
 let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
 let _running      = false, _abort = null, _pendingQuery = '';
@@ -609,9 +611,9 @@ function startThinking(){
     if(ev)ev.textContent=s+'s';if(tl)tl.textContent=fmt(_thkTokCount)+' tokens';
   },400);
 }
-function updateThinkingToks({inTokens=0,outTokens=0,thinkingTokens=0,status=''}){
+function updateThinkingToks({inTokens=0,outTokens=0,thinkingTokens=0,status='',phase=2}){
   _thkTokCount=inTokens+outTokens+thinkingTokens;
-  const label=status.includes('Raciocinando')?'ainda pensando…':status.includes('Pesquisando')?'buscando dados…':status.includes('Concluindo')?'concluindo…':'analisando…';
+  const label=phase===1?'[F1] pesquisando…':status.includes('Raciocinando')?'ainda pensando…':status.includes('Pesquisando')?'buscando dados…':status.includes('Concluindo')?'concluindo…':'analisando…';
   const lb=document.getElementById('thk-label');if(lb)lb.textContent=label;
 }
 function stopThinking(done=true){
@@ -1149,6 +1151,55 @@ function renderScheduleChips(jogos){
   chips.innerHTML=html;document.getElementById('reload-btn').style.display='inline';
   document.getElementById('sched-lbl').textContent=`${upcoming.length} jogo${upcoming.length!==1?'s':''} próximo${upcoming.length!==1?'s':''}`;
 }
+// ─── Tournament context cache ─────────────────────────────────────────────
+function _loadCtxCache(){
+  try{const raw=localStorage.getItem(CTX_STORE);if(!raw)return null;const c=JSON.parse(raw);return(c&&c.data)?c:null;}catch{return null;}
+}
+function _saveCtxCache(data){
+  try{localStorage.setItem(CTX_STORE,JSON.stringify({fetched_at:Date.now(),data}));}catch(e){}
+}
+function getTournamentCtxString(){
+  const c=_loadCtxCache();if(!c)return'';
+  try{
+    const d=c.data;const lines=[];
+    if(d.fase_atual)lines.push(`FASE ATUAL: ${d.fase_atual}`);
+    if(d.standings&&Object.keys(d.standings).length){
+      lines.push('CLASSIFICAÇÃO DOS GRUPOS:');
+      Object.entries(d.standings).forEach(([g,rows])=>{lines.push(`  ${g}: ${rows.map(r=>`${r.time}(${r.pts}pts)`).join(' | ')}`);});
+    }
+    if(d.results&&d.results.length){
+      lines.push('RESULTADOS RECENTES:');
+      d.results.slice(0,12).forEach(r=>lines.push(`  ${r.data||''} ${r.mandante} ${r.placar||'?-?'} ${r.visitante}`));
+    }
+    return lines.join('\n');
+  }catch{return'';}
+}
+function loadTournamentCtx(force){
+  const cache=_loadCtxCache();
+  if(cache&&!force){const age=Date.now()-(cache.fetched_at||0);if(age<CTX_TTL)return;}
+  fetchTournamentCtxFromApi();
+}
+async function fetchTournamentCtxFromApi(){
+  const apiKey=document.getElementById('api-key-input').value.trim();
+  if(!apiKey.startsWith('sk-'))return;
+  const today=new Date().toISOString().slice(0,10);
+  const SP=`Copa do Mundo 2026 — agente de contexto. Data: ${today}. Pesquise e retorne APENAS JSON válido (sem markdown): {"fase_atual":"string","standings":{"GrupoA":[{"time":"","pts":0,"j":0,"v":0,"e":0,"d":0,"gp":0,"gc":0}]},"results":[{"data":"DD/MM","mandante":"","placar":"N-N","visitante":""}]}. Inclua todos os grupos ativos e os últimos 12 resultados.`;
+  const msgs=[{role:'user',content:`Tabela de classificação e resultados recentes da Copa do Mundo 2026 até ${today}.`}];
+  try{
+    for(let i=0;i<8;i++){
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
+      const data=await res.json();if(!res.ok)return;
+      if(data.stop_reason==='end_turn'){
+        const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+        const m=txt.match(/\{[\s\S]*\}/);
+        if(m){let d;try{d=JSON.parse(m[0]);}catch{return;}if(d&&(d.results||d.standings)){_saveCtxCache(d);return;}}
+        return;
+      }
+      if(data.stop_reason==='tool_use'){msgs.push({role:'assistant',content:data.content});msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});}else return;
+    }
+  }catch{}
+}
+
 function fillMatch(i){
   const j=_schedule[i];if(!j)return;
   if(_currentView==='library')showView('chat');
@@ -1236,12 +1287,12 @@ document.getElementById('api-key-input').addEventListener('input',function(){
   clearTimeout(_keyDebounce);
   const v=this.value.trim();
   try{if(v)sessionStorage.setItem(KEY_STORE,v);else sessionStorage.removeItem(KEY_STORE);}catch(e){}
-  if(v.startsWith('sk-ant-')&&v.length>30)_keyDebounce=setTimeout(loadSchedule,800);
+  if(v.startsWith('sk-ant-')&&v.length>30)_keyDebounce=setTimeout(()=>{loadSchedule();loadTournamentCtx();},800);
 });
 document.getElementById('api-key-input').addEventListener('blur',function(){
   clearTimeout(_keyDebounce);
   const v=this.value.trim();
-  if(v.startsWith('sk-ant-')&&v.length>30)loadSchedule();
+  if(v.startsWith('sk-ant-')&&v.length>30){loadSchedule();loadTournamentCtx();}
 });
 
 // Restaura a API Key salva nesta aba (sessionStorage — apagada ao fechar)
@@ -1249,12 +1300,88 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
   let saved='';try{saved=sessionStorage.getItem(KEY_STORE)||'';}catch(e){}
   if(saved){
     document.getElementById('api-key-input').value=saved;
-    if(saved.startsWith('sk-ant-')&&saved.length>30)loadSchedule();
+    if(saved.startsWith('sk-ant-')&&saved.length>30){loadSchedule();loadTournamentCtx();}
   }
 })();
 
 // Carrega o histórico persistido (localStorage) e popula a lista de Análises Recentes
 loadHistory();renderRecentAnalyses();
+
+// ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
+async function gatherFacts(query,apiKey,signal,onUpdate){
+  const SP=`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
+Dado o contexto da partida, execute as pesquisas abaixo e retorne APENAS JSON válido:
+{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}
+
+SEQUÊNCIA (em português, nesta ordem):
+① "[Mandante] Copa do Mundo 2026 resultados"
+② "[Visitante] Copa do Mundo 2026 resultados"
+③ "[Mandante] [Visitante] lesões suspensões escalação Copa 2026"
+④ grupos: "Grupo [X] Copa 2026 classificação" / mata-mata: "[Mandante] [Visitante] Copa 2026"
+⑤ só se ①② sem xG: "[Mandante] [Visitante] xG Copa 2026"
+
+Após as buscas, preencha o JSON. RESPONDA APENAS COM O JSON.`;
+  const msgs=[{role:'user',content:query}];
+  for(let i=0;i<8;i++){
+    if(signal.aborted)throw new Error('cancelled');
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]}),signal});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
+    const data=await res.json();
+    if(data.stop_reason==='end_turn'){
+      const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+      const m=txt.match(/\{[\s\S]*\}/);
+      let rawFacts=null;try{if(m)rawFacts=JSON.parse(m[0]);}catch{}
+      const u=data.usage||{};
+      return{rawFacts,inTokens:u.input_tokens||0,outTokens:u.output_tokens||0};
+    }
+    if(data.stop_reason==='tool_use'){
+      msgs.push({role:'assistant',content:data.content});
+      msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
+      onUpdate({status:'Pesquisando dados…',phase:1});
+    }else break;
+  }
+  return{rawFacts:null,inTokens:0,outTokens:0};
+}
+function buildEnrichedQuery(query,rawFacts,ctx){
+  const parts=[query];
+  if(rawFacts){parts.push('\nDADOS PRÉ-COLETADOS (não pesquise, calcule com base nisto):');parts.push(JSON.stringify(rawFacts,null,2));}
+  if(ctx){parts.push('\nCONTEXTO DO TORNEIO (standings e resultados recentes):');parts.push(ctx);}
+  return parts.join('\n');
+}
+function getSystemPromptPhase2(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
+
+DATA ATUAL: ${currentDateFull()}
+
+PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados — NÃO faça pesquisas. Use exatamente os dados fornecidos em DADOS PRÉ-COLETADOS.
+
+OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais. Se um dado estiver ausente (lacuna), declare-o na seção "lacunas" sem inventar.
+
+CONSCIÊNCIA TEMPORAL:
+1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual
+2. Verifique se os times já estão classificados, eliminados ou precisam de resultado específico
+3. Pondere o impacto da fase: grupos (poupar titulares, diferença de gols), mata-mata (prorrogação real, média de gols menor), Quartas/Semi/Final (cartões acumulados, pressão máxima)
+4. Sede: EUA, México (altitude), Canadá — impacto sobre os times
+
+METODOLOGIA:
+1. Use os dados pré-coletados para montar o perfil de cada time
+2. Calcule lambdas: xG ofensivo/defensivo, desfalques, sede, fase
+3. Aplique Poisson: resultado, gols, placares exatos
+4. Identifique EVENTOS PROVÁVEIS com fundamento factual
+5. Gere SUGESTÕES DE TICKET baseadas em probabilidade estatística — não em odds
+
+PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
+
+LINGUAGEM E ESCRITA:
+- Estilo direto e analítico — mantenha sempre
+- Quando usar termo técnico (xG, lambda, Poisson, BTTS etc.), adicione entre parênteses uma explicação curta na primeira ocorrência
+- Evite acúmulo de abreviações e siglas num mesmo trecho — prefira escrever por extenso
+- Não use jargões de mercado de apostas sem explicar o que significam
+- Revise a gramática: evite frases incompletas, parênteses sem fechamento, vírgulas excessivas e truncamentos abruptos
+- Texto deve ser compreensível por alguém que entende de futebol mas não de estatística avançada
+
+RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
+
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"(mesma estrutura)"},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"lacunas":[]}`;}
 
 // ─── Main analysis ────────────────────────────────────────────────────────
 // Alterna entre iniciar e interromper a análise
@@ -1285,24 +1412,38 @@ async function runAnalysis(){
   const effort=EFFORT_LEVELS[currentEffort];
   const reqHeaders={'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
   reqHeaders['anthropic-beta']=effort.budget>0?'interleaved-thinking-2025-05-14,prompt-caching-2024-07-31':'prompt-caching-2024-07-31';
-  const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+8000:8000,system:[{type:'text',text:getSystemPrompt(),cache_control:{type:'ephemeral'}}],tools:[{type:'web_search_20250305',name:'web_search'}]};
-  if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
 
-  const messages=[{role:'user',content:`Analise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${query}`}];
-  let finalText='',lastIn=0,lastOut=0,searchCount=0,lastCacheCreated=0,lastCacheRead=0;
+  let finalText='',lastIn=0,lastOut=0,lastCacheCreated=0,lastCacheRead=0;
 
   try{
+    // ── Fase 1: Haiku coleta fatos via web_search ─────────────────────────
+    updateThinkingToks({status:'Pesquisando dados…',phase:1});
+    const{rawFacts,inTokens:p1in,outTokens:p1out}=await gatherFacts(query,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
+    tokenState.sessionIn+=p1in;tokenState.sessionOut+=p1out;
+
+    // ── Fase 2: modelo escolhido analisa (sem ferramentas se fatos OK) ────
+    updateThinkingToks({status:'Raciocinando…',phase:2});
+    const useEnriched=!!rawFacts;
+    const ctx=useEnriched?getTournamentCtxString():'';
+    const finalQuery=useEnriched?buildEnrichedQuery(query,rawFacts,ctx):query;
+    const sysText=useEnriched?getSystemPromptPhase2():getSystemPrompt();
+    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+8000:8000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
+    if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search'}];
+    if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
+    const messages=[{role:'user',content:`Analise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
+
     for(let iter=0;iter<10;iter++){
       const{text,stopReason,allContent,toolUses,inTokens,outTokens,thinkingTokens,cacheCreated,cacheRead}=
-        await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks(upd);},_abort.signal);
+        await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks({...upd,phase:2});},_abort.signal);
       lastIn=inTokens;lastOut=outTokens;lastCacheCreated+=cacheCreated;lastCacheRead+=cacheRead;
       if(stopReason==='end_turn'){finalText=text;break;}
-      if(stopReason==='tool_use'){
+      if(stopReason==='tool_use'&&!useEnriched){
         messages.push({role:'assistant',content:allContent});
         messages.push({role:'user',content:toolUses.map(t=>({type:'tool_result',tool_use_id:t.id,content:''}))});
-        searchCount++;updateThinkingToks({inTokens:lastIn,outTokens:lastOut,thinkingTokens,status:'Pesquisando dados…'});
+        updateThinkingToks({inTokens:lastIn,outTokens:lastOut,thinkingTokens,status:'Pesquisando dados…',phase:2});
       }else{finalText=text;break;}
     }
+
     tokenState.lastIn=lastIn;tokenState.lastOut=lastOut;tokenState.sessionIn+=lastIn;tokenState.sessionOut+=lastOut;tokenState.runs++;
     tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
     stopThinking(true);

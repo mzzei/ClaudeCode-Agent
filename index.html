@@ -275,7 +275,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .ds-status{font-size:10px;color:var(--muted);margin-left:auto}
 .ds-status.ok{color:#2a8a56}
 .ds-status.err{color:var(--terra)}
-.sf input[type=password]{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--deep);font-family:var(--mono);margin-top:2px;margin-bottom:.6rem}
+.sf input[type=password]{width:100%;box-sizing:border-box;background:var(--cream-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--deep);font-family:var(--sans);margin-top:2px;margin-bottom:.6rem}
 .sf input[type=password]:focus{outline:none;border-color:rgba(200,86,60,.4)}
 #api-key-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.68rem .9rem;font-family:var(--sans);font-size:14px;color:var(--deep);outline:none;transition:border-color .2s}
 #api-key-input:focus{border-color:rgba(130,70,55,.38)}
@@ -397,7 +397,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <div class="ex-wrap">
           <div class="ex-hdr">
             <span class="ex-lbl" id="sched-lbl">jogos de hoje e próximos dias</span>
-            <button class="ex-reload" id="reload-btn" onclick="fetchScheduleFromApi(false)" style="display:none">↻ atualizar</button>
+            <button class="ex-reload" id="reload-btn" onclick="loadSchedule(true)" style="display:none">↻ atualizar</button>
           </div>
           <div class="ex-chips" id="ex-chips">
             <span class="ex-auto-hint" id="ex-auto-hint">Configure a API Key em Configurações para carregar automaticamente</span>
@@ -1137,8 +1137,11 @@ function _saveSchedCache(jogos){
   try{localStorage.setItem(SCHED_STORE,JSON.stringify({fetched_at:Date.now(),jogos}));}catch(e){}
 }
 function loadSchedule(force){
-  // If FD key is configured, defer to loadFdData (which also updates schedule)
-  if(getFdKey()){loadFdData();return;}
+  if(getFdKey()){
+    // FD key configurada: usa API determinística (respeita force via bust de cache)
+    if(force){try{localStorage.removeItem('copa2026_fd_matches_v1');}catch{}}
+    loadFdData();return;
+  }
   const cache=_loadSchedCache();
   if(cache&&!force){
     _schedule=cache.jogos;
@@ -1218,6 +1221,7 @@ function getTournamentCtxString(){
   }catch{return'';}
 }
 function loadTournamentCtx(force){
+  if(getFdKey())return; // loadFdData() já atualiza CTX_STORE — evita race condition
   const cache=_loadCtxCache();
   if(cache&&!force){const age=Date.now()-(cache.fetched_at||0);if(age<CTX_TTL)return;}
   fetchTournamentCtxFromApi();
@@ -1327,7 +1331,9 @@ async function loadFdData(){
         const d=new Date(m.utcDate);const s=m.score?.fullTime;
         return{data:`${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`,mandante:m.homeTeam.name,placar:s!=null?`${s.home}-${s.away}`:'?-?',visitante:m.awayTeam.name};
       });
-      const active=matches.matches.find(m=>m.status!=='FINISHED');
+      const live=matches.matches.find(m=>['IN_PLAY','PAUSED','HALFTIME'].includes(m.status));
+      const nextSched=matches.matches.find(m=>m.status==='SCHEDULED');
+      const active=live||nextSched;
       if(active)ctx.fase_atual=active.stage;
     }
     _saveCtxCache(ctx);
@@ -1383,8 +1389,8 @@ function renderLibrary(){
   const libMatches=document.getElementById('lib-matches');
   if(!jogos.length){
     const apiKey=document.getElementById('api-key-input').value.trim();
-    libMatches.innerHTML=apiKey.startsWith('sk-')
-      ?'<div class="lib-empty">Carregando agenda…<br><button class="chip chip-cta" style="margin-top:10px" onclick="fetchScheduleFromApi(false)">↻ Buscar agora</button></div>'
+    libMatches.innerHTML=(apiKey.startsWith('sk-')||getFdKey())
+      ?`<div class="lib-empty">Carregando agenda…<br><button class="chip chip-cta" style="margin-top:10px" onclick="loadSchedule(true)">↻ Buscar agora</button></div>`
       :'<div class="lib-empty">Configure a API Key em Configurações<br>para carregar o calendário completo.</div>';
     return;
   }

@@ -1042,8 +1042,31 @@ CONSCIÊNCIA TEMPORAL:
 3. Pondere o impacto da fase: grupos (poupar titulares, diferença de gols), mata-mata (prorrogação real, média de gols menor), Quartas/Semi/Final (cartões acumulados, pressão máxima)
 4. Sede: EUA, México (altitude), Canadá — impacto sobre os times
 
+SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
+
+① "[Mandante] Copa do Mundo 2026 resultados"
+   → jogos disputados, gols marcados/sofridos, xG se disponível
+
+② "[Visitante] Copa do Mundo 2026 resultados"
+   → idem para o visitante
+
+③ "[Mandante] [Visitante] lesões suspensões escalação Copa 2026"
+   → desfalques confirmados e prováveis titulares de ambos
+
+④ [SE fase de grupos]  "Grupo [letra] Copa 2026 classificação tabela"
+   [SE mata-mata]      "[Mandante] [Visitante] Copa do Mundo confrontos"
+
+⑤ [APENAS SE ①② não retornaram xG] "[Mandante] [Visitante] xG estatísticas Copa 2026"
+
+REGRAS DE PESQUISA:
+• Após ①②③ + ④, avalie se os dados são suficientes. Se sim, PARE e calcule.
+• Máximo 5 buscas por análise.
+• NÃO pesquise: data, hora, sede, fase — já constam na mensagem.
+• NÃO pesquise ranking FIFA geral — use apenas se aparecer como dado colateral.
+• Dados não encontrados → declare em "lacunas". Nunca invente valores.
+
 METODOLOGIA:
-1. Pesquise fatos reais: lesões, suspensões, escalações, forma recente, confrontos diretos
+1. Use os dados coletados na sequência acima para montar o perfil de cada time
 2. Calcule lambdas: xG ofensivo/defensivo, desfalques, sede, fase
 3. Aplique Poisson: resultado, gols, placares exatos
 4. Identifique EVENTOS PROVÁVEIS com fundamento factual

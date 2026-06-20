@@ -1249,6 +1249,7 @@ async function fetchTournamentCtxFromApi(){
 
 // ─── football-data.org integration ───────────────────────────────────────
 let _fdRateLeft=Infinity,_fdRateReset=0; // throttle state (X-RequestsAvailable / X-RequestCounter-Reset)
+let _fdLastError='';
 function getFdKey(){try{return localStorage.getItem(FD_KEY_STORE)||'';}catch{return'';}}
 function _parseFdHeaders(res){
   const left=parseInt(res.headers.get('X-RequestsAvailable')||'',10);
@@ -1269,22 +1270,21 @@ async function fetchFd(path,cacheKey,ttl=FD_TTL){
     const res=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
     _parseFdHeaders(res);
     if(res.status===429){
-      // Rate limited — wait for reset then retry once
       const wait=(_fdRateReset>Date.now()?_fdRateReset-Date.now():60000)+300;
       updateFdStatus('err',`rate limit · retry em ${Math.ceil(wait/1000)}s`);
       await new Promise(r=>setTimeout(r,wait));
       const r2=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
       _parseFdHeaders(r2);
-      if(!r2.ok){updateFdStatus('err',`Erro ${r2.status}`);return null;}
+      if(!r2.ok){_fdLastError=`Erro ${r2.status}`;return null;}
       const d2=await r2.json();
       try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data:d2}));}catch{}
       return d2;
     }
-    if(!res.ok){updateFdStatus('err',`Erro ${res.status}`);return null;}
+    if(!res.ok){_fdLastError=`Erro ${res.status}`;return null;}
     const data=await res.json();
     try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}
     return data;
-  }catch{return null;}
+  }catch(e){_fdLastError=`rede: ${e?.message||'timeout'}`;return null;}
 }
 async function getFdStandings(){return fetchFd('/competitions/WC/standings?season=2026','copa2026_fd_standings_v1');}
 async function getFdMatches(){
@@ -1342,7 +1342,7 @@ async function loadFdData(){
   const key=getFdKey();if(!key){updateFdStatus('','não configurado');return;}
   updateFdStatus('','verificando…');
   const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
-  if(!standings&&!matches){updateFdStatus('err','sem resposta');return;}
+  if(!standings&&!matches){updateFdStatus('err',_fdLastError||'sem resposta');return;}
   // Update tournament context from FD (authoritative source)
   if(standings||matches){
     const ctx={fase_atual:'',standings:{},results:[]};

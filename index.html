@@ -661,6 +661,7 @@ function exportCards(cardEls,opts){
 ${css}
 /* ── Overrides do relatório exportado ── */
 html,body{height:auto;overflow:auto;background:var(--cream)}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
 .rep-wrap{max-width:880px;margin:0 auto;padding:2rem 1.25rem 4rem}
 .rep-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.75rem;flex-wrap:wrap}
 .rep-brand{display:flex;gap:11px;align-items:center}
@@ -671,7 +672,13 @@ html,body{height:auto;overflow:auto;background:var(--cream)}
 .rep-print:hover{background:var(--terra-dark)}
 .rep-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:2.5rem;line-height:1.6}
 .rep-wrap .a-card{margin-bottom:1.75rem}
-.print-tabname{display:none}
+.print-tabname{display:none;font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--terra-dark);padding:.9rem 0 .25rem;border-top:2px solid var(--terra-pale);margin:.6rem 0 .3rem}
+/* Estado "imprimindo": expande todas as seções e oculta as abas, mesmo se o navegador ignorar @media print */
+body.printing .a-tabs{display:none !important}
+body.printing .a-tc{display:block !important}
+body.printing .print-tabname{display:block}
+body.printing .no-print{display:none !important}
+body.printing .a-card{break-inside:avoid;page-break-inside:avoid}
 @media print{
   @page{margin:14mm}
   .no-print{display:none !important}
@@ -680,7 +687,7 @@ html,body{height:auto;overflow:auto;background:var(--cream)}
   .a-card{border-color:#ccc;break-inside:avoid;page-break-inside:avoid;margin-bottom:1.25rem}
   .a-tabs{display:none !important}
   .a-tc{display:block !important}
-  .print-tabname{display:block;font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--terra-dark);padding:.9rem 0 .25rem;border-top:2px solid var(--terra-pale);margin:.6rem 0 .3rem}
+  .print-tabname{display:block}
   .tab-s{break-inside:avoid;page-break-inside:avoid}
 }
 </style>
@@ -695,7 +702,7 @@ html,body{height:auto;overflow:auto;background:var(--cream)}
         <div class="rep-meta">Agente Futebolístico IA · Copa 2026 · ${dateStr} · ${count} análise${count!==1?'s':''}</div>
       </div>
     </div>
-    <button class="rep-print no-print" onclick="window.print()">↓ Salvar como PDF</button>
+    <button class="rep-print no-print" onclick="doPrint()">↓ Salvar como PDF</button>
   </div>
   ${clone.innerHTML}
   <div class="rep-hint no-print">Use as abas para navegar entre as seções · clique em "Salvar como PDF" para gerar um documento com todas as seções expandidas.<br>Análise estatística baseada em modelo de Poisson · não é recomendação financeira.</div>
@@ -709,6 +716,8 @@ function showTab(cardId,tab){
   const tabs=['resumo','tatica','individual','avancado'];
   const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];if(btn)btn.classList.add('active');
 }
+function doPrint(){document.body.classList.add('printing');setTimeout(function(){window.print();},40);}
+window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
 <\/script>
 </body>
 </html>`;

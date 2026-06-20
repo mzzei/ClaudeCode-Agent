@@ -290,6 +290,26 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .estep.done{border-color:var(--terra);background:var(--terra)}
 .estep.cur{border-color:var(--terra);background:var(--cream);box-shadow:0 0 0 3px var(--terra-pale)}
 .effort-range-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+
+/* ── Biblioteca de Jogos ── */
+.lib-panel{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.lib-filter-bar{padding:.6rem 1.35rem;border-bottom:1px solid var(--border);display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex-shrink:0;background:var(--white)}
+.lib-filter-lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:2px;flex-shrink:0}
+.lib-filter-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--mid);cursor:pointer;font-family:var(--sans);transition:all .15s;flex-shrink:0}
+.lib-filter-btn:hover{background:var(--terra-pale);border-color:rgba(200,86,60,.3);color:var(--terra-dark)}
+.lib-filter-btn.active{background:var(--terra);border-color:var(--terra);color:#fff}
+.lib-matches{flex:1;overflow-y:auto;padding:1rem 1.35rem}
+.lib-day-hdr{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:8px 0 4px;margin-top:8px}
+.lib-day-hdr:first-child{margin-top:0}
+.lib-match{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--white);margin-bottom:5px;cursor:pointer;transition:border-color .15s,background .15s}
+.lib-match:hover{border-color:rgba(200,86,60,.25);background:var(--cream)}
+.lib-match-teams{font-size:13px;font-weight:500;color:var(--deep)}
+.lib-match-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.lib-match-time{font-size:12px;font-weight:600;color:var(--terra);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lib-match-btn{flex-shrink:0;background:var(--terra);color:#fff;border:none;border-radius:7px;padding:5px 11px;font-size:11px;font-family:var(--sans);cursor:pointer;font-weight:500;transition:background .15s;white-space:nowrap}
+.lib-match-btn:hover{background:var(--terra-dark)}
+.lib-empty{font-size:13px;color:var(--muted);padding:2rem;text-align:center;line-height:1.8}
+.lib-cache-note{font-size:10px;color:var(--muted);padding:.5rem 1.35rem;border-top:1px solid var(--border);text-align:center;flex-shrink:0;background:var(--white)}
 </style>
 </head>
 <body>
@@ -316,10 +336,9 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Análises Recentes
       </button>
-      <button class="ls-link soon" disabled title="Em breve">
+      <button class="ls-link" id="nav-library" onclick="showView('library')">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         Biblioteca de Jogos
-        <span class="ls-soon-tag">em breve</span>
       </button>
       <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -368,7 +387,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <div class="ex-wrap">
           <div class="ex-hdr">
             <span class="ex-lbl" id="sched-lbl">jogos de hoje e próximos dias</span>
-            <button class="ex-reload" id="reload-btn" onclick="loadSchedule()" style="display:none">↻ atualizar</button>
+            <button class="ex-reload" id="reload-btn" onclick="fetchScheduleFromApi(false)" style="display:none">↻ atualizar</button>
           </div>
           <div class="ex-chips" id="ex-chips">
             <span class="ex-auto-hint" id="ex-auto-hint">Configure a API Key em Configurações para carregar automaticamente</span>
@@ -378,6 +397,21 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 
       <!-- Conversation -->
       <div id="conversation"></div>
+    </div>
+
+    <!-- Biblioteca de Jogos panel -->
+    <div class="lib-panel" id="lib-panel" style="display:none">
+      <div class="lib-filter-bar">
+        <span class="lib-filter-lbl">Filtrar:</span>
+        <button class="lib-filter-btn active" data-f="todos" onclick="setLibFilter('todos')">Todos</button>
+        <button class="lib-filter-btn" data-f="hoje" onclick="setLibFilter('hoje')">Hoje</button>
+        <button class="lib-filter-btn" data-f="amanha" onclick="setLibFilter('amanha')">Amanhã</button>
+        <button class="lib-filter-btn" data-f="semana" onclick="setLibFilter('semana')">7 dias</button>
+        <button class="lib-filter-btn" data-f="grupos" onclick="setLibFilter('grupos')">Fase de Grupos</button>
+        <button class="lib-filter-btn" data-f="mata" onclick="setLibFilter('mata')">Mata-mata</button>
+      </div>
+      <div class="lib-matches" id="lib-matches"></div>
+      <div class="lib-cache-note" id="lib-cache-note"></div>
     </div>
 
     <!-- Input dock -->
@@ -511,9 +545,13 @@ let _schedule     = [];
 let _cardCount    = 0;
 let _history      = [];
 const HIST_KEY    = 'copa2026_history';
+const SCHED_STORE = 'copa2026_sched_v2';
+const SCHED_TTL   = 6 * 60 * 60 * 1000;
 const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
 let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
 let _running      = false, _abort = null, _pendingQuery = '';
+let _currentView  = 'chat';
+let _libFilter    = 'todos';
 
 // ─── Settings ────────────────────────────────────────────────────────────
 function openSettings(){document.getElementById('sov').style.display='flex';}
@@ -607,10 +645,11 @@ function updateTokenBar(){
 // ─── Clear ───────────────────────────────────────────────────────────────
 function clearAll(){
   _pendingQuery='';
+  if(_currentView!=='chat')showView('chat');
   if(_running&&_abort){try{_abort.abort();}catch(e){}}
   document.getElementById('conversation').innerHTML='';
   document.getElementById('empty-state').style.display='block';
-  document.getElementById('match-input').value='';
+  const ta=document.getElementById('match-input');ta.value='';ta.rows=2;
   document.getElementById('error-box').style.display='none';
   if(_thkEl){_thkEl.remove();_thkEl=null;}
   if(_thkInterval){clearInterval(_thkInterval);_thkInterval=null;}
@@ -980,11 +1019,22 @@ function renderResults(d,opts){
 // ─── Temporal helpers ────────────────────────────────────────────────────
 function offsetDate(n){const d=new Date();d.setDate(d.getDate()+n);return d.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});}
 function currentDateFull(){return new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+function dateLabelFromISO(iso){
+  if(!iso)return'outros';
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=new Date(iso+'T12:00:00');d.setHours(0,0,0,0);
+  const diff=Math.round((d-today)/864e5);
+  if(diff===0)return'hoje';if(diff===1)return'amanhã';if(diff===-1)return'ontem';
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}
+function formatDateBR(iso){if(!iso)return'';const[y,m,dd]=iso.split('-');return`${dd}/${m}/${y}`;}
 
 // ─── System prompt ────────────────────────────────────────────────────────
 function getSystemPrompt(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
 
 DATA ATUAL: ${currentDateFull()}
+
+PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados e verificados — NÃO pesquise para confirmar times, data, fase ou sede. Pesquise APENAS: desempenho das seleções nos jogos já disputados na Copa 2026, lesões/suspensões confirmadas, escalação provável, xG e métricas de desempenho. Vá direto à análise.
 
 CONSCIÊNCIA TEMPORAL:
 1. Identifique a fase atual da Copa 2026 e pesquise o calendário oficial
@@ -1013,41 +1063,150 @@ RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
 {"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"(mesma estrutura)"},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"lacunas":[]}`;}
 
-// ─── Schedule loader ──────────────────────────────────────────────────────
-async function loadSchedule(){
+// ─── Schedule loader (cache-first) ────────────────────────────────────────
+function _loadSchedCache(){
+  try{const raw=localStorage.getItem(SCHED_STORE);if(!raw)return null;const c=JSON.parse(raw);return(c&&Array.isArray(c.jogos))?c:null;}catch{return null;}
+}
+function _saveSchedCache(jogos){
+  try{localStorage.setItem(SCHED_STORE,JSON.stringify({fetched_at:Date.now(),jogos}));}catch(e){}
+}
+function loadSchedule(force){
+  const cache=_loadSchedCache();
+  if(cache&&!force){
+    _schedule=cache.jogos;
+    renderScheduleChips(_schedule);
+    if(_currentView==='library')renderLibrary();
+    const age=Date.now()-(cache.fetched_at||0);
+    if(age>SCHED_TTL)fetchScheduleFromApi(true);
+  }else{
+    fetchScheduleFromApi(false);
+  }
+}
+async function fetchScheduleFromApi(silent){
   const apiKey=document.getElementById('api-key-input').value.trim();
-  if(!apiKey.startsWith('sk-')){return;}
+  if(!apiKey.startsWith('sk-'))return;
   const chips=document.getElementById('ex-chips');
-  chips.innerHTML='<span class="ex-loading"><span class="ldot"></span> Buscando agenda da Copa 2026…</span>';
-  document.getElementById('reload-btn').style.display='none';
-  const d0=offsetDate(0),d1=offsetDate(1),d2=offsetDate(2);
-  const SP=`Busca agenda Copa 2026. APENAS JSON: {"jogos":[{"mandante":"nome_pt","visitante":"nome_pt","fase":"string","dia":"hoje|amanhã|DD/MM","hora_brt":"HH:MM"}]}. hoje=${d0}, amanhã=${d1}. Apenas partidas confirmadas.`;
-  const msgs=[{role:'user',content:`Partidas Copa 2026 em ${d0}, ${d1} e ${d2}. Fase e horário BRT.`}];
+  if(!silent){chips.innerHTML='<span class="ex-loading"><span class="ldot"></span> Buscando agenda da Copa 2026…</span>';document.getElementById('reload-btn').style.display='none';}
+  const today=new Date().toISOString().slice(0,10);
+  const in14=new Date(Date.now()+14*864e5).toISOString().slice(0,10);
+  const SP=`Copa 2026 schedule. Respond ONLY with valid JSON (no markdown, no extra text): {"jogos":[{"mandante":"nome pt-BR","visitante":"nome pt-BR","fase":"string","grupo":"A-L ou null","data_iso":"YYYY-MM-DD","hora_brt":"HH:MM","sede":"cidade · estádio"}]}. Inclua TODOS os jogos confirmados de ${today} até ${in14}.`;
+  const msgs=[{role:'user',content:`Calendário Copa do Mundo 2026 de ${today} a ${in14}. Todos os jogos com times em português, fase, grupo (se fase de grupos), data em formato YYYY-MM-DD e horário BRT.`}];
   try{
     for(let i=0;i<6;i++){
-      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2500,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
       const data=await res.json();if(!res.ok)throw new Error(data.error?.message);
-      if(data.stop_reason==='end_turn'){const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');const m=txt.match(/\{[\s\S]*\}/);if(m){try{renderScheduleChips(JSON.parse(m[0]).jogos||[]);}catch{renderScheduleChips([]);}return;}break;}
+      if(data.stop_reason==='end_turn'){
+        const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+        const m=txt.match(/\{[\s\S]*\}/);
+        if(m){let jogos;try{jogos=JSON.parse(m[0]).jogos||[];}catch{jogos=[];}
+          jogos=jogos.filter(j=>j.mandante&&j.visitante&&j.data_iso);
+          if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();return;}}
+        break;
+      }
       if(data.stop_reason==='tool_use'){msgs.push({role:'assistant',content:data.content});msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});}else break;
     }
-    renderScheduleChips([]);
-  }catch(e){chips.innerHTML=`<button class="chip chip-cta" onclick="loadSchedule()">↻ tentar novamente</button>`;}
+    if(!silent)renderScheduleChips([]);
+  }catch(e){if(!silent)chips.innerHTML=`<button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">↻ tentar novamente</button>`;}
 }
 function renderScheduleChips(jogos){
   _schedule=jogos;const chips=document.getElementById('ex-chips');
   if(!jogos.length){chips.innerHTML='<span class="ex-loading">Nenhuma partida encontrada</span>';document.getElementById('reload-btn').style.display='inline';return;}
-  const grp={};jogos.forEach((j,i)=>{j._idx=i;const k=j.dia||'outros';if(!grp[k])grp[k]=[];grp[k].push(j);});
+  const today=new Date();today.setHours(0,0,0,0);
+  const limit=new Date(today.getTime()+4*864e5);
+  const upcoming=jogos.filter(j=>{if(!j.data_iso)return true;const d=new Date(j.data_iso+'T12:00:00');return d>=today&&d<limit;});
+  if(!upcoming.length){
+    chips.innerHTML=`<span class="ex-auto-hint">Sem jogos nos próximos dias · <button class="chip chip-cta" onclick="showView('library')">ver calendário →</button></span>`;
+    document.getElementById('sched-lbl').textContent='agenda da copa 2026';
+    document.getElementById('reload-btn').style.display='inline';return;
+  }
+  const grp={};upcoming.forEach(j=>{const k=dateLabelFromISO(j.data_iso);if(!grp[k])grp[k]=[];grp[k].push(j);});
   const order=['hoje','amanhã'];const keys=[...order.filter(k=>grp[k]),...Object.keys(grp).filter(k=>!order.includes(k))];
-  let html='';keys.forEach(day=>{html+=`<span class="ex-day">${esc(day)}</span>`;grp[day].forEach(j=>{const h=j.hora_brt?` · ${esc(j.hora_brt)}`:'';html+=`<button class="chip chip-match" onclick="fillMatch(${j._idx})"><span class="chip-teams">${esc(j.mandante)} x ${esc(j.visitante)}</span><span class="chip-meta">${esc(j.fase||'Copa 2026')}${h}</span></button>`;});});
+  let html='';keys.forEach(day=>{html+=`<span class="ex-day">${esc(day)}</span>`;grp[day].forEach(j=>{const idx=jogos.indexOf(j);const h=j.hora_brt?` · ${esc(j.hora_brt)}`:'';html+=`<button class="chip chip-match" onclick="fillMatch(${idx})"><span class="chip-teams">${esc(j.mandante)} x ${esc(j.visitante)}</span><span class="chip-meta">${esc(j.fase||'Copa 2026')}${h}</span></button>`;});});
+  if(jogos.length>upcoming.length)html+=`<button class="chip chip-cta" onclick="showView('library')" style="margin-top:4px">todos ${jogos.length} jogos →</button>`;
   chips.innerHTML=html;document.getElementById('reload-btn').style.display='inline';
-  document.getElementById('sched-lbl').textContent=`${jogos.length} jogo${jogos.length!==1?'s':''} encontrado${jogos.length!==1?'s':''}`;
+  document.getElementById('sched-lbl').textContent=`${upcoming.length} jogo${upcoming.length!==1?'s':''} próximo${upcoming.length!==1?'s':''}`;
 }
 function fillMatch(i){
   const j=_schedule[i];if(!j)return;
-  const h=j.hora_brt?` às ${j.hora_brt} BRT`:'';
-  document.getElementById('match-input').value=`${j.mandante} x ${j.visitante}, ${j.fase||'Copa 2026'}${h}. Com base em dados reais e considerando o impacto da fase atual do torneio, identifique os eventos mais prováveis e sugira 2-3 tickets com fundamento estatístico.`;
-  document.getElementById('match-input').focus();
+  if(_currentView==='library')showView('chat');
+  const lines=[`PARTIDA: ${j.mandante} x ${j.visitante}`,`FASE: ${j.fase||'Copa do Mundo 2026'}`];
+  if(j.grupo)lines.push(`GRUPO: ${j.grupo}`);
+  const dLabel=j.data_iso?formatDateBR(j.data_iso):'';
+  if(dLabel&&j.hora_brt)lines.push(`DATA/HORA: ${dLabel} às ${j.hora_brt} BRT`);
+  else if(dLabel)lines.push(`DATA: ${dLabel}`);
+  if(j.sede)lines.push(`SEDE: ${j.sede}`);
+  lines.push('','Pesquise forma recente na Copa 2026, lesões/suspensões confirmadas, escalação provável e xG. Sugira 2-3 tickets com fundamento estatístico.');
+  const ta=document.getElementById('match-input');ta.value=lines.join('\n');ta.rows=Math.min(8,lines.length+1);ta.focus();
 }
+// ─── Biblioteca de Jogos ──────────────────────────────────────────────────
+function showView(view){
+  _currentView=view;
+  const chatEl=document.getElementById('chat');
+  const libEl=document.getElementById('lib-panel');
+  const dockEl=document.querySelector('.i-dock');
+  const navChat=document.getElementById('nav-chat');
+  const navLib=document.getElementById('nav-library');
+  const mTitle=document.querySelector('.m-title');
+  const mSub=document.querySelector('.m-sub');
+  if(view==='library'){
+    chatEl.style.display='none';libEl.style.display='flex';dockEl.style.display='none';
+    navChat.classList.remove('active');navLib.classList.add('active');
+    mTitle.textContent='Biblioteca de Jogos';mSub.textContent='Calendário completo da Copa do Mundo 2026';
+    renderLibrary();
+  }else{
+    chatEl.style.display='';libEl.style.display='none';dockEl.style.display='';
+    navLib.classList.remove('active');navChat.classList.add('active');
+    mTitle.textContent='Chat com o Agente';mSub.textContent='Converse com sua IA especialista em futebol.';
+  }
+}
+function setLibFilter(f){
+  _libFilter=f;
+  document.querySelectorAll('.lib-filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.f===f));
+  renderLibrary();
+}
+function renderLibrary(){
+  const jogos=_schedule;
+  const libMatches=document.getElementById('lib-matches');
+  if(!jogos.length){
+    const apiKey=document.getElementById('api-key-input').value.trim();
+    libMatches.innerHTML=apiKey.startsWith('sk-')
+      ?'<div class="lib-empty">Carregando agenda…<br><button class="chip chip-cta" style="margin-top:10px" onclick="fetchScheduleFromApi(false)">↻ Buscar agora</button></div>'
+      :'<div class="lib-empty">Configure a API Key em Configurações<br>para carregar o calendário completo.</div>';
+    return;
+  }
+  const today=new Date();today.setHours(0,0,0,0);
+  let filtered=jogos;
+  if(_libFilter==='hoje')filtered=jogos.filter(j=>dateLabelFromISO(j.data_iso)==='hoje');
+  else if(_libFilter==='amanha')filtered=jogos.filter(j=>dateLabelFromISO(j.data_iso)==='amanhã');
+  else if(_libFilter==='semana'){const lim=new Date(today.getTime()+7*864e5);filtered=jogos.filter(j=>{if(!j.data_iso)return false;const d=new Date(j.data_iso+'T12:00:00');return d>=today&&d<lim;});}
+  else if(_libFilter==='grupos')filtered=jogos.filter(j=>(j.fase||'').toLowerCase().includes('grupo'));
+  else if(_libFilter==='mata')filtered=jogos.filter(j=>!(j.fase||'').toLowerCase().includes('grupo'));
+  if(!filtered.length){libMatches.innerHTML='<div class="lib-empty">Nenhuma partida neste filtro.</div>';return;}
+  const grp={};filtered.forEach(j=>{const k=j.data_iso||'outros';if(!grp[k])grp[k]=[];grp[k].push(j);});
+  let html='';Object.keys(grp).sort().forEach(dateKey=>{
+    const lbl=dateLabelFromISO(dateKey);
+    const full=dateKey!=='outros'?new Date(dateKey+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}):'';
+    const hdr=lbl==='hoje'?`Hoje · ${full}`:lbl==='amanhã'?`Amanhã · ${full}`:full||dateKey;
+    html+=`<div class="lib-day-hdr">${esc(hdr)}</div>`;
+    grp[dateKey].forEach(j=>{
+      const idx=jogos.indexOf(j);
+      html+=`<div class="lib-match" onclick="fillMatch(${idx})">
+        <div style="flex:1;min-width:0">
+          <div class="lib-match-teams">${esc(j.mandante)} <span style="color:var(--muted);font-weight:400">×</span> ${esc(j.visitante)}</div>
+          <div class="lib-match-meta">${esc(j.fase||'Copa 2026')}${j.sede?` · ${esc(j.sede)}`:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-right:8px">
+          <div class="lib-match-time">${esc(j.hora_brt||'–:––')} BRT</div>
+        </div>
+        <button class="lib-match-btn" onclick="event.stopPropagation();fillMatch(${idx})">Analisar</button>
+      </div>`;
+    });
+  });
+  libMatches.innerHTML=html;
+  const note=document.getElementById('lib-cache-note');
+  if(note){try{const c=JSON.parse(localStorage.getItem(SCHED_STORE)||'{}');if(c.fetched_at){const age=Math.floor((Date.now()-c.fetched_at)/60000);note.textContent=`Agenda atualizada há ${age<2?'<1':age<60?age:(Math.floor(age/60)+'h')} min · ${jogos.length} jogos no total`;}}catch{}}
+}
+
 const KEY_STORE='copa2026_api_key';
 let _keyDebounce=null;
 document.getElementById('api-key-input').addEventListener('input',function(){

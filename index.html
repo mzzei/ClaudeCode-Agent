@@ -450,6 +450,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
       <label class="sf-lbl" for="api-key-input">API Key Anthropic</label>
       <input id="api-key-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off">
       <div class="sf-hint" id="key-status">Guardada apenas nesta aba · apagada ao fechar</div>
+      <div class="sf-hint" style="color:var(--terra);margin-top:.3rem">⚠ Não compartilhe este arquivo publicamente — a chave ficaria exposta.</div>
     </div>
     <div class="sf">
       <label class="sf-lbl">Modelo</label>
@@ -548,7 +549,7 @@ function showUserBubble(text){
   const ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const el=document.createElement('div');
   el.className='msg-user';
-  el.innerHTML=`<div class="user-bubble">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div><div class="user-meta"><button class="ua-btn" onclick="copyUserMsg()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>copiar</button><span class="ua-ts">${ts} ✓</span></div>`;
+  el.innerHTML=`<div class="user-bubble">${esc(text)}</div><div class="user-meta"><button class="ua-btn" onclick="copyUserMsg()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>copiar</button><span class="ua-ts">${ts} ✓</span></div>`;
   document.getElementById('conversation').appendChild(el);
   scrollChat();
 }
@@ -673,24 +674,35 @@ html,body{height:auto;overflow:auto;background:var(--cream)}
 .rep-print{background:var(--terra);color:#fff;border:none;border-radius:10px;padding:.6rem 1.1rem;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:background .18s}
 .rep-print:hover{background:var(--terra-dark)}
 .rep-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:2.5rem;line-height:1.6}
-.rep-wrap .a-card{margin-bottom:1.75rem}
+.rep-wrap .a-card{margin-bottom:1.75rem;overflow:visible}
 .print-tabname{display:none;font-family:var(--serif);font-style:italic;font-size:1.15rem;color:var(--terra-dark);padding:.9rem 0 .25rem;border-top:2px solid var(--terra-pale);margin:.6rem 0 .3rem}
 /* Estado "imprimindo": expande todas as seções e oculta as abas, mesmo se o navegador ignorar @media print */
 body.printing .a-tabs{display:none !important}
 body.printing .a-tc{display:block !important}
 body.printing .print-tabname{display:block}
 body.printing .no-print{display:none !important}
-body.printing .a-card{break-inside:avoid;page-break-inside:avoid}
+body.printing .a-card{overflow:visible}
+body.printing .tab-h{break-after:avoid;page-break-after:avoid}
+body.printing .a-title{break-after:avoid;page-break-after:avoid}
+body.printing .tab-s{break-inside:avoid;page-break-inside:avoid}
+body.printing .ticket{break-inside:avoid;page-break-inside:avoid}
+body.printing .tcard{break-inside:avoid;page-break-inside:avoid}
+body.printing .stile{break-inside:avoid;page-break-inside:avoid}
 @media print{
   @page{margin:14mm}
   .no-print{display:none !important}
   html,body{background:#fff}
   .rep-wrap{max-width:none;padding:0}
-  .a-card{border-color:#ccc;break-inside:avoid;page-break-inside:avoid;margin-bottom:1.25rem}
+  .a-card{border-color:#ccc;overflow:visible;margin-bottom:1.25rem}
   .a-tabs{display:none !important}
   .a-tc{display:block !important}
   .print-tabname{display:block}
   .tab-s{break-inside:avoid;page-break-inside:avoid}
+  .ticket{break-inside:avoid;page-break-inside:avoid}
+  .tcard{break-inside:avoid;page-break-inside:avoid}
+  .stile{break-inside:avoid;page-break-inside:avoid}
+  .tab-h{break-after:avoid;page-break-after:avoid}
+  .a-title{break-after:avoid;page-break-after:avoid}
 }
 </style>
 </head>
@@ -1015,7 +1027,7 @@ async function loadSchedule(){
     for(let i=0;i<6;i++){
       const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
       const data=await res.json();if(!res.ok)throw new Error(data.error?.message);
-      if(data.stop_reason==='end_turn'){const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');const m=txt.match(/\{[\s\S]*\}/);if(m){renderScheduleChips(JSON.parse(m[0]).jogos||[]);return;}break;}
+      if(data.stop_reason==='end_turn'){const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');const m=txt.match(/\{[\s\S]*\}/);if(m){try{renderScheduleChips(JSON.parse(m[0]).jogos||[]);}catch{renderScheduleChips([]);}return;}break;}
       if(data.stop_reason==='tool_use'){msgs.push({role:'assistant',content:data.content});msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});}else break;
     }
     renderScheduleChips([]);
@@ -1114,8 +1126,9 @@ async function runAnalysis(){
     stopThinking(true);
     setTimeout(()=>{updateTokenBar();},1300);
     const m=finalText.match(/\{[\s\S]*\}/);
-    if(!m)throw new Error('Formato de resposta inesperado. Tente novamente.');
-    renderResults(JSON.parse(m[0]));
+    if(!m)throw new Error('Resposta fora do formato esperado. Reformule a pergunta e tente novamente.');
+    let parsed;try{parsed=JSON.parse(m[0]);}catch{throw new Error('JSON inválido na resposta do modelo. Tente novamente.');}
+    renderResults(parsed);
     ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }catch(e){
     stopThinking(false);

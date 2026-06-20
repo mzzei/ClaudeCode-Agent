@@ -644,7 +644,9 @@ function exportCards(cardEls,opts){
       tc.insertBefore(h,tc.firstChild);
     });
   });
-  const css=document.querySelector('style')?document.querySelector('style').textContent:'';
+  // Concatena TODOS os blocos <style> (robusto contra <style> injetado por extensões do navegador,
+  // que faziam querySelector('style') devolver um CSS vazio e o relatório sair sem estilo)
+  const css=[...document.querySelectorAll('style')].map(s=>s.textContent).filter(Boolean).join('\n\n');
   const now=new Date();
   const dateStr=now.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
   const count=clone.querySelectorAll('.a-card').length;

@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente · Copa 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,500;1,600&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --cream:#faeee9;--cream-card:#f3e3da;--cream-mid:#e8cfc4;
+  --terra:#c8563c;--terra-pale:#f2d4ca;--terra-dark:#a0422c;
+  --deep:#2d1f18;--mid:#7a5449;--muted:#a88078;
+  --border:rgba(120,65,50,.13);--white:#fff;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-font-smoothing:antialiased}
+
+/* ── App shell ── */
+.app{display:grid;grid-template-columns:220px 1fr 280px;height:100vh;overflow:hidden}
+
+/* ── Left sidebar ── */
+.l-sb{background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.ls-brand{display:flex;gap:10px;align-items:flex-start;padding:1.25rem 1.1rem .9rem}
+.ls-ball{width:36px;height:36px;background:var(--terra-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ls-name{font-family:var(--serif);font-size:.95rem;line-height:1.2;font-weight:500;font-style:italic;color:var(--deep)}
+.ls-tag{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.4}
+.ls-new{margin:.1rem .85rem .65rem;background:var(--terra);color:#fff;border:none;border-radius:10px;padding:.62rem 1rem;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;text-align:left;width:calc(100% - 1.7rem);transition:background .18s}
+.ls-new:hover{background:var(--terra-dark)}
+.ls-nav{padding:0 .5rem;flex:1}
+.ls-link{display:flex;align-items:center;gap:9px;padding:.6rem .75rem;border-radius:9px;font-size:13px;color:var(--mid);cursor:pointer;margin-bottom:1px;transition:background .15s,color .15s;border:none;background:none;width:100%;font-family:var(--sans);text-align:left}
+.ls-link:hover{background:var(--cream);color:var(--deep)}
+.ls-link.active{background:var(--terra);color:#fff}
+.ls-link.active svg{stroke:#fff}
+.ls-link svg{width:14px;height:14px;stroke:var(--mid);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:stroke .15s}
+.ls-foot{padding:.85rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.ls-avatar{width:30px;height:30px;border-radius:50%;background:var(--terra-pale);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--terra-dark);flex-shrink:0}
+.ls-uname{font-size:12px;font-weight:500;color:var(--deep)}
+.ls-uplan{font-size:10px;color:var(--muted);margin-top:1px}
+
+/* ── Main panel ── */
+.main{display:flex;flex-direction:column;overflow:hidden}
+.m-hdr{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.35rem;border-bottom:1px solid var(--border);background:var(--white);flex-shrink:0}
+.m-title{font-size:1rem;font-weight:500;color:var(--deep)}
+.m-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.m-hdr-acts{display:flex;align-items:center;gap:7px}
+.hdr-ic{width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--mid);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;font-family:var(--sans)}
+.hdr-ic:hover{background:var(--cream)}
+.hdr-primary{display:flex;align-items:center;gap:5px;background:var(--cream-card);border:1px solid var(--border);border-radius:9px;padding:.45rem .85rem;font-family:var(--sans);font-size:12px;color:var(--mid);cursor:pointer;transition:background .15s;font-weight:500}
+.hdr-primary:hover{background:var(--cream-mid)}
+
+/* Chat scrollable */
+.chat{flex:1;overflow-y:auto;padding:1.35rem;scroll-behavior:smooth}
+
+/* Empty state */
+.empty-greet{margin-bottom:1.5rem}
+.empty-greet h2{font-family:var(--serif);font-size:1.35rem;font-style:italic;font-weight:500;margin-bottom:.35rem}
+.empty-greet p{font-size:13px;color:var(--mid)}
+
+/* Schedule chips */
+.ex-wrap{margin-bottom:1.1rem}
+.ex-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.ex-lbl{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.ex-reload{font-size:11px;color:var(--mid);background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:6px;transition:color .15s}
+.ex-reload:hover{color:var(--terra)}
+.ex-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:28px;align-items:flex-start}
+.chip{font-size:12px;color:var(--mid);background:transparent;border:1px solid var(--border);border-radius:999px;padding:5px 13px;cursor:pointer;font-family:var(--sans);transition:background .15s,border-color .15s,color .15s;text-align:left}
+.chip:hover{background:var(--terra-pale);border-color:rgba(200,86,60,.3);color:var(--terra-dark)}
+.chip-match{display:flex;flex-direction:column;padding:6px 14px;border-radius:12px;line-height:1}
+.chip-teams{font-size:13px;font-weight:500;color:var(--deep)}
+.chip-meta{font-size:10px;color:var(--muted);margin-top:3px}
+.chip-cta{background:var(--terra-pale);border-color:rgba(200,86,60,.28);color:var(--terra-dark);font-weight:500}
+.chip-cta:hover{background:var(--terra);color:#fff;border-color:var(--terra)}
+.ex-loading{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);padding:5px 2px}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--terra);flex-shrink:0;animation:breathe 1.3s ease-in-out infinite}
+.ex-day{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 0 2px;width:100%;flex-basis:100%;margin-top:4px}
+.ex-day:first-child{margin-top:0}
+.ex-auto-hint{font-size:11px;color:var(--muted);font-style:italic;padding:3px 2px}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.28}}
+
+/* User message bubble */
+.msg-user{margin-bottom:1.1rem;display:flex;flex-direction:column;align-items:flex-end}
+.user-bubble{background:var(--terra-pale);border:1px solid rgba(200,86,60,.2);border-radius:18px 18px 4px 18px;padding:.8rem 1rem;color:var(--deep);font-size:14px;line-height:1.6;word-break:break-word;max-width:88%}
+.user-meta{display:flex;align-items:center;gap:7px;margin-top:.3rem}
+.ua-btn{font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:6px;display:flex;align-items:center;gap:3px;transition:color .15s;font-family:var(--sans)}
+.ua-btn:hover{color:var(--mid)}
+.ua-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ua-ts{font-size:11px;color:var(--muted)}
+
+/* Thinking indicator (created dynamically) */
+.thk-compact{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--mid);background:var(--white);border:1px solid var(--border);border-radius:12px;padding:.6rem 1rem;margin-bottom:1rem;width:fit-content}
+.thk-star{color:var(--terra);animation:thk-rotate 1.5s linear infinite;display:inline-block;font-size:15px;line-height:1}
+@keyframes thk-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.thk-sep{color:var(--muted);margin:0 1px;font-size:12px}
+.thk-elapsed{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+.thk-toks{font-variant-numeric:tabular-nums;font-size:12px}
+.thk-lbl{color:var(--muted);font-style:italic;font-size:12px}
+.thk-pill{font-size:10px;padding:1px 7px;border-radius:999px;background:var(--terra-pale);color:var(--terra-dark);margin-left:2px}
+
+/* ── Analysis card ── */
+.a-card{background:var(--white);border:1px solid var(--border);border-radius:16px;margin-bottom:1.5rem;overflow:hidden}
+.a-hdr{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.1rem .4rem}
+.a-agent{display:flex;align-items:center;gap:8px}
+.a-ball{width:28px;height:28px;background:var(--terra-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.a-name{font-size:12px;font-weight:500;color:var(--deep)}
+.a-pill{font-size:9px;font-weight:700;background:var(--terra);color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;letter-spacing:.05em}
+.a-hdr-r{display:flex;align-items:center;gap:5px}
+.a-ts{font-size:11px;color:var(--muted)}
+.a-ic{background:none;border:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:6px;display:flex;align-items:center;transition:color .15s}
+.a-ic:hover{color:var(--mid)}
+.a-ic svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.a-status{font-size:11px;color:var(--muted);padding:0 1.1rem .5rem;font-style:italic}
+.a-title{font-family:var(--serif);font-size:1.2rem;font-weight:500;font-style:italic;padding:0 1.1rem .8rem;color:var(--deep)}
+
+/* Tabs */
+.a-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 .6rem;overflow-x:auto;scrollbar-width:none}
+.a-tabs::-webkit-scrollbar{display:none}
+.a-tab{flex-shrink:0;background:none;border:none;border-bottom:2px solid transparent;padding:.6rem .55rem;font-family:var(--sans);font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:-1px;transition:color .15s,border-color .15s;font-weight:500}
+.a-tab:hover{color:var(--mid)}
+.a-tab.active{color:var(--terra);border-bottom-color:var(--terra)}
+
+/* Tab content */
+.a-tc{padding:1.1rem}
+.tab-s{margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)}
+.tab-s:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.tab-h{font-family:var(--serif);font-size:1.05rem;font-weight:500;font-style:italic;color:var(--terra);margin-bottom:.9rem;line-height:1.2}
+.tab-body{font-size:13px;color:var(--mid);line-height:1.7;margin-top:.55rem}
+
+/* Reused result component styles */
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:3px 11px;border-radius:999px;margin-bottom:.65rem}
+.b-ok{background:#e2ede4;color:#336244}.b-warn{background:#f4e8d0;color:#7a5a20}
+.prow{margin-bottom:.85rem}.prow:last-of-type{margin-bottom:0}
+.pmeta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+.pname{font-size:14px;font-weight:500}.ppct{font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
+.prange{font-size:11px;color:var(--muted);margin-top:3px}
+.btrack{height:5px;background:var(--cream-mid);border-radius:3px;overflow:hidden;margin-top:4px}
+.bfill{height:100%;border-radius:3px;transition:width .9s cubic-bezier(.22,.61,.36,1)}
+.s3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stile{background:var(--cream-card);border:1px solid var(--border);border-radius:12px;padding:.8rem .6rem;text-align:center}
+.slbl{font-size:11px;color:var(--mid);margin-bottom:4px}.sval{font-size:1.4rem;font-weight:500;font-variant-numeric:tabular-nums}
+.ev-row{padding:8px 0;border-bottom:1px solid var(--border)}.ev-row:last-child{border-bottom:none;padding-bottom:0}
+.ev-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.ev-nome{font-size:13px;font-weight:500}.ev-pct{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--terra)}
+.ev-bar-track{height:3px;background:var(--cream-mid);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.ev-bar-fill{height:100%;border-radius:2px;background:var(--terra);transition:width .9s cubic-bezier(.22,.61,.36,1)}
+.ev-reason{font-size:11px;color:var(--muted);line-height:1.5}
+.ticket{background:var(--cream);border:1px solid rgba(120,65,50,.2);border-radius:13px;padding:.9rem 1rem;margin-bottom:8px}
+.ticket:last-child{margin-bottom:0}
+.ticket-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:5px}
+.ticket-desc{font-family:var(--serif);font-style:italic;font-size:.95rem;font-weight:500;line-height:1.3;flex:1}
+.ticket-prob{font-size:1.4rem;font-weight:500;font-variant-numeric:tabular-nums;color:var(--terra);flex-shrink:0}
+.ticket-reason{font-size:12px;color:var(--mid);line-height:1.55;margin-bottom:7px}
+.ticket-conf{display:inline-block;font-size:10px;font-weight:500;padding:2px 9px;border-radius:999px}
+.conf-alta{background:#e2ede4;color:#336244}.conf-media{background:#f4e8d0;color:#7a5a20}.conf-baixa{background:#f9e0da;color:#a0422c}
+.tend-item{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.55}
+.tend-item:last-child{border-bottom:none}
+.tend-dot{width:5px;height:5px;border-radius:50%;background:var(--terra);flex-shrink:0;margin-top:7px}
+.teams-full{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tcard{background:var(--cream-card);border:1px solid var(--border);border-radius:14px;padding:.9rem}
+.tname{font-family:var(--serif);font-style:italic;font-size:1rem;font-weight:500;color:var(--terra);margin-bottom:.6rem}
+.irow{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;gap:8px}
+.irow:last-of-type{border-bottom:none}
+.ilbl{color:var(--mid);flex-shrink:0}.ival{text-align:right;word-break:break-word}
+.spill{display:inline-block;font-size:10px;font-weight:500;padding:2px 9px;border-radius:999px;margin-top:6px}
+.sp-ok{background:#e2ede4;color:#336244}.sp-warn{background:#f4e8d0;color:#7a5a20}
+.tesc{font-size:11px;color:var(--mid);margin-top:5px;line-height:1.5}
+.tkeys{font-size:11px;color:var(--muted);margin-top:5px}
+.lrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.lrow:last-child{border-bottom:none}
+.llogic{font-size:11px;color:var(--muted);padding:3px 0 7px}.lhint{font-size:11px;color:var(--muted);margin-top:.6rem}
+.sc{display:inline-block;font-size:12px;padding:4px 12px;border-radius:999px;margin:3px;background:var(--cream-mid);color:var(--mid);border:1px solid var(--border);font-variant-numeric:tabular-nums}
+.sc strong{color:var(--deep)}
+.frow{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+.frow:last-child{border-bottom:none}
+.fnum{font-size:10px;font-weight:600;width:19px;height:19px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--terra-pale);color:var(--terra-dark);margin-top:2px}
+.urow{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+.urow:last-child{border-bottom:none}
+.udot{width:5px;height:5px;border-radius:50%;background:var(--terra);flex-shrink:0;margin-top:7px}
+.gitem{font-size:12px;color:var(--mid);padding:3px 0}
+.disc{font-size:11px;color:var(--muted);text-align:center;padding:.85rem 0 .25rem;line-height:1.6}
+
+/* ── Input dock ── */
+.i-dock{border-top:1px solid var(--border);background:var(--white);padding:.85rem 1.35rem .7rem;flex-shrink:0}
+.err-box{font-size:13px;color:var(--terra-dark);background:#f9e8e3;border:1px solid rgba(160,66,44,.18);border-radius:10px;padding:.65rem .9rem;margin-bottom:.7rem}
+.i-lbl{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.38rem}
+#match-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.65rem .9rem;font-family:var(--sans);font-size:14px;color:var(--deep);resize:none;line-height:1.55;outline:none;transition:border-color .2s}
+#match-input:focus{border-color:rgba(130,70,55,.38)}
+#match-input::placeholder{color:var(--muted)}
+.i-foot{display:flex;gap:8px;margin-top:.6rem;align-items:center}
+.i-clear{width:38px;height:38px;border:1px solid var(--border);border-radius:9px;background:none;font-size:16px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0}
+.i-clear:hover{background:var(--cream)}
+.i-analyze{flex:1;background:var(--terra);color:#fff;border:none;border-radius:9px;padding:.65rem 1rem;font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}
+.i-analyze:hover:not(:disabled){background:var(--terra-dark)}
+.i-analyze:disabled{opacity:.5;cursor:not-allowed}
+.i-disc{font-size:10px;color:var(--muted);text-align:center;margin-top:.5rem}
+
+/* ── Right sidebar ── */
+.r-sb{background:var(--cream);border-left:1px solid var(--border);overflow-y:auto;padding:.9rem}
+.rs-block{background:var(--white);border:1px solid var(--border);border-radius:13px;padding:.9rem;margin-bottom:.75rem}
+.rs-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
+
+/* Right: match context */
+.rs-fase{font-size:12px;font-weight:500;color:var(--terra);margin-bottom:.6rem}
+.rs-teams-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:.65rem}
+.rs-team{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;font-size:11px;font-weight:500;color:var(--deep);text-align:center}
+.rs-flag{font-size:22px}
+.rs-vs{font-size:10px;color:var(--muted);flex-shrink:0}
+.rs-det{font-size:11px;color:var(--mid);margin-bottom:3px;display:flex;align-items:center;gap:4px}
+
+/* Right: insights */
+.rs-insight{display:flex;gap:7px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--mid);line-height:1.5}
+.rs-insight:last-child{border-bottom:none;padding-bottom:0}
+.rs-ins-dot{width:6px;height:6px;border-radius:50%;background:var(--terra-pale);border:1.5px solid var(--terra);flex-shrink:0;margin-top:4px}
+
+/* Right: stats */
+.rs-sh{display:flex;justify-content:space-between;font-size:10px;font-weight:600;color:var(--muted);margin-bottom:.5rem;letter-spacing:.03em}
+.rs-srow{display:flex;align-items:center;gap:5px;padding:5px 0;font-size:11px;border-bottom:1px solid var(--border)}
+.rs-srow:last-child{border-bottom:none}
+.rs-sv-l{font-variant-numeric:tabular-nums;font-weight:600;color:var(--terra);min-width:30px;font-size:12px}
+.rs-slbl{flex:1;color:var(--muted);text-align:center;font-size:10px}
+.rs-sv-r{font-variant-numeric:tabular-nums;font-weight:600;color:var(--mid);min-width:30px;text-align:right;font-size:12px}
+.rs-sbar{height:3px;background:var(--cream-mid);border-radius:2px;overflow:hidden;margin:-2px 0 3px;display:flex}
+.rs-bh{height:100%;background:var(--terra)}
+.rs-ba{height:100%;background:var(--mid)}
+
+/* Right: token bar */
+.tok-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.tok-lbl{font-size:10px;color:var(--muted)}
+.tok-val{font-size:11px;color:var(--mid);font-variant-numeric:tabular-nums}
+.tok-track{height:3px;background:var(--cream-mid);border-radius:2px;overflow:hidden;margin-bottom:7px}
+.tok-fill{height:100%;border-radius:2px;background:var(--terra);transition:width .7s cubic-bezier(.22,.61,.36,1)}
+.tok-fill-dim{background:var(--muted)}
+.tok-footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:3px;font-size:10px;color:var(--muted);margin-top:4px}
+
+/* Right: recent */
+.rs-rec{padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .15s}
+.rs-rec:last-child{border-bottom:none;padding-bottom:0}
+.rs-rec:hover{opacity:.7}
+.rs-rec-title{font-size:12px;font-weight:500;color:var(--deep)}
+.rs-rec-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.rs-empty{font-size:12px;color:var(--muted)}
+
+/* ── Settings overlay ── */
+.sov{position:fixed;inset:0;background:rgba(0,0,0,.28);display:flex;align-items:flex-start;justify-content:flex-end;z-index:200;padding:1rem}
+.spanel{background:var(--white);border-radius:16px;width:360px;max-height:calc(100vh - 2rem);overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.14);padding:1.35rem}
+.sp-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1rem}
+.sp-hdr h2{font-size:1rem;font-weight:500}
+.sp-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:4px;line-height:1;border-radius:6px}
+.sp-close:hover{background:var(--cream);color:var(--mid)}
+.sf{margin-bottom:1.1rem}
+.sf-lbl{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin-bottom:.4rem}
+.sf-hint{font-size:11px;color:var(--muted);margin-top:.35rem}
+#api-key-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.68rem .9rem;font-family:var(--sans);font-size:14px;color:var(--deep);outline:none;transition:border-color .2s}
+#api-key-input:focus{border-color:rgba(130,70,55,.38)}
+#api-key-input::placeholder{color:var(--muted)}
+.model-picker{display:flex;gap:6px}
+.mbtn{flex:1;background:var(--cream-card);border:1px solid var(--border);border-radius:11px;padding:8px 7px;cursor:pointer;text-align:center;font-family:var(--sans);transition:background .18s,border-color .18s}
+.mbtn:hover:not(.active){background:var(--cream-mid)}
+.mbtn.active{background:var(--deep);border-color:var(--deep)}
+.mname{display:block;font-size:13px;font-weight:500;color:var(--deep)}
+.mdesc{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.mbtn.active .mname{color:#fff}.mbtn.active .mdesc{color:rgba(255,255,255,.5)}
+.effort-section{padding:.65rem 0 .3rem}
+.effort-section.disabled{opacity:.38;pointer-events:none}
+.effort-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem}
+.effort-lbl{font-size:12px;font-weight:500;color:var(--deep)}
+.effort-cur{font-size:12px;color:var(--terra);font-weight:500}
+.effort-wrap{position:relative;padding:7px 0;margin-bottom:.4rem}
+.effort-bg{position:absolute;top:50%;left:10px;right:10px;height:4px;background:var(--cream-mid);border-radius:2px;transform:translateY(-50%);overflow:hidden}
+.effort-fg{height:100%;background:var(--terra);border-radius:2px;width:0%;transition:width .3s ease}
+.effort-steps{display:flex;justify-content:space-between;position:relative;z-index:1}
+.estep{width:20px;height:20px;border-radius:50%;border:2.5px solid var(--cream-mid);background:var(--cream-card);cursor:pointer;transition:all .18s;padding:0;flex-shrink:0}
+.estep.done{border-color:var(--terra);background:var(--terra)}
+.estep.cur{border-color:var(--terra);background:var(--cream);box-shadow:0 0 0 3px var(--terra-pale)}
+.effort-range-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── LEFT SIDEBAR ── -->
+  <aside class="l-sb">
+    <div class="ls-brand">
+      <div class="ls-ball">⚽</div>
+      <div>
+        <div class="ls-name">Agente<br>Futebolístico IA</div>
+        <div class="ls-tag">análise tática e desempenho</div>
+      </div>
+    </div>
+
+    <button class="ls-new" onclick="clearAll()">+ Nova Análise</button>
+
+    <nav class="ls-nav">
+      <button class="ls-link active" id="nav-chat">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat com o Agente
+      </button>
+      <button class="ls-link" onclick="">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Análises Recentes
+      </button>
+      <button class="ls-link" onclick="">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Biblioteca de Jogos
+      </button>
+      <button class="ls-link" onclick="">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Modelos de Análise
+      </button>
+      <button class="ls-link" onclick="">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Relatórios Salvos
+      </button>
+      <button class="ls-link" onclick="openSettings()">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Configurações
+      </button>
+    </nav>
+
+    <div class="ls-foot">
+      <div class="ls-avatar">U</div>
+      <div>
+        <div class="ls-uname">Usuário</div>
+        <div class="ls-uplan">Plano API · Claude</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN PANEL ── -->
+  <main class="main">
+    <header class="m-hdr">
+      <div>
+        <div class="m-title">Chat com o Agente</div>
+        <div class="m-sub">Converse com sua IA especialista em futebol.</div>
+      </div>
+      <div class="m-hdr-acts">
+        <button class="hdr-primary" onclick="exportReport()">↑ Exportar relatório</button>
+      </div>
+    </header>
+
+    <div class="chat" id="chat">
+      <!-- Empty state -->
+      <div id="empty-state">
+        <div class="empty-greet">
+          <h2>Olá, tudo pronto para analisar.</h2>
+          <p>Selecione uma partida abaixo ou descreva o que quer analisar.</p>
+        </div>
+        <div class="ex-wrap">
+          <div class="ex-hdr">
+            <span class="ex-lbl" id="sched-lbl">jogos de hoje e próximos dias</span>
+            <button class="ex-reload" id="reload-btn" onclick="loadSchedule()" style="display:none">↻ atualizar</button>
+          </div>
+          <div class="ex-chips" id="ex-chips">
+            <span class="ex-auto-hint" id="ex-auto-hint">Configure a API Key em Configurações para carregar automaticamente</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conversation -->
+      <div id="conversation"></div>
+    </div>
+
+    <!-- Input dock -->
+    <div class="i-dock">
+      <div id="error-box" class="err-box" style="display:none"><span id="error-msg"></span></div>
+      <label class="i-lbl" for="match-input">Partida ou conteúdo</label>
+      <textarea id="match-input" rows="2" placeholder="Descreva a partida ou o que quer analisar…"></textarea>
+      <div class="i-foot">
+        <button class="i-clear" onclick="clearAll()" title="Limpar">↺</button>
+        <button class="i-analyze" id="run-btn" onclick="runAnalysis()">Analisar partida</button>
+      </div>
+      <p class="i-disc">O agente pode cometer erros. Sempre valide as informações.</p>
+    </div>
+  </main>
+
+  <!-- ── RIGHT SIDEBAR ── -->
+  <aside class="r-sb">
+    <!-- Match context -->
+    <div class="rs-block" id="rs-match" style="display:none">
+      <div class="rs-lbl">Contexto da Partida</div>
+      <div id="rs-match-card"></div>
+    </div>
+
+    <!-- Key insights -->
+    <div class="rs-block" id="rs-insights" style="display:none">
+      <div class="rs-lbl">Insights Chave</div>
+      <div id="rs-insights-list"></div>
+    </div>
+
+    <!-- Match stats -->
+    <div class="rs-block" id="rs-stats" style="display:none">
+      <div class="rs-lbl">Dados da Partida</div>
+      <div id="rs-stats-list"></div>
+    </div>
+
+    <!-- Token bar -->
+    <div class="rs-block" id="token-bar" style="display:none">
+      <div class="rs-lbl">Uso da API</div>
+      <div class="tok-row"><span class="tok-lbl">Janela de contexto</span><span class="tok-val" id="tok-ctx-val">—</span></div>
+      <div class="tok-track"><div class="tok-fill" id="tok-ctx-fill"></div></div>
+      <div class="tok-row"><span class="tok-lbl">Sessão total</span><span class="tok-val" id="tok-session-val">—</span></div>
+      <div class="tok-track"><div class="tok-fill tok-fill-dim" id="tok-session-fill"></div></div>
+      <div class="tok-footer">
+        <span id="tok-model-footer"></span>
+        <span id="tok-runs-footer"></span>
+        <span id="tok-cache-footer" style="color:var(--terra)"></span>
+      </div>
+    </div>
+
+    <!-- Recent analyses -->
+    <div class="rs-block" id="rs-recent">
+      <div class="rs-lbl">Análises Recentes</div>
+      <div id="rs-recent-list"><p class="rs-empty">Nenhuma análise ainda.</p></div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ── SETTINGS OVERLAY ── -->
+<div id="sov" class="sov" style="display:none" onclick="closeSettings(event)">
+  <div class="spanel">
+    <div class="sp-hdr">
+      <h2>Configurações</h2>
+      <button class="sp-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="sf">
+      <label class="sf-lbl" for="api-key-input">API Key Anthropic</label>
+      <input id="api-key-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off">
+      <div class="sf-hint" id="key-status">Usada apenas nesta sessão · nunca armazenada</div>
+    </div>
+    <div class="sf">
+      <label class="sf-lbl">Modelo</label>
+      <div class="model-picker">
+        <button class="mbtn" data-model="claude-haiku-4-5-20251001" onclick="setModel(this)">
+          <span class="mname">Haiku</span><span class="mdesc">rápido · econômico</span>
+        </button>
+        <button class="mbtn active" data-model="claude-sonnet-4-6" onclick="setModel(this)">
+          <span class="mname">Sonnet</span><span class="mdesc">preciso · padrão</span>
+        </button>
+        <button class="mbtn" data-model="claude-opus-4-8" onclick="setModel(this)">
+          <span class="mname">Opus</span><span class="mdesc">máximo · avançado</span>
+        </button>
+      </div>
+    </div>
+    <div class="sf">
+      <label class="sf-lbl">Esforço do modelo</label>
+      <div class="effort-section" id="effort-section">
+        <div class="effort-head">
+          <span class="effort-lbl" style="display:none"></span>
+          <span class="effort-cur" id="effort-cur">Padrão</span>
+        </div>
+        <div class="effort-wrap">
+          <div class="effort-bg"><div class="effort-fg" id="effort-fg"></div></div>
+          <div class="effort-steps">
+            <button class="estep cur" onclick="setEffort(0)"></button>
+            <button class="estep" onclick="setEffort(1)"></button>
+            <button class="estep" onclick="setEffort(2)"></button>
+            <button class="estep" onclick="setEffort(3)"></button>
+            <button class="estep" onclick="setEffort(4)"></button>
+          </div>
+        </div>
+        <div class="effort-range-lbl"><span>Mais rápido</span><span>Mais inteligente</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────
+const MODEL_CTX   = {'claude-haiku-4-5-20251001':200000,'claude-sonnet-4-6':200000,'claude-opus-4-8':200000};
+const MODEL_SHORT = {'claude-haiku-4-5-20251001':'Haiku 4.5','claude-sonnet-4-6':'Sonnet 4.6','claude-opus-4-8':'Opus 4.8'};
+const EFFORT_LEVELS = [
+  {label:'Padrão',budget:0},{label:'Leve',budget:2000},{label:'Médio',budget:5000},
+  {label:'Alto',budget:10000},{label:'Máximo',budget:16000}
+];
+const FLAGS = {'Brasil':'🇧🇷','Argentina':'🇦🇷','França':'🇫🇷','Alemanha':'🇩🇪','Espanha':'🇪🇸',
+  'Portugal':'🇵🇹','Holanda':'🇳🇱','Países Baixos':'🇳🇱','Bélgica':'🇧🇪','Inglaterra':'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Uruguai':'🇺🇾','México':'🇲🇽','EUA':'🇺🇸','Estados Unidos':'🇺🇸','Canadá':'🇨🇦',
+  'Japão':'🇯🇵','Coreia do Sul':'🇰🇷','Marrocos':'🇲🇦','Senegal':'🇸🇳','Austrália':'🇦🇺',
+  'Croácia':'🇭🇷','Suíça':'🇨🇭','Polônia':'🇵🇱','Dinamarca':'🇩🇰','Suécia':'🇸🇪',
+  'Itália':'🇮🇹','Holand':'🇳🇱','Equador':'🇪🇨','Colômbia':'🇨🇴','Venezuela':'🇻🇪'};
+
+// ─── State ───────────────────────────────────────────────────────────────
+let currentModel  = 'claude-sonnet-4-6';
+let currentEffort = 0;
+let _schedule     = [];
+let _cardCount    = 0;
+const _recent     = [];
+const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
+let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
+
+// ─── Settings ────────────────────────────────────────────────────────────
+function openSettings(){document.getElementById('sov').style.display='flex';}
+function closeSettings(e){if(!e||e.target===document.getElementById('sov'))document.getElementById('sov').style.display='none';}
+
+// ─── Model / Effort ──────────────────────────────────────────────────────
+function setEffort(val){
+  currentEffort=Number(val);
+  document.getElementById('effort-cur').textContent=EFFORT_LEVELS[currentEffort].label;
+  document.querySelectorAll('.estep').forEach((s,i)=>{s.classList.toggle('done',i<currentEffort);s.classList.toggle('cur',i===currentEffort);});
+  document.getElementById('effort-fg').style.width=(currentEffort/4*100)+'%';
+}
+function setModel(btn){
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');currentModel=btn.dataset.model;
+  const ef=document.getElementById('effort-section');
+  if(currentModel==='claude-haiku-4-5-20251001'){ef.classList.add('disabled');setEffort(0);}
+  else ef.classList.remove('disabled');
+  if(tokenState.runs>0)updateTokenBar();
+}
+
+// ─── Chat helpers ─────────────────────────────────────────────────────────
+function scrollChat(){const c=document.getElementById('chat');setTimeout(()=>{c.scrollTop=c.scrollHeight;},60);}
+
+function fmt(n){return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
+
+let _lastQuery='';
+function showUserBubble(text){
+  _lastQuery=text;
+  document.getElementById('empty-state').style.display='none';
+  const now=new Date();
+  const ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const el=document.createElement('div');
+  el.className='msg-user';
+  el.innerHTML=`<div class="user-bubble">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div><div class="user-meta"><button class="ua-btn" onclick="copyUserMsg()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>copiar</button><span class="ua-ts">${ts} ✓</span></div>`;
+  document.getElementById('conversation').appendChild(el);
+  scrollChat();
+}
+function copyUserMsg(){navigator.clipboard.writeText(_lastQuery).catch(()=>{});}
+
+// ─── Thinking ─────────────────────────────────────────────────────────────
+function startThinking(){
+  _thkStart=Date.now();_thkTokCount=0;
+  const effort=EFFORT_LEVELS[currentEffort];
+  _thkEl=document.createElement('div');
+  _thkEl.className='thk-compact';
+  _thkEl.id='thk-compact';
+  _thkEl.innerHTML=`<span class="thk-star">✳</span><span class="thk-elapsed" id="thk-elapsed-val">0s</span><span class="thk-sep">·</span><span class="thk-toks" id="thk-tok-live">0 tokens</span><span class="thk-sep">·</span><span class="thk-lbl" id="thk-label">ainda pensando…</span>${effort.budget>0?`<span id="thk-effort-pill" class="thk-pill">✦ ${effort.label}</span>`:'<span id="thk-effort-pill" style="display:none"></span>'}`;
+  document.getElementById('conversation').appendChild(_thkEl);
+  scrollChat();
+  _thkInterval=setInterval(()=>{
+    const s=Math.floor((Date.now()-_thkStart)/1000);
+    const ev=document.getElementById('thk-elapsed-val');const tl=document.getElementById('thk-tok-live');
+    if(ev)ev.textContent=s+'s';if(tl)tl.textContent=fmt(_thkTokCount)+' tokens';
+  },400);
+}
+function updateThinkingToks({inTokens=0,outTokens=0,thinkingTokens=0,status=''}){
+  _thkTokCount=inTokens+outTokens+thinkingTokens;
+  const label=status.includes('Raciocinando')?'ainda pensando…':status.includes('Pesquisando')?'buscando dados…':status.includes('Concluindo')?'concluindo…':'analisando…';
+  const lb=document.getElementById('thk-label');if(lb)lb.textContent=label;
+}
+function stopThinking(done=true){
+  if(_thkInterval){clearInterval(_thkInterval);_thkInterval=null;}
+  if(!_thkEl)return;
+  const s=Math.floor((Date.now()-_thkStart)/1000);
+  const ev=document.getElementById('thk-elapsed-val');const tl=document.getElementById('thk-tok-live');const lb=document.getElementById('thk-label');
+  if(ev)ev.textContent=s+'s';if(tl)tl.textContent=fmt(_thkTokCount)+' tokens';
+  if(done){if(lb)lb.textContent='concluído';setTimeout(()=>{if(_thkEl){_thkEl.remove();_thkEl=null;}},1000);}
+  else{_thkEl.remove();_thkEl=null;}
+}
+
+// ─── Token bar ────────────────────────────────────────────────────────────
+function updateTokenBar(){
+  const ctx=MODEL_CTX[currentModel]||200000;
+  const p1=Math.min(100,Math.round(tokenState.lastIn/ctx*100));
+  const tot=tokenState.sessionIn+tokenState.sessionOut;
+  const p2=Math.min(100,Math.round(tot/ctx*100));
+  document.getElementById('tok-ctx-val').textContent=`${fmt(tokenState.lastIn)} / ${fmt(ctx)} (${p1}%)`;
+  document.getElementById('tok-ctx-fill').style.width=p1+'%';
+  document.getElementById('tok-session-val').textContent=`${fmt(tot)} tokens`;
+  document.getElementById('tok-session-fill').style.width=p2+'%';
+  document.getElementById('tok-model-footer').textContent=MODEL_SHORT[currentModel]||'';
+  const n=tokenState.runs;
+  document.getElementById('tok-runs-footer').textContent=`${n} análise${n!==1?'s':''}`;
+  const ce=document.getElementById('tok-cache-footer');
+  if(tokenState.sessionCacheRead>0){ce.textContent=`⚡ ${fmt(tokenState.sessionCacheRead)} do cache`;}else{ce.textContent='';}
+  document.getElementById('token-bar').style.display='block';
+}
+
+// ─── Clear ───────────────────────────────────────────────────────────────
+function clearAll(){
+  document.getElementById('conversation').innerHTML='';
+  document.getElementById('empty-state').style.display='block';
+  document.getElementById('match-input').value='';
+  document.getElementById('error-box').style.display='none';
+  if(_thkEl){_thkEl.remove();_thkEl=null;}
+  if(_thkInterval){clearInterval(_thkInterval);_thkInterval=null;}
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────
+function exportReport(){
+  const t=document.getElementById('conversation')?.innerText||'Nenhuma análise';
+  const b=new Blob([t],{type:'text/plain'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download=`copa2026-analise-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();URL.revokeObjectURL(u);
+}
+
+// ─── Tab navigation ──────────────────────────────────────────────────────
+function showTab(cardId,tab){
+  const card=document.getElementById('acard-'+cardId);
+  if(!card)return;
+  card.querySelectorAll('.a-tc').forEach(t=>t.style.display='none');
+  card.querySelectorAll('.a-tab').forEach(t=>t.classList.remove('active'));
+  const tc=document.getElementById(`at-${tab}-${cardId}`);if(tc)tc.style.display='block';
+  const tabs=['resumo','tatica','individual','avancado'];
+  const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];if(btn)btn.classList.add('active');
+}
+function copyAnalysis(id){
+  const c=document.getElementById('acard-'+id);
+  navigator.clipboard.writeText(c?c.innerText:'').catch(()=>{});
+}
+
+// ─── Right sidebar ────────────────────────────────────────────────────────
+function updateRightSidebar(d,prob){
+  const fl=n=>FLAGS[n]||'🏟';
+  const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'};
+  const cL={alto:'alta confiança',medio:'média confiança',baixo:'baixa confiança'};
+  const hn=d.mandante?.nome||'Mandante',an=d.visitante?.nome||'Visitante';
+
+  // Match context
+  document.getElementById('rs-match-card').innerHTML=`
+    <div class="rs-fase">${d.fase||'Copa do Mundo 2026'}</div>
+    <div class="rs-teams-row">
+      <div class="rs-team"><span class="rs-flag">${fl(hn)}</span><span>${hn}</span></div>
+      <div class="rs-vs">vs</div>
+      <div class="rs-team"><span class="rs-flag">${fl(an)}</span><span>${an}</span></div>
+    </div>
+    ${d.data_hora?`<div class="rs-det">📅 ${d.data_hora}</div>`:''}
+    ${d.sede?`<div class="rs-det">📍 ${d.sede}</div>`:''}
+    ${d.grupo?`<div class="rs-det">🏆 Grupo ${d.grupo}</div>`:''}
+    <span class="badge ${cM[d.confianca_geral]||'b-warn'}" style="margin-top:.5rem">${cL[d.confianca_geral]||d.confianca_geral}</span>`;
+  document.getElementById('rs-match').style.display='block';
+
+  // Insights
+  if(d.eventos_provaveis?.length){
+    document.getElementById('rs-insights-list').innerHTML=d.eventos_provaveis.slice(0,4).map(e=>`
+      <div class="rs-insight"><div class="rs-ins-dot"></div><div>${e.evento} — <strong>${Math.round((e.probabilidade||0)*100)}%</strong></div></div>`).join('');
+    document.getElementById('rs-insights').style.display='block';
+  }
+
+  // Stats
+  const hxg=d.mandante?.xg_marcado??'—',axg=d.visitante?.xg_marcado??'—';
+  const hr=d.mandante?.ranking_fifa||'—',ar=d.visitante?.ranking_fifa||'—';
+  const ph=Math.round(prob.home*100),pa=Math.round(prob.away*100);
+  document.getElementById('rs-stats-list').innerHTML=`
+    <div class="rs-sh"><span>${hn.split(' ')[0]}</span><span>${an.split(' ')[0]}</span></div>
+    <div class="rs-srow"><span class="rs-sv-l">${ph}%</span><span class="rs-slbl">Vitória</span><span class="rs-sv-r">${pa}%</span></div>
+    <div class="rs-sbar"><div class="rs-bh" style="width:${ph}%"></div><div class="rs-ba" style="width:${pa}%"></div></div>
+    <div class="rs-srow"><span class="rs-sv-l">${hxg}</span><span class="rs-slbl">xG marcado</span><span class="rs-sv-r">${axg}</span></div>
+    <div class="rs-srow"><span class="rs-sv-l">${d.mandante?.xg_sofrido??'—'}</span><span class="rs-slbl">xG sofrido</span><span class="rs-sv-r">${d.visitante?.xg_sofrido??'—'}</span></div>
+    <div class="rs-srow"><span class="rs-sv-l">${hr}</span><span class="rs-slbl">Ranking FIFA</span><span class="rs-sv-r">${ar}</span></div>`;
+  document.getElementById('rs-stats').style.display='block';
+}
+
+function renderRecentAnalyses(){
+  document.getElementById('rs-recent-list').innerHTML=_recent.length?
+    _recent.map(a=>`<div class="rs-rec"><div class="rs-rec-title">${a.title}</div><div class="rs-rec-meta">${a.fase||'Copa 2026'} · ${a.ts}</div></div>`).join(''):
+    '<p class="rs-empty">Nenhuma análise ainda.</p>';
+}
+
+// ─── Render results ───────────────────────────────────────────────────────
+function pct(v){return Math.round(v*100)+'%';}
+function poissonPMF(k,lam){if(lam<=0)return k===0?1:0;let lp=-lam+k*Math.log(lam);for(let i=1;i<=k;i++)lp-=Math.log(i);return Math.exp(lp);}
+function calcPoisson(lh,la){
+  const N=9,ph=Array.from({length:N+1},(_,i)=>poissonPMF(i,lh)),pa=Array.from({length:N+1},(_,i)=>poissonPMF(i,la));
+  let home=0,draw=0,away=0,btts=0,over=0;const sc=[];
+  for(let i=0;i<=N;i++)for(let j=0;j<=N;j++){const p=ph[i]*pa[j];if(i>j)home+=p;else if(i===j)draw+=p;else away+=p;if(i>=1&&j>=1)btts+=p;if(i+j>2.5)over+=p;sc.push({s:`${i}-${j}`,p});}
+  sc.sort((a,b)=>b.p-a.p);return{home,draw,away,btts,over,under:1-over,top:sc.slice(0,5)};
+}
+
+function tcard(t){
+  if(!t)return '';
+  return `<div class="tname">${t.nome||'—'}</div>
+    <div class="irow"><span class="ilbl">Ranking FIFA</span><span class="ival">${t.ranking_fifa||'—'}</span></div>
+    <div class="irow"><span class="ilbl">Forma</span><span class="ival" style="font-family:monospace;font-size:11px">${t.forma_recente||'—'}</span></div>
+    <div class="irow"><span class="ilbl">xG marc.</span><span class="ival">${t.xg_marcado??'—'}</span></div>
+    <div class="irow"><span class="ilbl">xG sofr.</span><span class="ival">${t.xg_sofrido??'—'}</span></div>
+    ${t.desfalques?.length?`<div class="irow"><span class="ilbl">Desf.</span><span class="ival">${t.desfalques.join(', ')}</span></div>`:''}
+    <span class="spill ${t.escalacao_status==='confirmada'?'sp-ok':'sp-warn'}">${t.escalacao_status}</span>
+    ${t.escalacao?`<div class="tesc">${t.escalacao}</div>`:''}
+    ${t.jogadores_chave?.length?`<div class="tkeys">★ ${t.jogadores_chave.join(' · ')}</div>`:''}`;
+}
+
+function renderResults(d){
+  _cardCount++;
+  const id=_cardCount;
+  const now=new Date();
+  const ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const lmh=d.lambda?.home_mid||1.5,lma=d.lambda?.away_mid||1.0;
+  const prob=calcPoisson(lmh,lma),pL=calcPoisson(d.lambda?.home_low||lmh*.8,d.lambda?.away_high||lma*1.2),pH=calcPoisson(d.lambda?.home_high||lmh*1.2,d.lambda?.away_low||lma*.8);
+  const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'},cL={alto:'alta confiança nos dados',medio:'confiança média nos dados',baixo:'baixa confiança nos dados'};
+  const hn=d.mandante?.nome||'Mandante',an=d.visitante?.nome||'Visitante';
+  const lm=d.lambda;
+
+  // ── Tab: Resumo ──
+  const tabResumo=`
+    ${d.contexto_fase||d.confianca_geral?`<div class="tab-s">
+      <div class="tab-h">1. Resumo Executivo</div>
+      <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||d.confianca_geral}</span>
+      ${d.contexto_fase?`<p class="tab-body">${d.contexto_fase}</p>`:''}
+    </div>`:''}
+    ${d.fatores_decisivos?.length?`<div class="tab-s">
+      <div class="tab-h">2. Fatores Decisivos</div>
+      ${d.fatores_decisivos.map((f,i)=>`<div class="frow"><span class="fnum">${i+1}</span><span>${f}</span></div>`).join('')}
+    </div>`:''}
+    ${d.tendencias?.length?`<div class="tab-s">
+      <div class="tab-h">3. Tendências Recentes</div>
+      ${d.tendencias.map(t=>`<div class="tend-item"><span class="tend-dot"></span><span>${t}</span></div>`).join('')}
+    </div>`:''}
+    ${d.sugestoes_ticket?.length?`<div class="tab-s">
+      <div class="tab-h">4. Sugestões de Ticket</div>
+      ${d.sugestoes_ticket.map(t=>`<div class="ticket"><div class="ticket-head"><span class="ticket-desc">${t.descricao}</span><span class="ticket-prob">${Math.round((t.probabilidade||0)*100)}%</span></div><div class="ticket-reason">${t.fundamento||''}</div><span class="ticket-conf conf-${t.confianca||'media'}">${t.confianca||'média'} confiança</span></div>`).join('')}
+    </div>`:''}`;
+
+  // ── Tab: Tática ──
+  const tabTatica=`
+    <div class="tab-s">
+      <div class="tab-h">1. Probabilidades · Resultado</div>
+      ${[{lbl:hn,v:prob.home,lo:pL.home,hi:pH.home,c:'#c8563c'},{lbl:'Empate',v:prob.draw,lo:pL.draw,hi:pH.draw,c:'#a07850'},{lbl:an,v:prob.away,lo:pL.away,hi:pH.away,c:'#7a5449'}].map(b=>`<div class="prow"><div class="pmeta"><span class="pname">${b.lbl}</span><span class="ppct">${pct(b.v)}</span></div><div class="btrack"><div class="bfill" style="width:${Math.round(b.v*100)}%;background:${b.c}"></div></div><div class="prange">faixa ${pct(b.lo)}–${pct(b.hi)}</div></div>`).join('')}
+    </div>
+    <div class="tab-s">
+      <div class="tab-h">2. Mercados de Gols</div>
+      <div class="s3">
+        <div class="stile"><div class="slbl">over 2.5</div><div class="sval">${pct(prob.over)}</div></div>
+        <div class="stile"><div class="slbl">under 2.5</div><div class="sval">${pct(prob.under)}</div></div>
+        <div class="stile"><div class="slbl">ambas marcam</div><div class="sval">${pct(prob.btts)}</div></div>
+      </div>
+    </div>
+    ${lm?`<div class="tab-s">
+      <div class="tab-h">3. Gols Esperados · Lambda Poisson</div>
+      <div class="lrow"><span style="color:var(--mid)">${hn}</span><span style="font-family:monospace;font-size:12px">${lm.home_low} · <strong>${lm.home_mid}</strong> · ${lm.home_high}</span></div>
+      ${lm.home_logic?`<div class="llogic">${lm.home_logic}</div>`:''}
+      <div class="lrow"><span style="color:var(--mid)">${an}</span><span style="font-family:monospace;font-size:12px">${lm.away_low} · <strong>${lm.away_mid}</strong> · ${lm.away_high}</span></div>
+      ${lm.away_logic?`<div class="llogic">${lm.away_logic}</div>`:''}
+      <div class="lhint">baixo · <strong>central</strong> · alto</div>
+    </div>`:''}
+    ${d.eventos_provaveis?.length?`<div class="tab-s">
+      <div class="tab-h">4. Eventos Prováveis</div>
+      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${e.evento}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" style="width:${Math.round((e.probabilidade||0)*100)}%"></div></div><div class="ev-reason">${e.fundamento||''}</div></div>`).join('')}
+    </div>`:''}`;
+
+  // ── Tab: Individual ──
+  const tabIndividual=`<div class="teams-full"><div class="tcard">${tcard(d.mandante)}</div><div class="tcard">${tcard(d.visitante)}</div></div>`;
+
+  // ── Tab: Avançado ──
+  const tabAvancado=`
+    <div class="tab-s">
+      <div class="tab-h">Placares Mais Prováveis</div>
+      <div>${prob.top.map(s=>`<span class="sc">${s.s} <strong>${Math.round(s.p*100)}%</strong></span>`).join('')}</div>
+    </div>
+    ${d.incerteza?.length?`<div class="tab-s">
+      <div class="tab-h">Incerteza · O que Ainda Pode Mudar</div>
+      ${d.incerteza.map(u=>`<div class="urow"><span class="udot"></span><span><strong>${u.fator}</strong> — ${u.impacto}</span></div>`).join('')}
+    </div>`:''}
+    <div class="tab-s">
+      <div class="tab-h">Lacunas de Dados</div>
+      ${d.lacunas?.length?d.lacunas.map(g=>`<div class="gitem">· ${g}</div>`).join(''):'<span style="font-size:12px;color:#336244">Nenhuma lacuna crítica declarada</span>'}
+    </div>
+    <div class="disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira</div>`;
+
+  // ── Full card ──
+  const el=document.createElement('div');
+  el.innerHTML=`<div class="a-card" id="acard-${id}">
+    <div class="a-hdr">
+      <div class="a-agent">
+        <div class="a-ball">⚽</div>
+        <div><span class="a-name">Agente Futebolístico IA</span><span class="a-pill">IA</span></div>
+      </div>
+      <div class="a-hdr-r">
+        <span class="a-ts">${ts}</span>
+        <button class="a-ic" onclick="copyAnalysis(${id})" title="Copiar análise">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="a-status">Análise concluída com sucesso</div>
+    <div class="a-title">${d.partida||'Análise'}</div>
+    <div class="a-tabs">
+      <button class="a-tab active" onclick="showTab(${id},'resumo')">Resumo Executivo</button>
+      <button class="a-tab" onclick="showTab(${id},'tatica')">Análise Tática</button>
+      <button class="a-tab" onclick="showTab(${id},'individual')">Desempenho Individual</button>
+      <button class="a-tab" onclick="showTab(${id},'avancado')">Dados Avançados</button>
+    </div>
+    <div id="at-resumo-${id}" class="a-tc">${tabResumo}</div>
+    <div id="at-tatica-${id}" class="a-tc" style="display:none">${tabTatica}</div>
+    <div id="at-individual-${id}" class="a-tc" style="display:none">${tabIndividual}</div>
+    <div id="at-avancado-${id}" class="a-tc" style="display:none">${tabAvancado}</div>
+  </div>`;
+  document.getElementById('conversation').appendChild(el.firstElementChild);
+
+  updateRightSidebar(d,prob);
+  _recent.unshift({title:d.partida||'Análise',fase:d.fase,ts});
+  if(_recent.length>5)_recent.pop();
+  renderRecentAnalyses();
+  scrollChat();
+}
+
+// ─── Temporal helpers ────────────────────────────────────────────────────
+function offsetDate(n){const d=new Date();d.setDate(d.getDate()+n);return d.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});}
+function currentDateFull(){return new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+
+// ─── System prompt ────────────────────────────────────────────────────────
+function getSystemPrompt(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
+
+DATA ATUAL: ${currentDateFull()}
+
+CONSCIÊNCIA TEMPORAL:
+1. Identifique a fase atual da Copa 2026 e pesquise o calendário oficial
+2. Verifique se os times já estão classificados, eliminados ou precisam de resultado específico
+3. Pondere o impacto da fase: grupos (poupar titulares, diferença de gols), mata-mata (prorrogação real, média de gols menor), Quartas/Semi/Final (cartões acumulados, pressão máxima)
+4. Sede: EUA, México (altitude), Canadá — impacto sobre os times
+
+METODOLOGIA:
+1. Pesquise fatos reais: lesões, suspensões, escalações, forma recente, confrontos diretos
+2. Calcule lambdas: xG ofensivo/defensivo, desfalques, sede, fase
+3. Aplique Poisson: resultado, gols, placares exatos
+4. Identifique EVENTOS PROVÁVEIS com fundamento factual
+5. Gere SUGESTÕES DE TICKET baseadas em probabilidade estatística — não em odds
+
+PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
+
+LINGUAGEM E ESCRITA:
+- Estilo direto e analítico — mantenha sempre
+- Quando usar termo técnico (xG, lambda, Poisson, BTTS etc.), adicione entre parênteses uma explicação curta na primeira ocorrência: ex. "xG (gols esperados com base nas chances criadas)"
+- Evite acúmulo de abreviações e siglas num mesmo trecho — prefira escrever por extenso quando o contexto ainda não deixou claro
+- Não use jargões de mercado de apostas sem explicar o que significam
+- Revise a gramática: evite frases incompletas, parênteses sem fechamento, vírgulas excessivas e truncamentos abruptos
+- Texto deve ser compreensível por alguém que entende de futebol mas não de estatística avançada
+
+RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
+
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"(mesma estrutura)"},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"lacunas":[]}`;}
+
+// ─── Schedule loader ──────────────────────────────────────────────────────
+async function loadSchedule(){
+  const apiKey=document.getElementById('api-key-input').value.trim();
+  if(!apiKey.startsWith('sk-')){return;}
+  const chips=document.getElementById('ex-chips');
+  chips.innerHTML='<span class="ex-loading"><span class="ldot"></span> Buscando agenda da Copa 2026…</span>';
+  document.getElementById('reload-btn').style.display='none';
+  const d0=offsetDate(0),d1=offsetDate(1),d2=offsetDate(2);
+  const SP=`Busca agenda Copa 2026. APENAS JSON: {"jogos":[{"mandante":"nome_pt","visitante":"nome_pt","fase":"string","dia":"hoje|amanhã|DD/MM","hora_brt":"HH:MM"}]}. hoje=${d0}, amanhã=${d1}. Apenas partidas confirmadas.`;
+  const msgs=[{role:'user',content:`Partidas Copa 2026 em ${d0}, ${d1} e ${d2}. Fase e horário BRT.`}];
+  try{
+    for(let i=0;i<6;i++){
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
+      const data=await res.json();if(!res.ok)throw new Error(data.error?.message);
+      if(data.stop_reason==='end_turn'){const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');const m=txt.match(/\{[\s\S]*\}/);if(m){renderScheduleChips(JSON.parse(m[0]).jogos||[]);return;}break;}
+      if(data.stop_reason==='tool_use'){msgs.push({role:'assistant',content:data.content});msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});}else break;
+    }
+    renderScheduleChips([]);
+  }catch(e){chips.innerHTML=`<button class="chip chip-cta" onclick="loadSchedule()">↻ tentar novamente</button>`;}
+}
+function renderScheduleChips(jogos){
+  _schedule=jogos;const chips=document.getElementById('ex-chips');
+  if(!jogos.length){chips.innerHTML='<span class="ex-loading">Nenhuma partida encontrada</span>';document.getElementById('reload-btn').style.display='inline';return;}
+  const grp={};jogos.forEach((j,i)=>{j._idx=i;const k=j.dia||'outros';if(!grp[k])grp[k]=[];grp[k].push(j);});
+  const order=['hoje','amanhã'];const keys=[...order.filter(k=>grp[k]),...Object.keys(grp).filter(k=>!order.includes(k))];
+  let html='';keys.forEach(day=>{html+=`<span class="ex-day">${day}</span>`;grp[day].forEach(j=>{const h=j.hora_brt?` · ${j.hora_brt}`:'';html+=`<button class="chip chip-match" onclick="fillMatch(${j._idx})"><span class="chip-teams">${j.mandante} x ${j.visitante}</span><span class="chip-meta">${j.fase||'Copa 2026'}${h}</span></button>`;});});
+  chips.innerHTML=html;document.getElementById('reload-btn').style.display='inline';
+  document.getElementById('sched-lbl').textContent=`${jogos.length} jogo${jogos.length!==1?'s':''} encontrado${jogos.length!==1?'s':''}`;
+}
+function fillMatch(i){
+  const j=_schedule[i];if(!j)return;
+  const h=j.hora_brt?` às ${j.hora_brt} BRT`:'';
+  document.getElementById('match-input').value=`${j.mandante} x ${j.visitante}, ${j.fase||'Copa 2026'}${h}. Com base em dados reais e considerando o impacto da fase atual do torneio, identifique os eventos mais prováveis e sugira 2-3 tickets com fundamento estatístico.`;
+  document.getElementById('match-input').focus();
+}
+let _keyDebounce=null;
+document.getElementById('api-key-input').addEventListener('input',function(){
+  clearTimeout(_keyDebounce);
+  const v=this.value.trim();
+  if(v.startsWith('sk-ant-')&&v.length>30)_keyDebounce=setTimeout(loadSchedule,800);
+});
+document.getElementById('api-key-input').addEventListener('blur',function(){
+  clearTimeout(_keyDebounce);
+  const v=this.value.trim();
+  if(v.startsWith('sk-ant-')&&v.length>30)loadSchedule();
+});
+
+// ─── Main analysis ────────────────────────────────────────────────────────
+async function runAnalysis(){
+  const apiKey=document.getElementById('api-key-input').value.trim();
+  if(!apiKey){const h=document.getElementById('key-status');h.textContent='Informe sua API Key em Configurações.';h.style.color='var(--terra)';openSettings();return;}
+  const query=document.getElementById('match-input').value.trim();
+  if(!query){document.getElementById('match-input').focus();return;}
+
+  document.getElementById('error-box').style.display='none';
+  document.getElementById('run-btn').disabled=true;
+  const ks=document.getElementById('key-status');ks.textContent='Analisando…';ks.style.color='var(--muted)';
+
+  document.getElementById('match-input').value='';
+  showUserBubble(query);
+  startThinking();
+
+  const effort=EFFORT_LEVELS[currentEffort];
+  const reqHeaders={'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+  reqHeaders['anthropic-beta']=effort.budget>0?'interleaved-thinking-2025-05-14,prompt-caching-2024-07-31':'prompt-caching-2024-07-31';
+  const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+8000:8000,system:[{type:'text',text:getSystemPrompt(),cache_control:{type:'ephemeral'}}],tools:[{type:'web_search_20250305',name:'web_search'}]};
+  if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
+
+  const messages=[{role:'user',content:`Analise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${query}`}];
+  let finalText='',lastIn=0,lastOut=0,searchCount=0,lastCacheCreated=0,lastCacheRead=0;
+
+  try{
+    for(let iter=0;iter<10;iter++){
+      const{text,stopReason,allContent,toolUses,inTokens,outTokens,thinkingTokens,cacheCreated,cacheRead}=
+        await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks(upd);});
+      lastIn=inTokens;lastOut=outTokens;lastCacheCreated+=cacheCreated;lastCacheRead+=cacheRead;
+      if(stopReason==='end_turn'){finalText=text;break;}
+      if(stopReason==='tool_use'){
+        messages.push({role:'assistant',content:allContent});
+        messages.push({role:'user',content:toolUses.map(t=>({type:'tool_result',tool_use_id:t.id,content:''}))});
+        searchCount++;updateThinkingToks({inTokens:lastIn,outTokens:lastOut,thinkingTokens,status:'Pesquisando dados…'});
+      }else{finalText=text;break;}
+    }
+    tokenState.lastIn=lastIn;tokenState.lastOut=lastOut;tokenState.sessionIn+=lastIn;tokenState.sessionOut+=lastOut;tokenState.runs++;
+    tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
+    stopThinking(true);
+    setTimeout(()=>{updateTokenBar();},1300);
+    const m=finalText.match(/\{[\s\S]*\}/);
+    if(!m)throw new Error('Formato de resposta inesperado. Tente novamente.');
+    renderResults(JSON.parse(m[0]));
+  }catch(e){
+    stopThinking(false);
+    document.getElementById('error-box').style.display='block';
+    document.getElementById('error-msg').textContent=e.message||'Erro inesperado. Verifique sua conexão.';
+  }finally{
+    document.getElementById('run-btn').disabled=false;
+    ks.textContent='Usada apenas nesta sessão · nunca armazenada';ks.style.color='var(--muted)';
+  }
+}
+
+// ─── Streaming ────────────────────────────────────────────────────────────
+async function streamOnce(body,headers,onUpdate){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({...body,stream:true})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
+  const reader=res.body.getReader(),decoder=new TextDecoder();
+  let buf='',inTokens=0,outTokens=0,thinkingChars=0,cacheCreated=0,cacheRead=0;
+  let allBlocks=[],currentBlock=null,curText='',curThink='',curToolInput='',stopReason=null;
+  try{
+    outer:while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buf+=decoder.decode(value,{stream:true});
+      const lines=buf.split('\n');buf=lines.pop()??'';
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const raw=line.slice(6).trim();if(raw==='[DONE]')break outer;
+        let e;try{e=JSON.parse(raw);}catch{continue;}
+        switch(e.type){
+          case 'message_start':
+            inTokens=e.message?.usage?.input_tokens??0;
+            cacheCreated=e.message?.usage?.cache_creation_input_tokens??0;
+            cacheRead=e.message?.usage?.cache_read_input_tokens??0;
+            onUpdate({inTokens,outTokens,thinkingTokens:0,status:'Analisando…'});break;
+          case 'content_block_start':
+            currentBlock={type:e.content_block.type,index:e.index};
+            if(e.content_block.type==='tool_use'){currentBlock.id=e.content_block.id;currentBlock.name=e.content_block.name;curToolInput='';}
+            else if(e.content_block.type==='thinking')curThink='';
+            else curText='';
+            break;
+          case 'content_block_delta':
+            if(!currentBlock)break;
+            const d=e.delta;
+            if(d.type==='thinking_delta'){curThink+=d.thinking;thinkingChars+=d.thinking.length;onUpdate({inTokens,outTokens,thinkingTokens:Math.floor(thinkingChars/4),status:'Raciocinando…'});}
+            else if(d.type==='text_delta'){curText+=d.text;onUpdate({inTokens,outTokens:Math.max(outTokens,Math.floor(curText.length/3)),thinkingTokens:Math.floor(thinkingChars/4),status:'Analisando…'});}
+            else if(d.type==='input_json_delta')curToolInput+=d.partial_json;
+            break;
+          case 'content_block_stop':
+            if(!currentBlock)break;
+            if(currentBlock.type==='thinking')allBlocks.push({type:'thinking',thinking:curThink});
+            else if(currentBlock.type==='text'&&curText)allBlocks.push({type:'text',text:curText});
+            else if(currentBlock.type==='tool_use'){let inp={};try{inp=JSON.parse(curToolInput);}catch{}allBlocks.push({type:'tool_use',id:currentBlock.id,name:currentBlock.name,input:inp});}
+            currentBlock=null;break;
+          case 'message_delta':
+            if(e.usage)outTokens=e.usage.output_tokens??outTokens;
+            stopReason=e.delta?.stop_reason??stopReason;
+            onUpdate({inTokens,outTokens,thinkingTokens:Math.floor(thinkingChars/4),status:'Concluindo…'});break;
+        }
+      }
+    }
+  }finally{try{reader.releaseLock();}catch{}}
+  return{text:allBlocks.filter(b=>b.type==='text').map(b=>b.text).join(''),stopReason,allContent:allBlocks,toolUses:allBlocks.filter(b=>b.type==='tool_use'),inTokens,outTokens,thinkingTokens:Math.floor(thinkingChars/4),cacheCreated,cacheRead};
+}
+</script>
+</body>
+</html>

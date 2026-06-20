@@ -199,6 +199,8 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .i-analyze{flex:1;background:var(--terra);color:#fff;border:none;border-radius:9px;padding:.65rem 1rem;font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}
 .i-analyze:hover:not(:disabled){background:var(--terra-dark)}
 .i-analyze:disabled{opacity:.5;cursor:not-allowed}
+.i-analyze.i-stop{background:var(--mid)}
+.i-analyze.i-stop:hover:not(:disabled){background:var(--deep)}
 .i-disc{font-size:10px;color:var(--muted);text-align:center;margin-top:.5rem}
 
 /* ── Right sidebar ── */
@@ -378,7 +380,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
       <textarea id="match-input" rows="2" placeholder="Descreva a partida ou o que quer analisar…"></textarea>
       <div class="i-foot">
         <button class="i-clear" onclick="clearAll()" title="Limpar">↺</button>
-        <button class="i-analyze" id="run-btn" onclick="runAnalysis()">Analisar partida</button>
+        <button class="i-analyze" id="run-btn" onclick="toggleRun()">Analisar partida</button>
       </div>
       <p class="i-disc">O agente pode cometer erros. Sempre valide as informações.</p>
     </div>
@@ -499,6 +501,7 @@ let _cardCount    = 0;
 const _recent     = [];
 const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
 let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
+let _running      = false, _abort = null, _pendingQuery = '';
 
 // ─── Settings ────────────────────────────────────────────────────────────
 function openSettings(){document.getElementById('sov').style.display='flex';}
@@ -591,6 +594,8 @@ function updateTokenBar(){
 
 // ─── Clear ───────────────────────────────────────────────────────────────
 function clearAll(){
+  _pendingQuery='';
+  if(_running&&_abort){try{_abort.abort();}catch(e){}}
   document.getElementById('conversation').innerHTML='';
   document.getElementById('empty-state').style.display='block';
   document.getElementById('match-input').value='';
@@ -903,14 +908,25 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
 })();
 
 // ─── Main analysis ────────────────────────────────────────────────────────
+// Alterna entre iniciar e interromper a análise
+function toggleRun(){if(_running)cancelAnalysis();else runAnalysis();}
+function cancelAnalysis(){if(_running&&_abort){try{_abort.abort();}catch(e){}}}
+function setRunBtn(running){
+  const b=document.getElementById('run-btn');
+  b.classList.toggle('i-stop',running);
+  b.textContent=running?'■ Parar análise':'Analisar partida';
+}
+
 async function runAnalysis(){
+  if(_running)return;
   const apiKey=document.getElementById('api-key-input').value.trim();
   if(!apiKey){const h=document.getElementById('key-status');h.textContent='Informe sua API Key em Configurações.';h.style.color='var(--terra)';openSettings();return;}
   const query=document.getElementById('match-input').value.trim();
   if(!query){document.getElementById('match-input').focus();return;}
 
+  _running=true;_abort=new AbortController();_pendingQuery=query;
   document.getElementById('error-box').style.display='none';
-  document.getElementById('run-btn').disabled=true;
+  setRunBtn(true);
   const ks=document.getElementById('key-status');ks.textContent='Analisando…';ks.style.color='var(--muted)';
 
   document.getElementById('match-input').value='';
@@ -929,7 +945,7 @@ async function runAnalysis(){
   try{
     for(let iter=0;iter<10;iter++){
       const{text,stopReason,allContent,toolUses,inTokens,outTokens,thinkingTokens,cacheCreated,cacheRead}=
-        await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks(upd);});
+        await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks(upd);},_abort.signal);
       lastIn=inTokens;lastOut=outTokens;lastCacheCreated+=cacheCreated;lastCacheRead+=cacheRead;
       if(stopReason==='end_turn'){finalText=text;break;}
       if(stopReason==='tool_use'){
@@ -945,19 +961,27 @@ async function runAnalysis(){
     const m=finalText.match(/\{[\s\S]*\}/);
     if(!m)throw new Error('Formato de resposta inesperado. Tente novamente.');
     renderResults(JSON.parse(m[0]));
+    ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }catch(e){
     stopThinking(false);
-    document.getElementById('error-box').style.display='block';
-    document.getElementById('error-msg').textContent=e.message||'Erro inesperado. Verifique sua conexão.';
+    if(e&&(e.name==='AbortError'||e.message==='cancelled')){
+      const inp=document.getElementById('match-input');
+      if(!inp.value.trim())inp.value=_pendingQuery;
+      ks.textContent='Análise interrompida · ajuste e tente de novo';ks.style.color='var(--muted)';
+    }else{
+      document.getElementById('error-box').style.display='block';
+      document.getElementById('error-msg').textContent=e.message||'Erro inesperado. Verifique sua conexão.';
+      ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
+    }
   }finally{
-    document.getElementById('run-btn').disabled=false;
-    ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
+    _running=false;_abort=null;
+    setRunBtn(false);
   }
 }
 
 // ─── Streaming ────────────────────────────────────────────────────────────
-async function streamOnce(body,headers,onUpdate){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({...body,stream:true})});
+async function streamOnce(body,headers,onUpdate,signal){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({...body,stream:true}),signal});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
   const reader=res.body.getReader(),decoder=new TextDecoder();
   let buf='',inTokens=0,outTokens=0,thinkingChars=0,cacheCreated=0,cacheRead=0;

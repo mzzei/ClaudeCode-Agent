@@ -242,12 +242,20 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .tok-footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:3px;font-size:10px;color:var(--muted);margin-top:4px}
 
 /* Right: recent */
-.rs-rec{padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity .15s}
+.rs-rec-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem}
+.rs-rec-clear{font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:5px;transition:color .15s;font-family:var(--sans)}
+.rs-rec-clear:hover{color:var(--terra)}
+.rs-rec{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
 .rs-rec:last-child{border-bottom:none;padding-bottom:0}
-.rs-rec:hover{opacity:.7}
-.rs-rec-title{font-size:12px;font-weight:500;color:var(--deep)}
+.rs-rec-main{flex:1;min-width:0;cursor:pointer;transition:opacity .15s}
+.rs-rec:hover .rs-rec-main{opacity:.65}
+.rs-rec-title{font-size:12px;font-weight:500;color:var(--deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rs-rec-meta{font-size:10px;color:var(--muted);margin-top:2px}
+.rs-rec-exp{flex-shrink:0;background:none;border:1px solid var(--border);border-radius:7px;width:26px;height:26px;font-size:12px;color:var(--mid);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s,border-color .15s}
+.rs-rec-exp:hover{background:var(--terra-pale);color:var(--terra-dark);border-color:rgba(200,86,60,.3)}
 .rs-empty{font-size:12px;color:var(--muted)}
+@keyframes aflash{0%{box-shadow:0 0 0 3px var(--terra-pale)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
+.a-flash{animation:aflash 1.3s ease-out}
 
 /* ── Settings overlay ── */
 .sov{position:fixed;inset:0;background:rgba(0,0,0,.28);display:flex;align-items:flex-start;justify-content:flex-end;z-index:200;padding:1rem}
@@ -304,10 +312,9 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         Chat com o Agente
       </button>
-      <button class="ls-link soon" disabled title="Em breve">
+      <button class="ls-link" onclick="goToRecent()">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Análises Recentes
-        <span class="ls-soon-tag">em breve</span>
       </button>
       <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -422,7 +429,10 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 
     <!-- Recent analyses -->
     <div class="rs-block" id="rs-recent">
-      <div class="rs-lbl">Análises Recentes</div>
+      <div class="rs-rec-hdr">
+        <div class="rs-lbl" style="margin-bottom:0">Análises Recentes</div>
+        <button class="rs-rec-clear" id="rs-rec-clear" onclick="clearHistory()" style="display:none">limpar</button>
+      </div>
       <div id="rs-recent-list"><p class="rs-empty">Nenhuma análise ainda.</p></div>
     </div>
   </aside>
@@ -498,7 +508,8 @@ let currentModel  = 'claude-sonnet-4-6';
 let currentEffort = 0;
 let _schedule     = [];
 let _cardCount    = 0;
-const _recent     = [];
+let _history      = [];
+const HIST_KEY    = 'copa2026_history';
 const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
 let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
 let _running      = false, _abort = null, _pendingQuery = '';
@@ -606,14 +617,23 @@ function clearAll(){
 
 // ─── Export ───────────────────────────────────────────────────────────────
 function exportReport(){
-  const conv=document.getElementById('conversation');
-  if(!conv||!conv.querySelector('.a-card')){
+  const cards=[...document.querySelectorAll('#conversation .a-card')];
+  if(!cards.length){
     document.getElementById('error-box').style.display='block';
     document.getElementById('error-msg').textContent='Nenhuma análise para exportar. Faça ao menos uma análise primeiro.';
     return;
   }
-  // Clona as análises e prepara cabeçalhos por aba (visíveis só na impressão)
-  const clone=conv.cloneNode(true);
+  exportCards(cards);
+}
+function exportSingle(hid){
+  const card=ensureRendered(hid);
+  if(card)exportCards([card],{single:true});
+}
+function exportCards(cardEls,opts){
+  opts=opts||{};
+  // Monta um container só com as análises escolhidas e injeta cabeçalhos por aba (impressão)
+  const clone=document.createElement('div');
+  cardEls.forEach(c=>clone.appendChild(c.cloneNode(true)));
   clone.querySelectorAll('.a-card').forEach(card=>{
     card.querySelectorAll('.a-ic').forEach(b=>b.remove());
     const tcs=card.querySelectorAll('.a-tc'),btns=card.querySelectorAll('.a-tab');
@@ -694,7 +714,8 @@ function showTab(cardId,tab){
 </html>`;
   const b=new Blob([html],{type:'text/html'});
   const u=URL.createObjectURL(b);const a=document.createElement('a');
-  a.href=u;a.download=`copa2026-relatorio-${now.toISOString().slice(0,10)}.html`;
+  const slug=opts.single&&cardEls[0]?((cardEls[0].querySelector('.a-title')?.textContent||'analise').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'').slice(0,40)||'analise'):'relatorio';
+  a.href=u;a.download=`copa2026-${slug}-${now.toISOString().slice(0,10)}.html`;
   a.click();URL.revokeObjectURL(u);
 }
 
@@ -755,9 +776,41 @@ function updateRightSidebar(d,prob){
   document.getElementById('rs-stats').style.display='block';
 }
 
+// ─── Histórico de análises (persistente em localStorage) ───────────────────
+function loadHistory(){try{_history=JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch(e){_history=[];}}
+function persistHistory(){try{localStorage.setItem(HIST_KEY,JSON.stringify(_history.slice(0,30)));}catch(e){}}
+function saveAnalysis(hid,d){
+  _history=_history.filter(h=>h.hid!==hid);
+  _history.unshift({hid,title:d.partida||'Análise',fase:d.fase||'',ts:new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),data:d});
+  if(_history.length>30)_history=_history.slice(0,30);
+  persistHistory();renderRecentAnalyses();
+}
+function clearHistory(){
+  if(!_history.length)return;
+  _history=[];persistHistory();renderRecentAnalyses();
+}
+function goToRecent(){
+  const blk=document.getElementById('rs-recent');
+  if(blk){blk.scrollIntoView({behavior:'smooth',block:'start'});flashCard(blk);}
+}
+function flashCard(card){if(!card)return;card.classList.remove('a-flash');void card.offsetWidth;card.classList.add('a-flash');}
+function cardByHid(hid){return document.querySelector('.a-card[data-hid="'+(window.CSS&&CSS.escape?CSS.escape(hid):hid)+'"]');}
+function ensureRendered(hid){
+  let card=cardByHid(hid);if(card)return card;
+  const h=_history.find(x=>x.hid===hid);if(!h)return null;
+  renderResults(h.data,{hid,save:false});
+  return cardByHid(hid);
+}
+function openHistory(hid){
+  const card=ensureRendered(hid);
+  if(card){card.scrollIntoView({behavior:'smooth',block:'start'});flashCard(card);}
+}
+
 function renderRecentAnalyses(){
-  document.getElementById('rs-recent-list').innerHTML=_recent.length?
-    _recent.map(a=>`<div class="rs-rec"><div class="rs-rec-title">${esc(a.title)}</div><div class="rs-rec-meta">${esc(a.fase||'Copa 2026')} · ${a.ts}</div></div>`).join(''):
+  const clr=document.getElementById('rs-rec-clear');
+  if(clr)clr.style.display=_history.length?'inline':'none';
+  document.getElementById('rs-recent-list').innerHTML=_history.length?
+    _history.map(a=>`<div class="rs-rec"><div class="rs-rec-main" onclick="openHistory('${a.hid}')"><div class="rs-rec-title">${esc(a.title)}</div><div class="rs-rec-meta">${esc(a.fase||'Copa 2026')} · ${a.ts}</div></div><button class="rs-rec-exp" title="Exportar esta análise" onclick="event.stopPropagation();exportSingle('${a.hid}')">↓</button></div>`).join(''):
     '<p class="rs-empty">Nenhuma análise ainda.</p>';
 }
 
@@ -784,7 +837,8 @@ function tcard(t){
     ${t.jogadores_chave?.length?`<div class="tkeys">★ ${t.jogadores_chave.map(esc).join(' · ')}</div>`:''}`;
 }
 
-function renderResults(d){
+function renderResults(d,opts){
+  opts=opts||{};
   _cardCount++;
   const id=_cardCount;
   const now=new Date();
@@ -889,12 +943,14 @@ function renderResults(d){
     <div id="at-individual-${id}" class="a-tc" style="display:none">${tabIndividual}</div>
     <div id="at-avancado-${id}" class="a-tc" style="display:none">${tabAvancado}</div>
   </div>`;
-  document.getElementById('conversation').appendChild(el.firstElementChild);
+  const cardEl=el.firstElementChild;
+  const hid=opts.hid||('h'+Date.now().toString(36)+id);
+  cardEl.dataset.hid=hid;
+  document.getElementById('conversation').appendChild(cardEl);
 
   updateRightSidebar(d,prob);
-  _recent.unshift({title:d.partida||'Análise',fase:d.fase,ts});
-  if(_recent.length>5)_recent.pop();
-  renderRecentAnalyses();
+  if(opts.save!==false)saveAnalysis(hid,d);
+  else renderRecentAnalyses();
   scrollChat();
 }
 
@@ -991,6 +1047,9 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
     if(saved.startsWith('sk-ant-')&&saved.length>30)loadSchedule();
   }
 })();
+
+// Carrega o histórico persistido (localStorage) e popula a lista de Análises Recentes
+loadHistory();renderRecentAnalyses();
 
 // ─── Main analysis ────────────────────────────────────────────────────────
 // Alterna entre iniciar e interromper a análise

@@ -36,6 +36,9 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .ls-link:hover{background:var(--cream);color:var(--deep)}
 .ls-link.active{background:var(--terra);color:#fff}
 .ls-link.active svg{stroke:#fff}
+.ls-link.soon{opacity:.5;cursor:not-allowed}
+.ls-link.soon:hover{background:none;color:var(--mid)}
+.ls-soon-tag{margin-left:auto;font-size:8px;letter-spacing:.04em;text-transform:uppercase;background:var(--cream-mid);color:var(--muted);padding:1px 5px;border-radius:5px;flex-shrink:0}
 .ls-link svg{width:14px;height:14px;stroke:var(--mid);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;transition:stroke .15s}
 .ls-foot{padding:.85rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:9px}
 .ls-avatar{width:30px;height:30px;border-radius:50%;background:var(--terra-pale);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--terra-dark);flex-shrink:0}
@@ -299,21 +302,25 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         Chat com o Agente
       </button>
-      <button class="ls-link" onclick="">
+      <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Análises Recentes
+        <span class="ls-soon-tag">em breve</span>
       </button>
-      <button class="ls-link" onclick="">
+      <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         Biblioteca de Jogos
+        <span class="ls-soon-tag">em breve</span>
       </button>
-      <button class="ls-link" onclick="">
+      <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Modelos de Análise
+        <span class="ls-soon-tag">em breve</span>
       </button>
-      <button class="ls-link" onclick="">
+      <button class="ls-link soon" disabled title="Em breve">
         <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Relatórios Salvos
+        <span class="ls-soon-tag">em breve</span>
       </button>
       <button class="ls-link" onclick="openSettings()">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -430,7 +437,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
     <div class="sf">
       <label class="sf-lbl" for="api-key-input">API Key Anthropic</label>
       <input id="api-key-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off">
-      <div class="sf-hint" id="key-status">Usada apenas nesta sessão · nunca armazenada</div>
+      <div class="sf-hint" id="key-status">Guardada apenas nesta aba · apagada ao fechar</div>
     </div>
     <div class="sf">
       <label class="sf-lbl">Modelo</label>
@@ -517,6 +524,7 @@ function setModel(btn){
 function scrollChat(){const c=document.getElementById('chat');setTimeout(()=>{c.scrollTop=c.scrollHeight;},60);}
 
 function fmt(n){return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 let _lastQuery='';
 function showUserBubble(text){
@@ -620,26 +628,26 @@ function updateRightSidebar(d,prob){
   const fl=n=>FLAGS[n]||'🏟';
   const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'};
   const cL={alto:'alta confiança',medio:'média confiança',baixo:'baixa confiança'};
-  const hn=d.mandante?.nome||'Mandante',an=d.visitante?.nome||'Visitante';
+  const hn=esc(d.mandante?.nome||'Mandante'),an=esc(d.visitante?.nome||'Visitante');
 
   // Match context
   document.getElementById('rs-match-card').innerHTML=`
-    <div class="rs-fase">${d.fase||'Copa do Mundo 2026'}</div>
+    <div class="rs-fase">${esc(d.fase||'Copa do Mundo 2026')}</div>
     <div class="rs-teams-row">
       <div class="rs-team"><span class="rs-flag">${fl(hn)}</span><span>${hn}</span></div>
       <div class="rs-vs">vs</div>
       <div class="rs-team"><span class="rs-flag">${fl(an)}</span><span>${an}</span></div>
     </div>
-    ${d.data_hora?`<div class="rs-det">📅 ${d.data_hora}</div>`:''}
-    ${d.sede?`<div class="rs-det">📍 ${d.sede}</div>`:''}
-    ${d.grupo?`<div class="rs-det">🏆 Grupo ${d.grupo}</div>`:''}
-    <span class="badge ${cM[d.confianca_geral]||'b-warn'}" style="margin-top:.5rem">${cL[d.confianca_geral]||d.confianca_geral}</span>`;
+    ${d.data_hora?`<div class="rs-det">📅 ${esc(d.data_hora)}</div>`:''}
+    ${d.sede?`<div class="rs-det">📍 ${esc(d.sede)}</div>`:''}
+    ${d.grupo?`<div class="rs-det">🏆 Grupo ${esc(d.grupo)}</div>`:''}
+    <span class="badge ${cM[d.confianca_geral]||'b-warn'}" style="margin-top:.5rem">${cL[d.confianca_geral]||esc(d.confianca_geral)}</span>`;
   document.getElementById('rs-match').style.display='block';
 
   // Insights
   if(d.eventos_provaveis?.length){
     document.getElementById('rs-insights-list').innerHTML=d.eventos_provaveis.slice(0,4).map(e=>`
-      <div class="rs-insight"><div class="rs-ins-dot"></div><div>${e.evento} — <strong>${Math.round((e.probabilidade||0)*100)}%</strong></div></div>`).join('');
+      <div class="rs-insight"><div class="rs-ins-dot"></div><div>${esc(e.evento)} — <strong>${Math.round((e.probabilidade||0)*100)}%</strong></div></div>`).join('');
     document.getElementById('rs-insights').style.display='block';
   }
 
@@ -659,7 +667,7 @@ function updateRightSidebar(d,prob){
 
 function renderRecentAnalyses(){
   document.getElementById('rs-recent-list').innerHTML=_recent.length?
-    _recent.map(a=>`<div class="rs-rec"><div class="rs-rec-title">${a.title}</div><div class="rs-rec-meta">${a.fase||'Copa 2026'} · ${a.ts}</div></div>`).join(''):
+    _recent.map(a=>`<div class="rs-rec"><div class="rs-rec-title">${esc(a.title)}</div><div class="rs-rec-meta">${esc(a.fase||'Copa 2026')} · ${a.ts}</div></div>`).join(''):
     '<p class="rs-empty">Nenhuma análise ainda.</p>';
 }
 
@@ -675,15 +683,15 @@ function calcPoisson(lh,la){
 
 function tcard(t){
   if(!t)return '';
-  return `<div class="tname">${t.nome||'—'}</div>
-    <div class="irow"><span class="ilbl">Ranking FIFA</span><span class="ival">${t.ranking_fifa||'—'}</span></div>
-    <div class="irow"><span class="ilbl">Forma</span><span class="ival" style="font-family:monospace;font-size:11px">${t.forma_recente||'—'}</span></div>
-    <div class="irow"><span class="ilbl">xG marc.</span><span class="ival">${t.xg_marcado??'—'}</span></div>
-    <div class="irow"><span class="ilbl">xG sofr.</span><span class="ival">${t.xg_sofrido??'—'}</span></div>
-    ${t.desfalques?.length?`<div class="irow"><span class="ilbl">Desf.</span><span class="ival">${t.desfalques.join(', ')}</span></div>`:''}
-    <span class="spill ${t.escalacao_status==='confirmada'?'sp-ok':'sp-warn'}">${t.escalacao_status}</span>
-    ${t.escalacao?`<div class="tesc">${t.escalacao}</div>`:''}
-    ${t.jogadores_chave?.length?`<div class="tkeys">★ ${t.jogadores_chave.join(' · ')}</div>`:''}`;
+  return `<div class="tname">${esc(t.nome||'—')}</div>
+    <div class="irow"><span class="ilbl">Ranking FIFA</span><span class="ival">${esc(t.ranking_fifa||'—')}</span></div>
+    <div class="irow"><span class="ilbl">Forma</span><span class="ival" style="font-family:monospace;font-size:11px">${esc(t.forma_recente||'—')}</span></div>
+    <div class="irow"><span class="ilbl">xG marc.</span><span class="ival">${esc(t.xg_marcado??'—')}</span></div>
+    <div class="irow"><span class="ilbl">xG sofr.</span><span class="ival">${esc(t.xg_sofrido??'—')}</span></div>
+    ${t.desfalques?.length?`<div class="irow"><span class="ilbl">Desf.</span><span class="ival">${t.desfalques.map(esc).join(', ')}</span></div>`:''}
+    <span class="spill ${t.escalacao_status==='confirmada'?'sp-ok':'sp-warn'}">${esc(t.escalacao_status)}</span>
+    ${t.escalacao?`<div class="tesc">${esc(t.escalacao)}</div>`:''}
+    ${t.jogadores_chave?.length?`<div class="tkeys">★ ${t.jogadores_chave.map(esc).join(' · ')}</div>`:''}`;
 }
 
 function renderResults(d){
@@ -694,27 +702,27 @@ function renderResults(d){
   const lmh=d.lambda?.home_mid||1.5,lma=d.lambda?.away_mid||1.0;
   const prob=calcPoisson(lmh,lma),pL=calcPoisson(d.lambda?.home_low||lmh*.8,d.lambda?.away_high||lma*1.2),pH=calcPoisson(d.lambda?.home_high||lmh*1.2,d.lambda?.away_low||lma*.8);
   const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'},cL={alto:'alta confiança nos dados',medio:'confiança média nos dados',baixo:'baixa confiança nos dados'};
-  const hn=d.mandante?.nome||'Mandante',an=d.visitante?.nome||'Visitante';
+  const hn=esc(d.mandante?.nome||'Mandante'),an=esc(d.visitante?.nome||'Visitante');
   const lm=d.lambda;
 
   // ── Tab: Resumo ──
   const tabResumo=`
     ${d.contexto_fase||d.confianca_geral?`<div class="tab-s">
       <div class="tab-h">1. Resumo Executivo</div>
-      <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||d.confianca_geral}</span>
-      ${d.contexto_fase?`<p class="tab-body">${d.contexto_fase}</p>`:''}
+      <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||esc(d.confianca_geral)}</span>
+      ${d.contexto_fase?`<p class="tab-body">${esc(d.contexto_fase)}</p>`:''}
     </div>`:''}
     ${d.fatores_decisivos?.length?`<div class="tab-s">
       <div class="tab-h">2. Fatores Decisivos</div>
-      ${d.fatores_decisivos.map((f,i)=>`<div class="frow"><span class="fnum">${i+1}</span><span>${f}</span></div>`).join('')}
+      ${d.fatores_decisivos.map((f,i)=>`<div class="frow"><span class="fnum">${i+1}</span><span>${esc(f)}</span></div>`).join('')}
     </div>`:''}
     ${d.tendencias?.length?`<div class="tab-s">
       <div class="tab-h">3. Tendências Recentes</div>
-      ${d.tendencias.map(t=>`<div class="tend-item"><span class="tend-dot"></span><span>${t}</span></div>`).join('')}
+      ${d.tendencias.map(t=>`<div class="tend-item"><span class="tend-dot"></span><span>${esc(t)}</span></div>`).join('')}
     </div>`:''}
     ${d.sugestoes_ticket?.length?`<div class="tab-s">
       <div class="tab-h">4. Sugestões de Ticket</div>
-      ${d.sugestoes_ticket.map(t=>`<div class="ticket"><div class="ticket-head"><span class="ticket-desc">${t.descricao}</span><span class="ticket-prob">${Math.round((t.probabilidade||0)*100)}%</span></div><div class="ticket-reason">${t.fundamento||''}</div><span class="ticket-conf conf-${t.confianca||'media'}">${t.confianca||'média'} confiança</span></div>`).join('')}
+      ${d.sugestoes_ticket.map(t=>`<div class="ticket"><div class="ticket-head"><span class="ticket-desc">${esc(t.descricao)}</span><span class="ticket-prob">${Math.round((t.probabilidade||0)*100)}%</span></div><div class="ticket-reason">${esc(t.fundamento||'')}</div><span class="ticket-conf conf-${esc(t.confianca||'media')}">${esc(t.confianca||'média')} confiança</span></div>`).join('')}
     </div>`:''}`;
 
   // ── Tab: Tática ──
@@ -734,14 +742,14 @@ function renderResults(d){
     ${lm?`<div class="tab-s">
       <div class="tab-h">3. Gols Esperados · Lambda Poisson</div>
       <div class="lrow"><span style="color:var(--mid)">${hn}</span><span style="font-family:monospace;font-size:12px">${lm.home_low} · <strong>${lm.home_mid}</strong> · ${lm.home_high}</span></div>
-      ${lm.home_logic?`<div class="llogic">${lm.home_logic}</div>`:''}
+      ${lm.home_logic?`<div class="llogic">${esc(lm.home_logic)}</div>`:''}
       <div class="lrow"><span style="color:var(--mid)">${an}</span><span style="font-family:monospace;font-size:12px">${lm.away_low} · <strong>${lm.away_mid}</strong> · ${lm.away_high}</span></div>
-      ${lm.away_logic?`<div class="llogic">${lm.away_logic}</div>`:''}
+      ${lm.away_logic?`<div class="llogic">${esc(lm.away_logic)}</div>`:''}
       <div class="lhint">baixo · <strong>central</strong> · alto</div>
     </div>`:''}
     ${d.eventos_provaveis?.length?`<div class="tab-s">
       <div class="tab-h">4. Eventos Prováveis</div>
-      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${e.evento}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" style="width:${Math.round((e.probabilidade||0)*100)}%"></div></div><div class="ev-reason">${e.fundamento||''}</div></div>`).join('')}
+      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" style="width:${Math.round((e.probabilidade||0)*100)}%"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
     </div>`:''}`;
 
   // ── Tab: Individual ──
@@ -755,11 +763,11 @@ function renderResults(d){
     </div>
     ${d.incerteza?.length?`<div class="tab-s">
       <div class="tab-h">Incerteza · O que Ainda Pode Mudar</div>
-      ${d.incerteza.map(u=>`<div class="urow"><span class="udot"></span><span><strong>${u.fator}</strong> — ${u.impacto}</span></div>`).join('')}
+      ${d.incerteza.map(u=>`<div class="urow"><span class="udot"></span><span><strong>${esc(u.fator)}</strong> — ${esc(u.impacto)}</span></div>`).join('')}
     </div>`:''}
     <div class="tab-s">
       <div class="tab-h">Lacunas de Dados</div>
-      ${d.lacunas?.length?d.lacunas.map(g=>`<div class="gitem">· ${g}</div>`).join(''):'<span style="font-size:12px;color:#336244">Nenhuma lacuna crítica declarada</span>'}
+      ${d.lacunas?.length?d.lacunas.map(g=>`<div class="gitem">· ${esc(g)}</div>`).join(''):'<span style="font-size:12px;color:#336244">Nenhuma lacuna crítica declarada</span>'}
     </div>
     <div class="disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira</div>`;
 
@@ -779,7 +787,7 @@ function renderResults(d){
       </div>
     </div>
     <div class="a-status">Análise concluída com sucesso</div>
-    <div class="a-title">${d.partida||'Análise'}</div>
+    <div class="a-title">${esc(d.partida||'Análise')}</div>
     <div class="a-tabs">
       <button class="a-tab active" onclick="showTab(${id},'resumo')">Resumo Executivo</button>
       <button class="a-tab" onclick="showTab(${id},'tatica')">Análise Tática</button>
@@ -861,7 +869,7 @@ function renderScheduleChips(jogos){
   if(!jogos.length){chips.innerHTML='<span class="ex-loading">Nenhuma partida encontrada</span>';document.getElementById('reload-btn').style.display='inline';return;}
   const grp={};jogos.forEach((j,i)=>{j._idx=i;const k=j.dia||'outros';if(!grp[k])grp[k]=[];grp[k].push(j);});
   const order=['hoje','amanhã'];const keys=[...order.filter(k=>grp[k]),...Object.keys(grp).filter(k=>!order.includes(k))];
-  let html='';keys.forEach(day=>{html+=`<span class="ex-day">${day}</span>`;grp[day].forEach(j=>{const h=j.hora_brt?` · ${j.hora_brt}`:'';html+=`<button class="chip chip-match" onclick="fillMatch(${j._idx})"><span class="chip-teams">${j.mandante} x ${j.visitante}</span><span class="chip-meta">${j.fase||'Copa 2026'}${h}</span></button>`;});});
+  let html='';keys.forEach(day=>{html+=`<span class="ex-day">${esc(day)}</span>`;grp[day].forEach(j=>{const h=j.hora_brt?` · ${esc(j.hora_brt)}`:'';html+=`<button class="chip chip-match" onclick="fillMatch(${j._idx})"><span class="chip-teams">${esc(j.mandante)} x ${esc(j.visitante)}</span><span class="chip-meta">${esc(j.fase||'Copa 2026')}${h}</span></button>`;});});
   chips.innerHTML=html;document.getElementById('reload-btn').style.display='inline';
   document.getElementById('sched-lbl').textContent=`${jogos.length} jogo${jogos.length!==1?'s':''} encontrado${jogos.length!==1?'s':''}`;
 }
@@ -871,10 +879,12 @@ function fillMatch(i){
   document.getElementById('match-input').value=`${j.mandante} x ${j.visitante}, ${j.fase||'Copa 2026'}${h}. Com base em dados reais e considerando o impacto da fase atual do torneio, identifique os eventos mais prováveis e sugira 2-3 tickets com fundamento estatístico.`;
   document.getElementById('match-input').focus();
 }
+const KEY_STORE='copa2026_api_key';
 let _keyDebounce=null;
 document.getElementById('api-key-input').addEventListener('input',function(){
   clearTimeout(_keyDebounce);
   const v=this.value.trim();
+  try{if(v)sessionStorage.setItem(KEY_STORE,v);else sessionStorage.removeItem(KEY_STORE);}catch(e){}
   if(v.startsWith('sk-ant-')&&v.length>30)_keyDebounce=setTimeout(loadSchedule,800);
 });
 document.getElementById('api-key-input').addEventListener('blur',function(){
@@ -882,6 +892,15 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
   const v=this.value.trim();
   if(v.startsWith('sk-ant-')&&v.length>30)loadSchedule();
 });
+
+// Restaura a API Key salva nesta aba (sessionStorage — apagada ao fechar)
+(function restoreApiKey(){
+  let saved='';try{saved=sessionStorage.getItem(KEY_STORE)||'';}catch(e){}
+  if(saved){
+    document.getElementById('api-key-input').value=saved;
+    if(saved.startsWith('sk-ant-')&&saved.length>30)loadSchedule();
+  }
+})();
 
 // ─── Main analysis ────────────────────────────────────────────────────────
 async function runAnalysis(){
@@ -932,7 +951,7 @@ async function runAnalysis(){
     document.getElementById('error-msg').textContent=e.message||'Erro inesperado. Verifique sua conexão.';
   }finally{
     document.getElementById('run-btn').disabled=false;
-    ks.textContent='Usada apenas nesta sessão · nunca armazenada';ks.style.color='var(--muted)';
+    ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }
 }
 

@@ -267,6 +267,16 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
 .sf{margin-bottom:1.1rem}
 .sf-lbl{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin-bottom:.4rem}
 .sf-hint{font-size:11px;color:var(--muted);margin-top:.35rem}
+.ds-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.ds-name{font-size:12px;font-weight:500;color:var(--deep)}
+.ds-badge{font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:99px;font-weight:600}
+.ds-badge.free{background:rgba(60,160,100,.12);color:#2a8a56}
+.ds-badge.enterprise{background:rgba(140,100,40,.1);color:#7a6020}
+.ds-status{font-size:10px;color:var(--muted);margin-left:auto}
+.ds-status.ok{color:#2a8a56}
+.ds-status.err{color:var(--terra)}
+.sf input[type=password]{width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--deep);font-family:var(--mono);margin-top:2px;margin-bottom:.6rem}
+.sf input[type=password]:focus{outline:none;border-color:rgba(200,86,60,.4)}
 #api-key-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.68rem .9rem;font-family:var(--sans);font-size:14px;color:var(--deep);outline:none;transition:border-color .2s}
 #api-key-input:focus{border-color:rgba(130,70,55,.38)}
 #api-key-input::placeholder{color:var(--muted)}
@@ -520,6 +530,31 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
         <div class="effort-range-lbl"><span>Mais rápido</span><span>Mais inteligente</span></div>
       </div>
     </div>
+    <div class="sf">
+      <label class="sf-lbl">Fontes de Dados</label>
+      <div class="sf-hint" style="margin-bottom:.8rem">APIs determinísticas eliminam buscas redundantes e garantem consistência entre standings e xG.</div>
+
+      <div class="ds-row">
+        <span class="ds-name">football-data.org</span>
+        <span class="ds-badge free">gratuito</span>
+        <span class="ds-status" id="fd-status">não configurado</span>
+      </div>
+      <input id="fd-key-input" type="password" placeholder="Chave API football-data.org" autocomplete="off">
+
+      <div class="ds-row">
+        <span class="ds-name">StatsBomb</span>
+        <span class="ds-badge enterprise">enterprise · xG</span>
+        <span class="ds-status" id="sb-status">não configurado</span>
+      </div>
+      <input id="sb-key-input" type="password" placeholder="Chave StatsBomb API" autocomplete="off">
+
+      <div class="ds-row">
+        <span class="ds-name">Opta / Stats Perform</span>
+        <span class="ds-badge enterprise">enterprise</span>
+        <span class="ds-status" id="op-status">não configurado</span>
+      </div>
+      <input id="op-key-input" type="password" placeholder="Chave Opta (Stats Perform)" autocomplete="off">
+    </div>
   </div>
 </div>
 
@@ -549,6 +584,12 @@ const SCHED_STORE = 'copa2026_sched_v2';
 const SCHED_TTL   = 6 * 60 * 60 * 1000;
 const CTX_STORE   = 'copa2026_ctx_v1';
 const CTX_TTL     = 4 * 60 * 60 * 1000;
+// Data API keys (localStorage — read-only data providers)
+const FD_KEY_STORE= 'copa2026_fd_key';
+const SB_KEY_STORE= 'copa2026_sb_key';
+const OP_KEY_STORE= 'copa2026_op_key';
+const FD_BASE     = 'https://api.football-data.org/v4';
+const FD_TTL      = 20 * 60 * 1000;
 const tokenState  = {sessionIn:0,sessionOut:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
 let _thkInterval  = null, _thkStart = 0, _thkTokCount = 0, _thkEl = null;
 let _running      = false, _abort = null, _pendingQuery = '';
@@ -1096,6 +1137,8 @@ function _saveSchedCache(jogos){
   try{localStorage.setItem(SCHED_STORE,JSON.stringify({fetched_at:Date.now(),jogos}));}catch(e){}
 }
 function loadSchedule(force){
+  // If FD key is configured, defer to loadFdData (which also updates schedule)
+  if(getFdKey()){loadFdData();return;}
   const cache=_loadSchedCache();
   if(cache&&!force){
     _schedule=cache.jogos;
@@ -1198,6 +1241,98 @@ async function fetchTournamentCtxFromApi(){
       if(data.stop_reason==='tool_use'){msgs.push({role:'assistant',content:data.content});msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});}else return;
     }
   }catch{}
+}
+
+// ─── football-data.org integration ───────────────────────────────────────
+function getFdKey(){try{return localStorage.getItem(FD_KEY_STORE)||'';}catch{return'';}}
+async function fetchFd(path,cacheKey,ttl=FD_TTL){
+  try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
+  const key=getFdKey();if(!key)return null;
+  try{
+    const res=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
+    if(!res.ok){updateFdStatus('err',`Erro ${res.status}`);return null;}
+    const data=await res.json();
+    try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}
+    return data;
+  }catch{return null;}
+}
+async function getFdStandings(){return fetchFd('/competitions/WC/standings?season=2026','copa2026_fd_standings_v1');}
+async function getFdMatches(){return fetchFd('/competitions/WC/matches?season=2026','copa2026_fd_matches_v1',15*60*1000);}
+function formatFdContext(standings,matches){
+  const lines=[];
+  if(standings?.standings?.length){
+    const grpMap={GROUP_A:'A',GROUP_B:'B',GROUP_C:'C',GROUP_D:'D',GROUP_E:'E',GROUP_F:'F',GROUP_G:'G',GROUP_H:'H',GROUP_I:'I',GROUP_J:'J',GROUP_K:'K',GROUP_L:'L'};
+    const groups=standings.standings.filter(s=>s.type==='TOTAL'&&s.group);
+    if(groups.length){
+      lines.push('CLASSIFICAÇÃO DOS GRUPOS:');
+      groups.forEach(s=>{
+        const g=grpMap[s.group]||s.group;
+        lines.push(`  Grupo ${g}: ${s.table.map(r=>`${r.team.shortName||r.team.name}(${r.points}pts/${r.playedGames}j ${r.goalsFor}-${r.goalsAgainst})`).join(' · ')}`);
+      });
+    }
+  }
+  if(matches?.matches?.length){
+    const finished=matches.matches.filter(m=>m.status==='FINISHED').slice(-15);
+    if(finished.length){
+      lines.push('RESULTADOS RECENTES:');
+      finished.forEach(m=>{
+        const d=new Date(m.utcDate);
+        const dt=`${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+        const s=m.score?.fullTime;
+        lines.push(`  ${dt} ${m.homeTeam.name} ${s!=null?s.home+'-'+s.away:'?-?'} ${m.awayTeam.name}`);
+      });
+    }
+    const live=matches.matches.find(m=>['IN_PLAY','PAUSED','HALFTIME'].includes(m.status));
+    const phases=[...new Set(matches.matches.filter(m=>m.status!=='FINISHED').map(m=>m.stage))];
+    if(live)lines.unshift(`FASE ATUAL: ${live.stage}`);
+    else if(phases.length)lines.unshift(`PRÓXIMA FASE: ${phases[0]}`);
+  }
+  return lines.join('\n');
+}
+function fdMatchesToSchedule(matches){
+  const phaseMap={GROUP_STAGE:'Fase de Grupos',ROUND_OF_16:'Oitavas de Final',QUARTER_FINALS:'Quartas de Final',SEMI_FINALS:'Semifinais','3RD_PLACE':'Terceiro Lugar',FINAL:'Final'};
+  return(matches.matches||[]).map(m=>{
+    const d=new Date(m.utcDate);
+    const brt=new Date(d.getTime()-3*3600000);
+    const grpLetter=m.group?m.group.replace('GROUP_',''):null;
+    return{mandante:m.homeTeam?.name||'',visitante:m.awayTeam?.name||'',fase:phaseMap[m.stage]||m.stage,grupo:grpLetter?`Grupo ${grpLetter}`:null,data_iso:d.toISOString().slice(0,10),hora_brt:`${String(brt.getUTCHours()).padStart(2,'0')}:${String(brt.getUTCMinutes()).padStart(2,'0')}`,sede:m.venue||''};
+  }).filter(j=>j.mandante&&j.visitante);
+}
+function updateFdStatus(state,msg){
+  const el=document.getElementById('fd-status');if(!el)return;
+  el.className='ds-status'+(state==='ok'?' ok':state==='err'?' err':'');
+  el.textContent=msg||'';
+}
+async function loadFdData(){
+  const key=getFdKey();if(!key){updateFdStatus('','não configurado');return;}
+  updateFdStatus('','verificando…');
+  const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
+  if(!standings&&!matches){updateFdStatus('err','sem resposta');return;}
+  // Update tournament context from FD (authoritative source)
+  if(standings||matches){
+    const ctx={fase_atual:'',standings:{},results:[]};
+    if(standings?.standings){
+      standings.standings.filter(s=>s.type==='TOTAL'&&s.group).forEach(s=>{
+        const g=s.group.replace('GROUP_','Grupo ');
+        ctx.standings[g]=s.table.map(r=>({time:r.team.shortName||r.team.name,pts:r.points,j:r.playedGames,v:r.won,e:r.draw,d:r.lost,gp:r.goalsFor,gc:r.goalsAgainst}));
+      });
+    }
+    if(matches?.matches){
+      ctx.results=matches.matches.filter(m=>m.status==='FINISHED').slice(-15).map(m=>{
+        const d=new Date(m.utcDate);const s=m.score?.fullTime;
+        return{data:`${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`,mandante:m.homeTeam.name,placar:s!=null?`${s.home}-${s.away}`:'?-?',visitante:m.awayTeam.name};
+      });
+      const active=matches.matches.find(m=>m.status!=='FINISHED');
+      if(active)ctx.fase_atual=active.stage;
+    }
+    _saveCtxCache(ctx);
+  }
+  // Optionally refresh schedule from FD
+  if(matches){
+    const jogos=fdMatchesToSchedule(matches);
+    if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}
+  }
+  updateFdStatus('ok',`${standings?'classificação':''}${standings&&matches?' · ':''}${matches?`${(matches.matches||[]).length} jogos`:''}`);
 }
 
 function fillMatch(i){
@@ -1304,14 +1439,72 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
   }
 })();
 
+// ─── Data API key listeners ───────────────────────────────────────────────
+(function initDataKeys(){
+  // football-data.org
+  const fdInp=document.getElementById('fd-key-input');
+  const saved=localStorage.getItem(FD_KEY_STORE)||'';
+  if(saved){fdInp.value=saved;setTimeout(loadFdData,200);}else{updateFdStatus('','não configurado');}
+  let _fdDeb=null;
+  fdInp.addEventListener('input',function(){
+    clearTimeout(_fdDeb);
+    const v=this.value.trim();
+    try{if(v)localStorage.setItem(FD_KEY_STORE,v);else localStorage.removeItem(FD_KEY_STORE);}catch{}
+    _fdDeb=setTimeout(loadFdData,800);
+  });
+  fdInp.addEventListener('blur',function(){
+    clearTimeout(_fdDeb);
+    const v=this.value.trim();
+    if(v)loadFdData();
+  });
+  // StatsBomb
+  const sbInp=document.getElementById('sb-key-input');
+  const sbSaved=localStorage.getItem(SB_KEY_STORE)||'';
+  if(sbSaved){sbInp.value=sbSaved;document.getElementById('sb-status').textContent='configurado';document.getElementById('sb-status').className='ds-status ok';}
+  sbInp.addEventListener('change',function(){
+    const v=this.value.trim();
+    try{if(v)localStorage.setItem(SB_KEY_STORE,v);else localStorage.removeItem(SB_KEY_STORE);}catch{}
+    const st=document.getElementById('sb-status');if(v){st.textContent='configurado';st.className='ds-status ok';}else{st.textContent='não configurado';st.className='ds-status';}
+  });
+  // Opta
+  const opInp=document.getElementById('op-key-input');
+  const opSaved=localStorage.getItem(OP_KEY_STORE)||'';
+  if(opSaved){opInp.value=opSaved;document.getElementById('op-status').textContent='configurado';document.getElementById('op-status').className='ds-status ok';}
+  opInp.addEventListener('change',function(){
+    const v=this.value.trim();
+    try{if(v)localStorage.setItem(OP_KEY_STORE,v);else localStorage.removeItem(OP_KEY_STORE);}catch{}
+    const st=document.getElementById('op-status');if(v){st.textContent='configurado';st.className='ds-status ok';}else{st.textContent='não configurado';st.className='ds-status';}
+  });
+})();
+
 // Carrega o histórico persistido (localStorage) e popula a lista de Análises Recentes
 loadHistory();renderRecentAnalyses();
 
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate){
-  const SP=`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-Dado o contexto da partida, execute as pesquisas abaixo e retorne APENAS JSON válido:
-{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}
+  // Pre-fetch deterministic data from football-data.org (if key available)
+  let fdCtx='';
+  if(getFdKey()){
+    const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
+    fdCtx=formatFdContext(standings,matches);
+  }
+  const hasFd=!!fdCtx;
+  const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
+  const SP=hasFd
+    ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
+RESULTADOS E CLASSIFICAÇÃO JÁ FORAM OBTIDOS VIA API OFICIAL (football-data.org) — veja abaixo.
+NÃO pesquise resultados nem classificação. Pesquise APENAS:
+① "[Mandante] [Visitante] lesões suspensões escalação Copa 2026"
+② [só se xG ausente nos dados] "[Mandante] [Visitante] xG Copa 2026"
+
+Após as buscas, retorne APENAS JSON válido combinando dados da API + pesquisa:
+${SCHEMA}
+
+DADOS FOOTBALL-DATA.ORG:
+${fdCtx}`
+    :`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
+Execute as pesquisas abaixo e retorne APENAS JSON válido:
+${SCHEMA}
 
 SEQUÊNCIA (em português, nesta ordem):
 ① "[Mandante] Copa do Mundo 2026 resultados"

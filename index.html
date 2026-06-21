@@ -1348,7 +1348,10 @@ async function loadFdData(){
   const key=getFdKey();if(!key){updateFdStatus('','não configurado');return;}
   updateFdStatus('','verificando…');
   const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
-  if(!standings&&!matches){updateFdStatus('err',_fdLastError||'sem resposta');return;}
+  if(!standings&&!matches){
+    const msg=_fdLastError==='Erro 403'?'Copa do Mundo não inclusa no plano gratuito':_fdLastError||'sem resposta';
+    updateFdStatus('err',msg);return;
+  }
   // Update tournament context from FD (authoritative source)
   if(standings||matches){
     const ctx={fase_atual:'',standings:{},results:[]};

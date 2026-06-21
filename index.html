@@ -717,40 +717,6 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
       <button class="sp-close" onclick="closeSettings()">✕</button>
     </div>
     <div class="sf">
-      <label class="sf-lbl">Modelo</label>
-      <div class="model-picker">
-        <button class="mbtn" data-model="claude-haiku-4-5-20251001" onclick="setModel(this)">
-          <span class="mname">Haiku</span><span class="mdesc">rápido · econômico</span>
-        </button>
-        <button class="mbtn active" data-model="claude-sonnet-4-6" onclick="setModel(this)">
-          <span class="mname">Sonnet</span><span class="mdesc">preciso · padrão</span>
-        </button>
-        <button class="mbtn" data-model="claude-opus-4-8" onclick="setModel(this)">
-          <span class="mname">Opus</span><span class="mdesc">máximo · avançado</span>
-        </button>
-      </div>
-    </div>
-    <div class="sf">
-      <label class="sf-lbl">Esforço do modelo</label>
-      <div class="effort-section" id="effort-section">
-        <div class="effort-head">
-          <span class="effort-lbl" style="display:none"></span>
-          <span class="effort-cur" id="effort-cur">Padrão</span>
-        </div>
-        <div class="effort-wrap">
-          <div class="effort-bg"><div class="effort-fg" id="effort-fg"></div></div>
-          <div class="effort-steps">
-            <button class="estep cur" onclick="setEffort(0)"></button>
-            <button class="estep" onclick="setEffort(1)"></button>
-            <button class="estep" onclick="setEffort(2)"></button>
-            <button class="estep" onclick="setEffort(3)"></button>
-            <button class="estep" onclick="setEffort(4)"></button>
-          </div>
-        </div>
-        <div class="effort-range-lbl"><span>Mais rápido</span><span>Mais inteligente</span></div>
-      </div>
-    </div>
-    <div class="sf">
       <label class="sf-lbl" for="api-key-input">API Key Anthropic</label>
       <input id="api-key-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off">
       <div class="sf-hint" id="key-status">Guardada apenas nesta aba · apagada ao fechar</div>

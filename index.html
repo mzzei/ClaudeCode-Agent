@@ -1505,21 +1505,21 @@ function _espnUrl(path){
   const direct=`${ESPN_BASE}${path}`;
   return _fdNeedProxy?`https://corsproxy.io/?url=${encodeURIComponent(direct)}`:direct;
 }
+let _espnLastError='';
 async function fetchEspn(path,cacheKey,ttl=ESPN_TTL){
   try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
   try{
     const res=await fetch(_espnUrl(path));
-    if(!res.ok)return null;
+    if(!res.ok){_espnLastError=`HTTP ${res.status}`;return null;}
     const data=await res.json();
     try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}
     return data;
-  }catch{return null;}
+  }catch(e){_espnLastError=`rede: ${e?.message||'timeout'}`;return null;}
 }
 async function getEspnStandings(){return fetchEspn('/standings','copa2026_espn_standings_v1');}
 async function getEspnScoreboard(){
-  const d0=new Date(Date.now()-7*864e5).toISOString().slice(0,10).replace(/-/g,'');
-  const d1=new Date(Date.now()+21*864e5).toISOString().slice(0,10).replace(/-/g,'');
-  return fetchEspn(`/scoreboard?dates=${d0}-${d1}`,'copa2026_espn_scores_v1',ESPN_TTL);
+  // Sem range de datas — ESPN retorna jogos do dia atual por padrão
+  return fetchEspn('/scoreboard','copa2026_espn_scores_v1',ESPN_TTL);
 }
 function formatEspnContext(sData,sbData){
   const lines=[];
@@ -1591,7 +1591,7 @@ async function loadEspnData(force){
   const[standings,scoreboard]=await Promise.all([getEspnStandings(),getEspnScoreboard()]);
   const espnEl=document.getElementById('espn-status');
   if(!standings&&!scoreboard){
-    if(espnEl){espnEl.textContent='indisponível';espnEl.className='ds-status err';}
+    if(espnEl){espnEl.textContent=_espnLastError||'indisponível';espnEl.className='ds-status err';}
     fetchScheduleFromApi(false);return;
   }
   if(espnEl){espnEl.textContent='ativo';espnEl.className='ds-status ok';}

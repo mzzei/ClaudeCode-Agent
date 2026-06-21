@@ -535,11 +535,18 @@ body{font-family:var(--sans);background:var(--cream);color:var(--deep);-webkit-f
       <div class="sf-hint" style="margin-bottom:.8rem">APIs determinísticas eliminam buscas redundantes e garantem consistência entre standings e xG.</div>
 
       <div class="ds-row">
+        <span class="ds-name">API-Football</span>
+        <span class="ds-badge free">gratuito · Copa 2026</span>
+        <span class="ds-status" id="af-status">não configurado</span>
+      </div>
+      <input id="af-key-input" type="password" placeholder="Chave API-Football (api-sports.io / RapidAPI)" autocomplete="off">
+
+      <div class="ds-row" style="margin-top:.6rem">
         <span class="ds-name">football-data.org</span>
-        <span class="ds-badge free">gratuito</span>
+        <span class="ds-badge free" style="opacity:.5">gratuito · sem Copa</span>
         <span class="ds-status" id="fd-status">não configurado</span>
       </div>
-      <input id="fd-key-input" type="password" placeholder="Chave API football-data.org" autocomplete="off">
+      <input id="fd-key-input" type="password" placeholder="Chave API football-data.org (ligas domésticas)" autocomplete="off">
 
       <div class="ds-row">
         <span class="ds-name">StatsBomb</span>
@@ -581,10 +588,15 @@ let _cardCount    = 0;
 let _history      = [];
 const HIST_KEY    = 'copa2026_history';
 const SCHED_STORE = 'copa2026_sched_v2';
-const SCHED_TTL   = 6 * 60 * 60 * 1000;
+const SCHED_TTL   = 24 * 60 * 60 * 1000; // 24h — era 6h (causava refresh Haiku silencioso)
 const CTX_STORE   = 'copa2026_ctx_v1';
-const CTX_TTL     = 4 * 60 * 60 * 1000;
+const CTX_TTL     = 12 * 60 * 60 * 1000; // 12h — era 4h
 // Data API keys (localStorage — read-only data providers)
+const AF_KEY_STORE= 'copa2026_af_key';
+const AF_BASE     = 'https://v3.football.api-sports.io';
+const AF_TTL      = 20 * 60 * 1000;
+const AF_FIX_TTL  = 15 * 60 * 1000;
+const AF_WC_LEAGUE= 1;
 const FD_KEY_STORE= 'copa2026_fd_key';
 const SB_KEY_STORE= 'copa2026_sb_key';
 const OP_KEY_STORE= 'copa2026_op_key';
@@ -1137,8 +1149,11 @@ function _saveSchedCache(jogos){
   try{localStorage.setItem(SCHED_STORE,JSON.stringify({fetched_at:Date.now(),jogos}));}catch(e){}
 }
 function loadSchedule(force){
+  if(getAfKey()){
+    if(force){try{localStorage.removeItem('copa2026_af_fixtures_v1');}catch{}}
+    loadAfData();return;
+  }
   if(getFdKey()){
-    // FD key configurada: usa API determinística (respeita force via bust de cache)
     if(force){try{localStorage.removeItem('copa2026_fd_matches_v1');}catch{}}
     loadFdData();return;
   }
@@ -1147,8 +1162,7 @@ function loadSchedule(force){
     _schedule=cache.jogos;
     renderScheduleChips(_schedule);
     if(_currentView==='library')renderLibrary();
-    const age=Date.now()-(cache.fetched_at||0);
-    if(age>SCHED_TTL)fetchScheduleFromApi(true);
+    // removido: refresh silencioso que consumia tokens Haiku em background
   }else{
     fetchScheduleFromApi(false);
   }
@@ -1221,7 +1235,7 @@ function getTournamentCtxString(){
   }catch{return'';}
 }
 function loadTournamentCtx(force){
-  if(getFdKey())return; // loadFdData() já atualiza CTX_STORE — evita race condition
+  if(getAfKey()||getFdKey())return; // loadAfData/loadFdData já atualiza CTX_STORE — evita race condition
   const cache=_loadCtxCache();
   if(cache&&!force){const age=Date.now()-(cache.fetched_at||0);if(age<CTX_TTL)return;}
   fetchTournamentCtxFromApi();
@@ -1233,7 +1247,7 @@ async function fetchTournamentCtxFromApi(){
   const SP=`Copa do Mundo 2026 — agente de contexto. Data: ${today}. Pesquise e retorne APENAS JSON válido (sem markdown): {"fase_atual":"string","standings":{"GrupoA":[{"time":"","pts":0,"j":0,"v":0,"e":0,"d":0,"gp":0,"gc":0}]},"results":[{"data":"DD/MM","mandante":"","placar":"N-N","visitante":""}]}. Inclua todos os grupos ativos e os últimos 12 resultados.`;
   const msgs=[{role:'user',content:`Tabela de classificação e resultados recentes da Copa do Mundo 2026 até ${today}.`}];
   try{
-    for(let i=0;i<8;i++){
+    for(let i=0;i<4;i++){
       const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]})});
       const data=await res.json();if(!res.ok)return;
       if(data.stop_reason==='end_turn'){
@@ -1381,6 +1395,108 @@ async function loadFdData(){
   updateFdStatus('ok',`${standings?'classificação':''}${standings&&matches?' · ':''}${matches?`${(matches.matches||[]).length} jogos`:''}`);
 }
 
+// ─── API-Football (v3.football.api-sports.io) ────────────────────────────
+let _afLastError='';
+function getAfKey(){try{return localStorage.getItem(AF_KEY_STORE)||'';}catch{return'';}}
+function updateAfStatus(state,msg){const el=document.getElementById('af-status');if(!el)return;el.className='ds-status'+(state==='ok'?' ok':state==='err'?' err':'');el.textContent=msg||'';}
+function _afUrl(path,key){
+  // Pass key as URL param (avoids CORS preflight from file:// origin)
+  const sep=path.includes('?')?'&':'?';
+  const direct=`${AF_BASE}${path}${sep}x-apisports-key=${encodeURIComponent(key)}`;
+  return _fdNeedProxy?`https://corsproxy.io/?url=${encodeURIComponent(direct)}`:direct;
+}
+async function fetchAf(path,cacheKey,ttl=AF_TTL){
+  try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
+  const key=getAfKey();if(!key)return null;
+  try{
+    const res=await fetch(_afUrl(path,key)); // no custom headers — simple GET, no preflight
+    if(!res.ok){_afLastError=`Erro ${res.status}`;return null;}
+    const data=await res.json();
+    if(data.errors&&Object.keys(data.errors).length){_afLastError=String(Object.values(data.errors)[0]);return null;}
+    try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}
+    return data;
+  }catch(e){_afLastError=`rede: ${e?.message||'timeout'}`;return null;}
+}
+async function getAfStandings(){return fetchAf(`/standings?league=${AF_WC_LEAGUE}&season=2026`,'copa2026_af_standings_v1');}
+async function getAfFixtures(){
+  const from=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const to=new Date(Date.now()+21*864e5).toISOString().slice(0,10);
+  return fetchAf(`/fixtures?league=${AF_WC_LEAGUE}&season=2026&from=${from}&to=${to}`,'copa2026_af_fixtures_v1',AF_FIX_TTL);
+}
+function formatAfContext(sData,fData){
+  const lines=[];
+  if(sData?.response?.[0]?.league?.standings){
+    lines.push('=== CLASSIFICAÇÃO (API-Football) ===');
+    sData.response[0].league.standings.forEach(group=>{
+      if(!group.length)return;
+      const gName=group[0].group||'Grupo';
+      lines.push(gName+':');
+      group.forEach(r=>lines.push(`  ${r.rank}. ${r.team.name} — Pts:${r.points} J:${r.all.played} V:${r.all.win} E:${r.all.draw} D:${r.all.lose} GP:${r.all.goals.for} GC:${r.all.goals.against}`));
+    });
+  }
+  if(fData?.response?.length){
+    const finished=fData.response.filter(f=>f.fixture.status.short==='FT').slice(-15);
+    if(finished.length){
+      lines.push('\n=== RESULTADOS RECENTES ===');
+      finished.forEach(f=>{const d=new Date(f.fixture.date);lines.push(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name}`);});
+    }
+    const live=fData.response.filter(f=>['1H','HT','2H','ET','P'].includes(f.fixture.status.short));
+    if(live.length){lines.push('\n=== AO VIVO ===');live.forEach(f=>lines.push(`${f.teams.home.name} ${f.goals.home??0}-${f.goals.away??0} ${f.teams.away.name} [${f.fixture.status.elapsed}']`));}
+    const sched=fData.response.filter(f=>f.fixture.status.short==='NS').slice(0,10);
+    if(sched.length){lines.push('\n=== PRÓXIMAS PARTIDAS ===');sched.forEach(f=>{const d=new Date(f.fixture.date);lines.push(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${f.teams.home.name} x ${f.teams.away.name}`);});}
+  }
+  return lines.join('\n');
+}
+function afFixturesToSchedule(fData){
+  if(!fData?.response?.length)return[];
+  return fData.response.map(f=>{
+    const d=new Date(f.fixture.date);
+    const brt=new Date(d.getTime()-3*3600000);
+    const round=f.league?.round||'';
+    const isGroup=round.toLowerCase().includes('group');
+    return{
+      mandante:f.teams.home.name,visitante:f.teams.away.name,
+      fase:round||'Copa do Mundo 2026',
+      grupo:isGroup?round.replace(/Group Stage - /i,'Grupo '):null,
+      data_iso:d.toISOString().slice(0,10),
+      hora_brt:`${String(brt.getUTCHours()).padStart(2,'0')}:${String(brt.getUTCMinutes()).padStart(2,'0')}`,
+      sede:f.fixture.venue?.city||''
+    };
+  }).filter(j=>j.mandante&&j.visitante);
+}
+async function loadAfData(){
+  const key=getAfKey();if(!key){updateAfStatus('','não configurado');return;}
+  updateAfStatus('','verificando…');
+  const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
+  if(!standings&&!fixtures){updateAfStatus('err',_afLastError||'sem resposta');return;}
+  const ctx={fase_atual:'',standings:{},results:[]};
+  if(standings?.response?.[0]?.league?.standings){
+    standings.response[0].league.standings.forEach(group=>{
+      if(!group.length)return;
+      const gName=(group[0].group||'Grupo').replace(/Group /i,'Grupo ');
+      ctx.standings[gName]=group.map(r=>({time:r.team.name,pts:r.points,j:r.all.played,v:r.all.win,e:r.all.draw,d:r.all.lose,gp:r.all.goals.for,gc:r.all.goals.against}));
+    });
+  }
+  if(fixtures?.response?.length){
+    ctx.results=fixtures.response.filter(f=>f.fixture.status.short==='FT').slice(-15).map(f=>{
+      const d=new Date(f.fixture.date);
+      return{data:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`,mandante:f.teams.home.name,placar:`${f.goals.home}-${f.goals.away}`,visitante:f.teams.away.name};
+    });
+    const live=fixtures.response.find(f=>['1H','HT','2H','ET','P'].includes(f.fixture.status.short));
+    const sched=fixtures.response.find(f=>f.fixture.status.short==='NS');
+    if(live||sched)ctx.fase_atual=(live||sched).league?.round||'';
+  }
+  _saveCtxCache(ctx);
+  if(fixtures?.response?.length){
+    const jogos=afFixturesToSchedule(fixtures);
+    if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}
+  }
+  const liveN=(fixtures?.response||[]).filter(f=>['1H','HT','2H','ET','P'].includes(f.fixture.status.short)).length;
+  const schedN=(fixtures?.response||[]).filter(f=>f.fixture.status.short==='NS').length;
+  const parts=[];if(standings)parts.push('classificação');if(liveN)parts.push(`${liveN} ao vivo`);if(schedN)parts.push(`${schedN} agendados`);
+  updateAfStatus('ok',parts.join(' · ')||'ok');
+}
+
 function fillMatch(i){
   const j=_schedule[i];if(!j)return;
   if(_currentView==='library')showView('chat');
@@ -1487,6 +1603,22 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
 
 // ─── Data API key listeners ───────────────────────────────────────────────
 (function initDataKeys(){
+  // API-Football
+  const afInp=document.getElementById('af-key-input');
+  const afSaved=localStorage.getItem(AF_KEY_STORE)||'';
+  if(afSaved){afInp.value=afSaved;setTimeout(loadAfData,200);}else{updateAfStatus('','não configurado');}
+  let _afDeb=null;
+  afInp.addEventListener('input',function(){
+    clearTimeout(_afDeb);
+    const v=this.value.trim();
+    try{if(v)localStorage.setItem(AF_KEY_STORE,v);else localStorage.removeItem(AF_KEY_STORE);}catch{}
+    _afDeb=setTimeout(loadAfData,800);
+  });
+  afInp.addEventListener('blur',function(){
+    clearTimeout(_afDeb);
+    const v=this.value.trim();
+    if(v)loadAfData();
+  });
   // football-data.org
   const fdInp=document.getElementById('fd-key-input');
   const saved=localStorage.getItem(FD_KEY_STORE)||'';
@@ -1528,9 +1660,12 @@ loadHistory();renderRecentAnalyses();
 
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate){
-  // Pre-fetch deterministic data from football-data.org (if key available)
+  // Pre-fetch deterministic data: AF first (supports WC), FD as fallback
   let fdCtx='';
-  if(getFdKey()){
+  if(getAfKey()){
+    const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
+    fdCtx=formatAfContext(standings,fixtures);
+  }else if(getFdKey()){
     const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
     fdCtx=formatFdContext(standings,matches);
   }
@@ -1538,7 +1673,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate){
   const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-RESULTADOS E CLASSIFICAÇÃO JÁ FORAM OBTIDOS VIA API OFICIAL (football-data.org) — veja abaixo.
+RESULTADOS E CLASSIFICAÇÃO JÁ FORAM OBTIDOS VIA API OFICIAL — veja abaixo.
 NÃO pesquise resultados nem classificação. Pesquise APENAS:
 ① "[Mandante] [Visitante] lesões suspensões escalação Copa 2026"
 ② [só se xG ausente nos dados] "[Mandante] [Visitante] xG Copa 2026"
@@ -1561,7 +1696,7 @@ SEQUÊNCIA (em português, nesta ordem):
 
 Após as buscas, preencha o JSON. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:query}];
-  for(let i=0;i<8;i++){
+  for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]}),signal});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}

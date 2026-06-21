@@ -1257,24 +1257,29 @@ function _parseFdHeaders(res){
   if(!isNaN(left))_fdRateLeft=left;
   if(!isNaN(reset))_fdRateReset=Date.now()+reset*1000;
 }
+// file:// origin sends Origin:null — most APIs block it. Route via CORS proxy when needed.
+const _fdNeedProxy=location.protocol==='file:'||location.origin==='null';
+function _fdUrl(path,key){
+  const sep=path.includes('?')?'&':'?';
+  const direct=`${FD_BASE}${path}${sep}token=${key}`;
+  return _fdNeedProxy?`https://corsproxy.io/?url=${encodeURIComponent(direct)}`:direct;
+}
 async function fetchFd(path,cacheKey,ttl=FD_TTL){
   try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
   const key=getFdKey();if(!key)return null;
-  // Pre-wait if rate limit exhausted
   if(_fdRateLeft<=0&&_fdRateReset>Date.now()){
     const ms=_fdRateReset-Date.now()+300;
     updateFdStatus('','aguardando rate limit…');
     await new Promise(r=>setTimeout(r,ms));
   }
   try{
-    const sep=path.includes('?')?'&':'?';
-    const res=await fetch(`${FD_BASE}${path}${sep}token=${key}`);
+    const res=await fetch(_fdUrl(path,key));
     _parseFdHeaders(res);
     if(res.status===429){
       const wait=(_fdRateReset>Date.now()?_fdRateReset-Date.now():60000)+300;
       updateFdStatus('err',`rate limit · retry em ${Math.ceil(wait/1000)}s`);
       await new Promise(r=>setTimeout(r,wait));
-      const r2=await fetch(`${FD_BASE}${path}${sep}token=${key}`);
+      const r2=await fetch(_fdUrl(path,key));
       _parseFdHeaders(r2);
       if(!r2.ok){_fdLastError=`Erro ${r2.status}`;return null;}
       const d2=await r2.json();

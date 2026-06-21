@@ -1267,13 +1267,14 @@ async function fetchFd(path,cacheKey,ttl=FD_TTL){
     await new Promise(r=>setTimeout(r,ms));
   }
   try{
-    const res=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
+    const sep=path.includes('?')?'&':'?';
+    const res=await fetch(`${FD_BASE}${path}${sep}token=${key}`);
     _parseFdHeaders(res);
     if(res.status===429){
       const wait=(_fdRateReset>Date.now()?_fdRateReset-Date.now():60000)+300;
       updateFdStatus('err',`rate limit · retry em ${Math.ceil(wait/1000)}s`);
       await new Promise(r=>setTimeout(r,wait));
-      const r2=await fetch(`${FD_BASE}${path}`,{headers:{'X-Auth-Token':key}});
+      const r2=await fetch(`${FD_BASE}${path}${sep}token=${key}`);
       _parseFdHeaders(r2);
       if(!r2.ok){_fdLastError=`Erro ${r2.status}`;return null;}
       const d2=await r2.json();

@@ -467,19 +467,28 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
    VERDANT DESIGN SYSTEM — glassmorphism overrides
    ══════════════════════════════════════════════ */
 
-/* Blob animations */
-@keyframes wc-blob1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(6%,8%) scale(1.07)}66%{transform:translate(-5%,4%) scale(.95)}}
-@keyframes wc-blob2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(-8%,6%) scale(1.05)}70%{transform:translate(4%,-5%) scale(.97)}}
-@keyframes wc-blob3{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(5%,-4%) scale(.94)}75%{transform:translate(-4%,7%) scale(1.08)}}
-@keyframes wc-pop{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+/* Blob animations — all use transform only for 60fps GPU compositing */
+@keyframes wc-blob1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(40px,-30px) scale(1.15)}66%{transform:translate(-25px,20px) scale(.92)}}
+@keyframes wc-blob2{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(-50px,40px) scale(1.2)}70%{transform:translate(30px,-20px) scale(.96)}}
+@keyframes wc-blob3{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(20px,-15px) scale(.94)}75%{transform:translate(-15px,25px) scale(1.1)}}
+@keyframes wc-pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes wc-aura{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.08)}}
+@keyframes wc-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .wc-blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 .wc-blob{position:absolute;border-radius:50%}
-.wc-blob1{width:55vw;height:55vw;top:-8%;left:-5%;background:radial-gradient(circle,rgba(40,217,142,.38),transparent 62%);filter:blur(80px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
-.wc-blob2{width:45vw;height:45vw;top:20%;right:-5%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(90px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
-.wc-blob3{width:40vw;height:40vw;bottom:-12%;left:20%;background:radial-gradient(circle,rgba(40,100,217,.18),transparent 58%);filter:blur(100px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
+.wc-blob1{width:520px;height:520px;top:-120px;left:18%;background:radial-gradient(circle,rgba(40,217,142,.4),transparent 62%);filter:blur(80px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
+.wc-blob2{width:480px;height:480px;bottom:-160px;right:6%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(90px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
+.wc-blob3{width:420px;height:420px;top:32%;left:38%;background:radial-gradient(circle,rgba(232,196,106,.13),transparent 58%);filter:blur(100px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
 
-/* Lime gradient text */
+/* Gradient text utilities */
 .wc-lime{background:linear-gradient(100deg,#d6f95a,#8fe87a 50%,#28d98e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
+.wc-gold{background:linear-gradient(100deg,#f5d87a,#e8c46a,#c9973c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
+
+/* ── Emblem (logo) ── */
+.ls-emblem{position:relative;width:46px;height:46px;flex-shrink:0}
+.ls-emblem-aura{position:absolute;inset:-5px;border-radius:18px;background:conic-gradient(from 140deg,#28d98e,#d6f95a,#e8c46a,#28d98e);filter:blur(8px);opacity:.85;animation:wc-aura 7s ease-in-out infinite;will-change:transform}
+.ls-emblem-face{position:absolute;inset:0;border-radius:16px;background:linear-gradient(150deg,#1a2e22,#0a1812);border:1px solid rgba(180,250,200,.3);box-shadow:inset 0 2px 4px rgba(255,255,255,.18),inset 0 -6px 14px rgba(0,0,0,.5),0 0 24px rgba(40,217,142,.45);display:flex;align-items:center;justify-content:center}
+.ls-emblem-trophy{font-size:26px;filter:drop-shadow(0 3px 9px rgba(232,196,106,.5));position:relative;z-index:1;line-height:1}
 
 /* ── Glass panels ── */
 .l-sb{
@@ -506,14 +515,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 }
 
 /* ── Sidebar internals ── */
-.ls-name{font-family:var(--sans);font-style:normal;font-weight:800;font-size:1rem;letter-spacing:.01em;color:var(--deep)}
+.ls-name{font-family:var(--sans);font-style:normal;font-weight:800;font-size:15px;letter-spacing:.02em;color:var(--deep);line-height:1.15}
+.ls-name-agent{display:block;font-weight:800;font-size:15px;letter-spacing:.22em}
 .ls-tag{color:var(--dim)}
-.ls-new{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;border-radius:12px;box-shadow:0 6px 20px rgba(67,224,143,.25);font-weight:600}
-.ls-new:hover{background:linear-gradient(120deg,#c8f040,#30cf7a);box-shadow:0 8px 26px rgba(67,224,143,.38)}
+.ls-new{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;border-radius:14px;box-shadow:0 10px 26px rgba(67,224,143,.3),inset 0 1px 0 rgba(255,255,255,.55);font-weight:700;transition:transform .15s,box-shadow .15s}
+.ls-new:hover{background:linear-gradient(120deg,#d6f95a,#43e08f);transform:translateY(-1px);box-shadow:0 14px 32px rgba(67,224,143,.45),inset 0 1px 0 rgba(255,255,255,.55)}
 .ls-link{color:var(--muted)}
-.ls-link:hover{background:rgba(255,255,255,.06);color:var(--deep)}
-.ls-link.active{background:linear-gradient(135deg,rgba(255,255,255,.18),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);color:var(--deep);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 14px rgba(67,224,143,.1)}
-.ls-link.active svg{stroke:var(--deep)}
+.ls-link:hover{background:rgba(255,255,255,.05);color:var(--deep)}
+.ls-link.active{background:linear-gradient(120deg,rgba(255,255,255,.2),rgba(160,240,190,.06));border:1px solid rgba(180,250,200,.36);color:#f3faf2;font-weight:600;box-shadow:0 0 26px rgba(67,224,143,.22),inset 0 1px 0 rgba(255,255,255,.28)}
+.ls-link.active svg{stroke:#a6f24a;filter:drop-shadow(0 0 5px rgba(120,240,120,.6))}
 .ls-link svg{stroke:var(--muted)}
 .ls-soon-tag{background:rgba(255,255,255,.06);color:var(--muted)}
 .ls-foot{border-top:1px solid rgba(160,240,190,.1)}
@@ -534,8 +544,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .m-sub{color:var(--muted)}
 .hdr-ic{background:rgba(255,255,255,.04);border:1px solid rgba(160,240,190,.14);color:var(--muted)}
 .hdr-ic:hover{background:rgba(255,255,255,.09);color:var(--mid)}
-.hdr-primary{background:rgba(255,255,255,.05);border:1px solid rgba(160,240,190,.16);color:var(--muted);font-weight:500}
-.hdr-primary:hover{background:rgba(255,255,255,.09);color:var(--mid)}
+.hdr-primary{background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid rgba(160,240,190,.18);color:var(--muted);font-weight:500;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:13px;transition:all .16s}
+.hdr-primary:hover{border-color:rgba(214,249,90,.4);box-shadow:0 0 22px rgba(67,224,143,.2);color:var(--deep)}
 .m-burger{color:var(--deep)}
 .m-burger:hover{background:rgba(255,255,255,.06)}
 
@@ -563,7 +573,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* ── Thinking indicator ── */
 .thk-compact{background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.thk-star{color:var(--green);filter:drop-shadow(0 0 6px rgba(67,224,143,.8))}
+.thk-star{color:#43e08f;filter:drop-shadow(0 0 6px rgba(67,224,143,.8));animation:wc-spin 1.5s linear infinite!important}
 .thk-lbl{color:var(--muted);font-style:normal}
 .thk-pill{background:rgba(40,217,142,.1);color:#7af0b4}
 .thk-sep{color:var(--dim)}
@@ -576,10 +586,16 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* ── Analysis card ── */
 .a-card{
+  position:relative;isolation:isolate;
   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
   border:1px solid rgba(160,240,190,.15);border-radius:22px;
   backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.4)
+}
+.a-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:130px;
+  background:radial-gradient(70% 100% at 22% 0%,rgba(67,224,143,.18),transparent 72%);
+  pointer-events:none;z-index:-1;border-radius:22px 22px 0 0
 }
 .a-hdr{background:transparent}
 .a-agent{background:transparent}
@@ -590,11 +606,16 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .a-ic{color:var(--muted)}
 .a-ic:hover{color:var(--mid)}
 .a-status{color:var(--dim)}
-.a-title{font-family:var(--sans);font-style:normal;font-weight:800;font-size:1.5rem;letter-spacing:-.02em;color:var(--deep);padding:0 1.1rem .7rem}
-.a-tabs{border-bottom:1px solid rgba(160,240,190,.1)}
-.a-tab{color:var(--muted);font-weight:600;border-bottom:2px solid transparent}
+.a-title{font-family:var(--sans);font-style:normal;font-weight:800;font-size:1.7rem;letter-spacing:-.02em;color:var(--deep);padding:0 1.1rem .7rem;line-height:1.15}
+.a-subtitle{display:block;font-size:.72rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:0 1.1rem .35rem}
+/* Tab pill slider */
+.a-tabs{position:relative;border-bottom:1px solid rgba(160,240,190,.1);overflow:visible}
+.a-tab-pill{position:absolute;bottom:0;height:100%;background:rgba(255,255,255,.08);border-radius:13px 13px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 -2px 16px rgba(67,224,143,.08);transition:left .34s cubic-bezier(.45,.05,.2,1),width .34s cubic-bezier(.45,.05,.2,1);pointer-events:none;will-change:left,width}
+.a-tab-pill::before{content:'';position:absolute;bottom:0;left:-11px;width:11px;height:11px;background:radial-gradient(circle at top right,transparent 11px,rgba(255,255,255,.08) 11px)}
+.a-tab-pill::after{content:'';position:absolute;bottom:0;right:-11px;width:11px;height:11px;background:radial-gradient(circle at top left,transparent 11px,rgba(255,255,255,.08) 11px)}
+.a-tab{color:var(--muted);font-weight:600;border-bottom:none;position:relative;z-index:1}
 .a-tab:hover{color:var(--mid)}
-.a-tab.active{color:var(--deep);border-bottom-color:var(--lime-mid)}
+.a-tab.active{color:#f3faf2}
 .tab-s{border-bottom:1px solid rgba(160,240,190,.1)}
 .tab-h{font-family:var(--sans);font-style:normal;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:#9fe87f}
 .tab-body{color:var(--mid)}
@@ -606,8 +627,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .pname{color:var(--mid);font-size:14px;font-weight:500}
 .ppct{color:var(--deep);font-size:1.45rem;font-weight:800}
 .prange{color:var(--dim)}
-.btrack{background:rgba(255,255,255,.07);border-radius:5px}
-.bfill{background:linear-gradient(90deg,#28d98e,#a6f24a);box-shadow:0 0 14px rgba(120,240,120,.55)}
+.btrack{background:rgba(255,255,255,.07);border-radius:5px;height:7px!important}
+.bfill{background:linear-gradient(90deg,#28d98e,#a6f24a);box-shadow:0 0 16px rgba(120,240,120,.6);transition:width 1.1s cubic-bezier(.22,.61,.36,1)!important}
 
 /* ── Stat tiles ── */
 .s3{gap:10px}
@@ -688,8 +709,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .tok-ring-fill{fill:none;stroke:var(--lime-mid);stroke-width:3;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(120,240,120,.7))}
 .i-clear{background:rgba(255,255,255,.04);border:1px solid rgba(160,240,190,.14);color:var(--muted)}
 .i-clear:hover{background:rgba(255,255,255,.08);color:var(--mid)}
-.i-analyze{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;font-weight:700;border-radius:12px;box-shadow:0 8px 24px rgba(67,224,143,.3)}
-.i-analyze:hover:not(:disabled){opacity:.92;box-shadow:0 12px 30px rgba(67,224,143,.45);transform:translateY(-1px)}
+.i-analyze{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;font-weight:700;border-radius:12px;box-shadow:0 10px 26px rgba(67,224,143,.34),inset 0 1px 0 rgba(255,255,255,.55);transition:transform .15s,box-shadow .15s}
+.i-analyze:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 34px rgba(67,224,143,.5),inset 0 1px 0 rgba(255,255,255,.55)}
 .i-analyze:disabled{opacity:.45;cursor:not-allowed}
 .i-analyze.i-stop{background:rgba(255,255,255,.1);color:var(--mid);box-shadow:none;transform:none}
 .i-analyze.i-stop:hover:not(:disabled){background:rgba(255,255,255,.16)}
@@ -716,7 +737,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-vs{color:var(--dim)}
 .rs-det{color:var(--mid)}
 .rs-insight{border-bottom:1px solid rgba(160,240,190,.09)}
-.rs-ins-dot{background:var(--lime-mid);border-color:var(--lime-mid);box-shadow:0 0 7px rgba(120,240,120,.7)}
+.rs-ins-dot{width:6px;height:6px;border-radius:50%;background:#a6f24a;border:none;box-shadow:0 0 9px rgba(120,240,120,.8);flex-shrink:0;margin-top:5px}
 .rs-srow{border-bottom:1px solid rgba(160,240,190,.09)}
 .rs-sv-l{color:var(--lime-mid)}
 .rs-sv-r{color:var(--mid)}
@@ -826,9 +847,14 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
   <!-- ── LEFT SIDEBAR ── -->
   <aside class="l-sb" id="l-sb">
     <div class="ls-brand">
-      <div class="ls-ball">🏆</div>
+      <div class="ls-emblem">
+        <div class="ls-emblem-aura"></div>
+        <div class="ls-emblem-face">
+          <span class="ls-emblem-trophy">🏆</span>
+        </div>
+      </div>
       <div>
-        <div class="ls-name">WorldCup <span class="wc-lime">Agent</span></div>
+        <div class="ls-name">WORLDCUP<span class="ls-name-agent wc-lime">AGENT</span></div>
         <div class="ls-tag">Copa 2026 · IA Tática</div>
       </div>
     </div>
@@ -1017,13 +1043,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
     <!-- Key insights -->
     <div class="rs-block" id="rs-insights" style="display:none">
-      <div class="rs-lbl">Insights Chave</div>
+      <div class="rs-lbl">Insights Rápidos</div>
       <div id="rs-insights-list"></div>
     </div>
 
     <!-- Match stats -->
     <div class="rs-block" id="rs-stats" style="display:none">
-      <div class="rs-lbl">Dados da Partida</div>
+      <div class="rs-lbl">Estatísticas Comparativas</div>
       <div id="rs-stats-list"></div>
     </div>
 
@@ -1541,7 +1567,17 @@ function showTab(cardId,tab){
   card.querySelectorAll('.a-tab').forEach(t=>t.classList.remove('active'));
   const tc=document.getElementById(`at-${tab}-${cardId}`);if(tc)tc.style.display='block';
   const tabs=['resumo','tatica','individual','avancado'];
-  const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];if(btn)btn.classList.add('active');
+  const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];
+  if(btn){
+    btn.classList.add('active');
+    const pill=card.querySelector('.a-tab-pill');
+    if(pill){pill.style.left=btn.offsetLeft+'px';pill.style.width=btn.offsetWidth+'px';}
+  }
+}
+function initTabPill(cardEl){
+  const btn=cardEl.querySelector('.a-tab.active');
+  const pill=cardEl.querySelector('.a-tab-pill');
+  if(btn&&pill){pill.style.transition='none';pill.style.left=btn.offsetLeft+'px';pill.style.width=btn.offsetWidth+'px';requestAnimationFrame(()=>{pill.style.transition='';});}
 }
 function copyAnalysis(id){
   const c=document.getElementById('acard-'+id);
@@ -1583,11 +1619,14 @@ function updateRightSidebar(d,prob){
   document.getElementById('rs-stats-list').innerHTML=`
     <div class="rs-sh"><span>${hn.split(' ')[0]}</span><span>${an.split(' ')[0]}</span></div>
     <div class="rs-srow"><span class="rs-sv-l">${ph}%</span><span class="rs-slbl">Vitória</span><span class="rs-sv-r">${pa}%</span></div>
-    <div class="rs-sbar"><div class="rs-bh" style="width:${ph}%"></div><div class="rs-ba" style="width:${pa}%"></div></div>
+    <div class="rs-sbar"><div class="rs-bh" data-w="${ph}" style="width:0%;transition:width .9s cubic-bezier(.22,.61,.36,1)"></div><div class="rs-ba" data-w="${pa}" style="width:0%;transition:width .9s cubic-bezier(.22,.61,.36,1)"></div></div>
     <div class="rs-srow"><span class="rs-sv-l">${hxg}</span><span class="rs-slbl">xG marcado</span><span class="rs-sv-r">${axg}</span></div>
     <div class="rs-srow"><span class="rs-sv-l">${d.mandante?.xg_sofrido??'—'}</span><span class="rs-slbl">xG sofrido</span><span class="rs-sv-r">${d.visitante?.xg_sofrido??'—'}</span></div>
     <div class="rs-srow"><span class="rs-sv-l">${hr}</span><span class="rs-slbl">Ranking FIFA</span><span class="rs-sv-r">${ar}</span></div>`;
   document.getElementById('rs-stats').style.display='block';
+  requestAnimationFrame(()=>{requestAnimationFrame(()=>{
+    document.querySelectorAll('.rs-bh[data-w],.rs-ba[data-w]').forEach(b=>b.style.width=b.dataset.w+'%');
+  });});
 }
 
 // ─── Histórico de análises (persistente em localStorage) ───────────────────
@@ -1701,7 +1740,7 @@ function renderResults(d,opts){
   const tabTatica=`
     <div class="tab-s">
       <div class="tab-h">1. Probabilidades · Resultado</div>
-      ${[{lbl:hn,v:prob.home,lo:pL.home,hi:pH.home},{lbl:'Empate',v:prob.draw,lo:pL.draw,hi:pH.draw},{lbl:an,v:prob.away,lo:pL.away,hi:pH.away}].map(b=>`<div class="prow"><div class="pmeta"><span class="pname">${b.lbl}</span><span class="ppct">${pct(b.v)}</span></div><div class="btrack"><div class="bfill" style="width:${Math.round(b.v*100)}%"></div></div><div class="prange">faixa ${pct(b.lo)}–${pct(b.hi)}</div></div>`).join('')}
+      ${[{lbl:hn,v:prob.home,lo:pL.home,hi:pH.home},{lbl:'Empate',v:prob.draw,lo:pL.draw,hi:pH.draw},{lbl:an,v:prob.away,lo:pL.away,hi:pH.away}].map(b=>`<div class="prow"><div class="pmeta"><span class="pname">${b.lbl}</span><span class="ppct">${pct(b.v)}</span></div><div class="btrack"><div class="bfill" data-w="${Math.round(b.v*100)}" style="width:0%"></div></div><div class="prange">faixa ${pct(b.lo)}–${pct(b.hi)}</div></div>`).join('')}
     </div>
     <div class="tab-s">
       <div class="tab-h">2. Mercados de Gols</div>
@@ -1721,7 +1760,7 @@ function renderResults(d,opts){
     </div>`:''}
     ${d.eventos_provaveis?.length?`<div class="tab-s">
       <div class="tab-h">4. Eventos Prováveis</div>
-      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" style="width:${Math.round((e.probabilidade||0)*100)}%"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
+      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="width:0%"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
     </div>`:''}
     ${(d.tecnico_mandante?.nome||d.tecnico_visitante?.nome)?`<div class="tab-s">
       <div class="tab-h">5. Perfil dos Técnicos</div>
@@ -1767,6 +1806,7 @@ function renderResults(d,opts){
     <div class="disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira</div>`;
 
   // ── Full card ──
+  const titleHtml=(d.partida||'Análise').replace(/×/g,'<span class="wc-gold">×</span>');
   const el=document.createElement('div');
   el.innerHTML=`<div class="a-card" id="acard-${id}">
     <div class="a-hdr">
@@ -1782,11 +1822,13 @@ function renderResults(d,opts){
       </div>
     </div>
     <div class="a-status">Análise concluída com sucesso</div>
-    <div class="a-title">${esc(d.partida||'Análise')}</div>
+    <div class="a-subtitle">${esc(d.fase||'Copa do Mundo 2026')}</div>
+    <div class="a-title">${titleHtml}</div>
     <div class="a-tabs">
-      <button class="a-tab active" onclick="showTab(${id},'resumo')">Resumo Executivo</button>
-      <button class="a-tab" onclick="showTab(${id},'tatica')">Análise Tática</button>
-      <button class="a-tab" onclick="showTab(${id},'individual')">Desempenho Individual</button>
+      <div class="a-tab-pill"></div>
+      <button class="a-tab active" onclick="showTab(${id},'resumo')">Resumo</button>
+      <button class="a-tab" onclick="showTab(${id},'tatica')">Tática</button>
+      <button class="a-tab" onclick="showTab(${id},'individual')">Desempenho</button>
       <button class="a-tab" onclick="showTab(${id},'avancado')">Dados Avançados</button>
     </div>
     <div id="at-resumo-${id}" class="a-tc">${tabResumo}</div>
@@ -1798,6 +1840,13 @@ function renderResults(d,opts){
   const hid=opts.hid||('h'+Date.now().toString(36)+id);
   cardEl.dataset.hid=hid;
   document.getElementById('conversation').appendChild(cardEl);
+  // Animate bars from 0→value and init tab pill
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      cardEl.querySelectorAll('.bfill[data-w],.ev-bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%');
+      initTabPill(cardEl);
+    });
+  });
 
   updateRightSidebar(d,prob);
   if(opts.save!==false)saveAnalysis(hid,d);

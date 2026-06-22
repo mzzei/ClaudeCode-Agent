@@ -489,6 +489,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ls-emblem-aura{position:absolute;inset:-5px;border-radius:18px;background:conic-gradient(from 140deg,#28d98e,#d6f95a,#e8c46a,#28d98e);filter:blur(8px);opacity:.85;animation:wc-aura 7s ease-in-out infinite;will-change:transform}
 .ls-emblem-face{position:absolute;inset:0;border-radius:16px;background:linear-gradient(150deg,#1a2e22,#0a1812);border:1px solid rgba(180,250,200,.3);box-shadow:inset 0 2px 4px rgba(255,255,255,.18),inset 0 -6px 14px rgba(0,0,0,.5),0 0 24px rgba(40,217,142,.45);display:flex;align-items:center;justify-content:center}
 .ls-emblem-trophy{width:27px;height:33px;filter:drop-shadow(0 3px 9px rgba(232,196,106,.55));position:relative;z-index:1;display:block}
+.ls-emblem-photo{position:absolute;inset:-9%;width:118%;height:118%;object-fit:contain;z-index:2;mix-blend-mode:screen;filter:drop-shadow(0 3px 9px rgba(232,196,106,.55));pointer-events:none}
 
 /* ── Glass panels ── */
 .l-sb{
@@ -850,6 +851,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="ls-emblem">
         <div class="ls-emblem-aura"></div>
         <div class="ls-emblem-face">
+          <img class="ls-emblem-photo" src="assets/wc-trophy.png" alt="Taça da Copa do Mundo" onerror="this.remove()">
           <svg class="ls-emblem-trophy" viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg" aria-label="Taça da Copa do Mundo">
             <defs>
               <linearGradient id="wcgold" x1="0" y1="0" x2="1" y2="1">

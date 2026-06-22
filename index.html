@@ -888,25 +888,20 @@ function closeSettings(e){if(!e||e.target===document.getElementById('sov'))docum
 // ─── Model / Effort ──────────────────────────────────────────────────────
 function setEffort(val){
   currentEffort=Number(val);
-  document.getElementById('effort-cur').textContent=EFFORT_LEVELS[currentEffort].label;
+  const cur=document.getElementById('effort-cur');if(cur)cur.textContent=EFFORT_LEVELS[currentEffort].label;
   document.querySelectorAll('.estep').forEach((s,i)=>{s.classList.toggle('done',i<currentEffort);s.classList.toggle('cur',i===currentEffort);});
-  document.getElementById('effort-fg').style.width=(currentEffort/4*100)+'%';
-  // sync dock
+  const fg=document.getElementById('effort-fg');if(fg)fg.style.width=(currentEffort/4*100)+'%';
   const lbl=document.getElementById('effort-sel-lbl');if(lbl)lbl.textContent=EFFORT_LEVELS[currentEffort].label;
   document.querySelectorAll('#effort-pop .sp-opt').forEach((b,i)=>b.classList.toggle('sp-active',i===currentEffort));
 }
 function setModel(btn){
-  document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');currentModel=btn.dataset.model;
-  const ef=document.getElementById('effort-section');
+  currentModel=btn?.dataset?.model||btn;
   const isHaiku=currentModel==='claude-haiku-4-5-20251001';
-  if(isHaiku){ef.classList.add('disabled');setEffort(0);}
-  else ef.classList.remove('disabled');
-  if(tokenState.runs>0)updateTokenBar();
-  // sync dock
+  if(isHaiku)setEffort(0);
+  const efBtn=document.getElementById('effort-sel-btn');if(efBtn)efBtn.disabled=isHaiku;
   const lbl=document.getElementById('model-sel-lbl');if(lbl)lbl.textContent=MODEL_DOCK[currentModel]||'Modelo';
   document.querySelectorAll('#model-pop .sp-opt').forEach(b=>b.classList.toggle('sp-active',b.dataset.model===currentModel));
-  const efBtn=document.getElementById('effort-sel-btn');if(efBtn)efBtn.disabled=isHaiku;
+  if(tokenState.runs>0)updateTokenBar();
   updateDockTokens();
 }
 // ─── Dock selectors & token display ──────────────────────────────────────
@@ -971,7 +966,7 @@ function closeSelPops(){
   ['model-sel-btn','effort-sel-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('pop-open');});
 }
 function pickModel(id){
-  const btn=document.querySelector(`.mbtn[data-model="${id}"]`);if(btn)setModel(btn);
+  setModel({dataset:{model:id}});
   closeSelPops();
 }
 function pickEffort(idx){setEffort(idx);closeSelPops();}
@@ -1375,6 +1370,27 @@ function renderResults(d,opts){
       <div class="tab-h">4. Eventos Prováveis</div>
       ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" style="width:${Math.round((e.probabilidade||0)*100)}%"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
     </div>`:''}
+    ${(d.tecnico_mandante?.nome||d.tecnico_visitante?.nome)?`<div class="tab-s">
+      <div class="tab-h">5. Perfil dos Técnicos</div>
+      <div class="teams-full">
+        ${d.tecnico_mandante?.nome?`<div class="tcard">
+          <div class="tname">${hn}</div>
+          <div class="irow"><span class="ilbl">Treinador</span><span class="ival">${esc(d.tecnico_mandante.nome)}</span></div>
+          <div class="irow"><span class="ilbl">Formação</span><span class="ival">${esc(d.tecnico_mandante.formacao||'—')}</span></div>
+          ${d.tecnico_mandante.filosofia?`<div class="irow"><span class="ilbl">Filosofia</span><span class="ival">${esc(d.tecnico_mandante.filosofia)}</span></div>`:''}
+          ${d.tecnico_mandante.ajustes_copa?`<div class="tesc">${esc(d.tecnico_mandante.ajustes_copa)}</div>`:''}
+          ${d.tecnico_mandante.impacto_mercados?`<div class="tkeys">↪ ${esc(d.tecnico_mandante.impacto_mercados)}</div>`:''}
+        </div>`:'<div class="tcard"><div class="tname">${hn}</div><p class="tesc">Dados do técnico não disponíveis</p></div>'}
+        ${d.tecnico_visitante?.nome?`<div class="tcard">
+          <div class="tname">${an}</div>
+          <div class="irow"><span class="ilbl">Treinador</span><span class="ival">${esc(d.tecnico_visitante.nome)}</span></div>
+          <div class="irow"><span class="ilbl">Formação</span><span class="ival">${esc(d.tecnico_visitante.formacao||'—')}</span></div>
+          ${d.tecnico_visitante.filosofia?`<div class="irow"><span class="ilbl">Filosofia</span><span class="ival">${esc(d.tecnico_visitante.filosofia)}</span></div>`:''}
+          ${d.tecnico_visitante.ajustes_copa?`<div class="tesc">${esc(d.tecnico_visitante.ajustes_copa)}</div>`:''}
+          ${d.tecnico_visitante.impacto_mercados?`<div class="tkeys">↪ ${esc(d.tecnico_visitante.impacto_mercados)}</div>`:''}
+        </div>`:'<div class="tcard"><div class="tname">${an}</div><p class="tesc">Dados do técnico não disponíveis</p></div>'}
+      </div>
+    </div>`:''}
     ${confrontoHtml}`;
 
 
@@ -1462,25 +1478,31 @@ CONSCIÊNCIA TEMPORAL:
 3. Pondere o impacto da fase: grupos (poupar titulares, diferença de gols), mata-mata (prorrogação real, média de gols menor), Quartas/Semi/Final (cartões acumulados, pressão máxima)
 4. Sede: EUA, México (altitude), Canadá — impacto sobre os times
 
+FONTES CONFIÁVEIS (use apenas estas — nunca blogs sem credencial estatística):
+ESPN, BBC Sport, The Guardian Sport, FIFA.com oficial, UEFA.com, FBref.com, Sofascore, Opta/StatsBomb, Transfermarkt, SofaScore, WhoScored, Goal.com (apenas para confirmação de escalações). Prefira sempre a fonte com maior rigor estatístico (FBref/Opta > ESPN > Goal). Cite a fonte nos campos de fundamento.
+
 SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
 
-① "[Mandante] Copa do Mundo 2026 resultados"
-   → jogos disputados, gols marcados/sofridos, xG se disponível
+① "[Mandante] Copa do Mundo 2026 resultados estatísticas"
+   → jogos disputados, gols marcados/sofridos, xG se disponível (FBref, Sofascore, ESPN)
 
-② "[Visitante] Copa do Mundo 2026 resultados"
+② "[Visitante] Copa do Mundo 2026 resultados estatísticas"
    → idem para o visitante
 
 ③ "[Mandante] [Visitante] lesões suspensões escalação Copa 2026"
-   → desfalques confirmados e prováveis titulares de ambos
+   → desfalques confirmados e prováveis titulares de ambos (Transfermarkt, BBC Sport)
 
 ④ [SE fase de grupos]  "Grupo [letra] Copa 2026 classificação tabela"
-   [SE mata-mata]      "[Mandante] [Visitante] Copa do Mundo confrontos"
+   [SE mata-mata]      "[Mandante] [Visitante] Copa do Mundo confrontos histórico"
 
-⑤ [APENAS SE ①② não retornaram xG] "[Mandante] [Visitante] xG estatísticas Copa 2026"
+⑤ "[Mandante] técnico treinador Copa 2026 formação tática" + "[Visitante] técnico treinador Copa 2026 formação tática"
+   → nome do treinador, formação habitual, filosofia de jogo, ajustes táticos realizados na Copa 2026
+
+⑥ [APENAS SE ①② não retornaram xG] "[Mandante] [Visitante] xG estatísticas Copa 2026 FBref Opta"
 
 REGRAS DE PESQUISA:
-• Após ①②③ + ④, avalie se os dados são suficientes. Se sim, PARE e calcule.
-• Máximo 5 buscas por análise.
+• Após ①②③④⑤, avalie se os dados são suficientes. Se sim, PARE e calcule.
+• Máximo 6 buscas por análise.
 • NÃO pesquise: data, hora, sede, fase — já constam na mensagem.
 • NÃO pesquise ranking FIFA geral — use apenas se aparecer como dado colateral.
 • Dados não encontrados → declare em "lacunas". Nunca invente valores.
@@ -1489,9 +1511,14 @@ METODOLOGIA:
 1. Use os dados coletados na sequência acima para montar o perfil de cada time
 2. Calcule lambdas: xG ofensivo/defensivo, desfalques, sede, fase
 3. Aplique Poisson: resultado, gols, placares exatos
-4. Identifique EVENTOS PROVÁVEIS com fundamento factual
-5. Gere SUGESTÕES DE TICKET baseadas em probabilidade estatística — não em odds
-6. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
+4. Identifique EVENTOS PROVÁVEIS com fundamento factual — mínimo 5 eventos, todos com fundamento citando fonte confiável
+5. Gere SUGESTÕES DE TICKET: mínimo 6 sugestões. Critério de confiança:
+   - "alta": probabilidade ≥60% E sustentada por xG + forma + tático + sem desfalques críticos
+   - "media": probabilidade ≥45% com dados parciais mas coerentes
+   - "baixa": apenas se a sugestão tiver valor estratégico excepcional; justifique explicitamente
+   Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
+6. ANÁLISE DE TÉCNICOS: pesquise o treinador de cada equipe. Identifique formação habitual, filosofia de pressão/posse/transição, ajustes realizados na Copa 2026 e como o perfil tático do técnico afeta os mercados (ex: técnico defensivo → under, alta linha → espaços nas costas)
+7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
 
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
@@ -1505,7 +1532,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"(mesma estrutura)"},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Schedule loader (cache-first) ────────────────────────────────────────
 function _loadSchedCache(){
@@ -2292,9 +2319,14 @@ METODOLOGIA:
 1. Use os dados pré-coletados para montar o perfil de cada time
 2. Calcule lambdas: xG ofensivo/defensivo, desfalques, sede, fase
 3. Aplique Poisson: resultado, gols, placares exatos
-4. Identifique EVENTOS PROVÁVEIS com fundamento factual
-5. Gere SUGESTÕES DE TICKET baseadas em probabilidade estatística — não em odds
-6. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
+4. Identifique EVENTOS PROVÁVEIS com fundamento factual — mínimo 5 eventos, todos com fundamento baseado em dados verificados
+5. Gere SUGESTÕES DE TICKET: mínimo 6 sugestões. Critério de confiança:
+   - "alta": probabilidade ≥60% E sustentada por xG + forma + análise tática + sem desfalques críticos
+   - "media": probabilidade ≥45% com dados parciais mas coerentes
+   - "baixa": apenas se a sugestão tiver valor estratégico excepcional; justifique explicitamente
+   Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
+6. ANÁLISE DE TÉCNICOS: use os dados coletados sobre os treinadores. Preencha tecnico_mandante e tecnico_visitante com nome, formação habitual, filosofia de jogo, ajustes na Copa 2026 e como o perfil tático afeta os mercados
+7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 
@@ -2308,7 +2340,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"(mesma estrutura)"},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Conversational chat ─────────────────────────────────────────────────
 async function runChat(){

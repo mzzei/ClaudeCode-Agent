@@ -488,7 +488,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ls-emblem{position:relative;width:46px;height:46px;flex-shrink:0}
 .ls-emblem-aura{position:absolute;inset:-5px;border-radius:18px;background:conic-gradient(from 140deg,#28d98e,#d6f95a,#e8c46a,#28d98e);filter:blur(8px);opacity:.85;animation:wc-aura 7s ease-in-out infinite;will-change:transform}
 .ls-emblem-face{position:absolute;inset:0;border-radius:16px;background:linear-gradient(150deg,#1a2e22,#0a1812);border:1px solid rgba(180,250,200,.3);box-shadow:inset 0 2px 4px rgba(255,255,255,.18),inset 0 -6px 14px rgba(0,0,0,.5),0 0 24px rgba(40,217,142,.45);display:flex;align-items:center;justify-content:center}
-.ls-emblem-trophy{font-size:26px;filter:drop-shadow(0 3px 9px rgba(232,196,106,.5));position:relative;z-index:1;line-height:1}
+.ls-emblem-trophy{width:27px;height:33px;filter:drop-shadow(0 3px 9px rgba(232,196,106,.55));position:relative;z-index:1;display:block}
 
 /* ── Glass panels ── */
 .l-sb{
@@ -850,7 +850,28 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="ls-emblem">
         <div class="ls-emblem-aura"></div>
         <div class="ls-emblem-face">
-          <span class="ls-emblem-trophy">🏆</span>
+          <svg class="ls-emblem-trophy" viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg" aria-label="Taça da Copa do Mundo">
+            <defs>
+              <linearGradient id="wcgold" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#fbeeb0"/><stop offset=".42" stop-color="#e8c46a"/><stop offset="1" stop-color="#b9852f"/>
+              </linearGradient>
+              <linearGradient id="wcgreen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#34a86c"/><stop offset="1" stop-color="#13653b"/>
+              </linearGradient>
+            </defs>
+            <!-- globe -->
+            <circle cx="60" cy="29" r="18" fill="url(#wcgold)"/>
+            <path d="M60 11a18 18 0 0 1 0 36" fill="none" stroke="#9c6e29" stroke-width="1.3" opacity=".45"/>
+            <line x1="42" y1="29" x2="78" y2="29" stroke="#9c6e29" stroke-width="1.3" opacity=".4"/>
+            <ellipse cx="60" cy="29" rx="7" ry="18" fill="none" stroke="#9c6e29" stroke-width="1.1" opacity=".38"/>
+            <!-- twisting body -->
+            <path d="M52 47C46 60 45 72 50 84c3 8 7 12 8 22h4c1-10 5-14 8-22 5-12 4-24-2-37-2 3-5 4-8 4s-6-1-8-4Z" fill="url(#wcgold)"/>
+            <!-- base -->
+            <path d="M44 106h32l-3.5 17h-25Z" fill="url(#wcgold)"/>
+            <rect x="46.5" y="111" width="27" height="3.6" fill="url(#wcgreen)"/>
+            <rect x="48" y="117.5" width="24" height="3.6" fill="url(#wcgreen)"/>
+            <rect x="43" y="123" width="34" height="6.5" rx="2" fill="url(#wcgold)"/>
+          </svg>
         </div>
       </div>
       <div>

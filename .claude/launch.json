@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "WorldCupAgent",
+      "runtimeExecutable": "pwsh",
+      "runtimeArgs": ["-NoProfile", "-File", "C:\\Users\\Gabriel\\.claude\\sessions\\WorldCupAgent\\serve.ps1"],
+      "port": 3456
+    }
+  ]
+}

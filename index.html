@@ -320,6 +320,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .tok-sf-rval{font-size:12px;font-weight:500;color:var(--mid);font-variant-numeric:tabular-nums;text-align:right}
 .tok-sf-green{color:var(--terra)}
 .tok-sf-amber{color:#e8a53a}
+/* ── News ticker ── */
+.ntick{display:flex;align-items:center;height:30px;border-bottom:1px solid rgba(160,240,190,.1);overflow:hidden;flex-shrink:0;background:rgba(4,13,8,.55)}
+.ntick-tag{font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--lime);padding:0 10px;border-right:1px solid rgba(214,249,90,.18);height:100%;display:flex;align-items:center;white-space:nowrap;flex-shrink:0;background:rgba(214,249,90,.04)}
+.ntick-wrap{flex:1;overflow:hidden;height:100%;-webkit-mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent);mask-image:linear-gradient(90deg,transparent,#000 3%,#000 97%,transparent)}
+.ntick-inner{display:inline-flex;align-items:center;height:100%;animation:ntick-run 80s linear infinite;white-space:nowrap}
+.ntick-inner:hover{animation-play-state:paused}
+.ntick-item{font-size:12px;color:var(--mid);padding:0 22px 0 0;white-space:nowrap;cursor:default}
+.ntick-item::before{content:'·';color:var(--terra);margin-right:10px;font-size:14px}
+@keyframes ntick-run{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .ds-badge{font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:99px;font-weight:600}
 .ds-badge.free{background:rgba(60,160,100,.12);color:#2a8a56}
 .ds-badge.enterprise{background:rgba(140,100,40,.1);color:#7a6020}
@@ -942,6 +951,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
         <button class="hdr-primary" onclick="exportReport()">↑<span class="hdr-text"> Exportar relatório</span></button>
       </div>
     </header>
+
+    <div class="ntick" id="ntick" style="display:none">
+      <span class="ntick-tag">COPA 2026</span>
+      <div class="ntick-wrap"><div class="ntick-inner" id="ntick-inner"></div></div>
+    </div>
 
     <div class="chat" id="chat">
       <!-- Empty state -->
@@ -2788,10 +2802,26 @@ function taReset(ta){ta.value='';ta.style.height='';ta.rows=1;}
   });
 })();
 
+// ─── News ticker ─────────────────────────────────────────────────────────
+const NEWS_TTL=10*60*1000;
+async function loadNews(){
+  try{
+    const data=await fetchEspn('/news?limit=20','copa2026_espn_news_v1',NEWS_TTL);
+    const arts=(data?.articles||[]).filter(a=>a.headline);
+    if(!arts.length)return;
+    const el=document.getElementById('ntick-inner');if(!el)return;
+    const items=arts.map(a=>`<span class="ntick-item">${esc(a.headline)}</span>`).join('');
+    el.innerHTML=items+items;
+    const estPx=arts.reduce((s,a)=>s+a.headline.length*7+44,0);
+    el.style.animationDuration=Math.max(25,Math.round(estPx/80))+'s';
+    document.getElementById('ntick').style.display='flex';
+  }catch{}
+}
+setInterval(loadNews,NEWS_TTL);
 loadHistory();renderRecentAnalyses();renderSidebarHistory();maybeShowWelcome();
 document.addEventListener('click',e=>{if(!e.target.closest('.sel-pop')&&!e.target.closest('.i-sel-btn'))closeSelPops();});
-// ESPN não requer chave — carrega standings/agenda imediatamente
-if(!getAfKey()&&!getFdKey())setTimeout(()=>loadEspnData(false),200);
+// ESPN não requer chave — carrega standings/agenda e notícias imediatamente
+if(!getAfKey()&&!getFdKey())setTimeout(()=>{loadEspnData(false);loadNews();},200);
 
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate){

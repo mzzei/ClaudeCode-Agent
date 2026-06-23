@@ -979,7 +979,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
     <!-- Input dock -->
     <div class="i-dock">
       <div id="error-box" class="err-box" style="display:none"><span id="error-msg"></span></div>
-      <textarea id="match-input" rows="2" placeholder="Descreva uma partida ou faça uma pergunta…"></textarea>
+      <textarea id="match-input" rows="1" placeholder="Descreva uma partida ou faça uma pergunta…"></textarea>
       <div class="i-bar">
         <div class="i-selectors">
           <button class="i-sel-btn" id="model-sel-btn" onclick="toggleModelPop(event)">
@@ -1456,7 +1456,7 @@ function clearAll(){
   if(_running&&_abort){try{_abort.abort();}catch(e){}}
   document.getElementById('conversation').innerHTML='';
   document.getElementById('empty-state').style.display='block';
-  const ta=document.getElementById('match-input');ta.value='';ta.rows=2;
+  taReset(document.getElementById('match-input'));
   document.getElementById('error-box').style.display='none';
   if(_thkEl){_thkEl.remove();_thkEl=null;}
   if(_thkInterval){clearInterval(_thkInterval);_thkInterval=null;}
@@ -1848,7 +1848,7 @@ function renderResults(d,opts){
     <div class="a-hdr">
       <div class="a-agent">
         <div class="a-ball">🏆</div>
-        <div><span class="a-name">WorldCup Agent</span><span class="a-pill">IA</span></div>
+        <div><span class="a-name">WorldCup Agent</span></div>
       </div>
       <div class="a-hdr-r">
         <span class="a-ts">${ts}</span>
@@ -2469,7 +2469,7 @@ function fillMatch(i){
   else if(dLabel)lines.push(`DATA: ${dLabel}`);
   if(j.sede)lines.push(`SEDE: ${j.sede}`);
   lines.push('','Pesquise forma recente na Copa 2026, lesões/suspensões confirmadas, escalação provável e xG. Sugira 2-3 tickets com fundamento estatístico.');
-  const ta=document.getElementById('match-input');ta.value=lines.join('\n');ta.rows=Math.min(8,lines.length+1);ta.focus();
+  const ta=document.getElementById('match-input');ta.value=lines.join('\n');ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,220)+'px';ta.focus();
 }
 // ─── Mobile sidebar ───────────────────────────────────────────────────────
 function toggleSidebar(){
@@ -2661,10 +2661,12 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
 })();
 
 // Carrega o histórico persistido (localStorage) e popula a lista de Análises Recentes
-// Textarea: Enter=enviar (Shift+Enter=nova linha), atualiza texto do botão dinamicamente
+// Textarea: Enter=enviar (Shift+Enter=nova linha), auto-resize, colapso no reset
+function taReset(ta){ta.value='';ta.style.height='';ta.rows=1;}
 (function(){
   const ta=document.getElementById('match-input');
-  ta.addEventListener('input',function(){if(!_running)setRunBtn(false);});
+  function taGrow(){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,220)+'px';}
+  ta.addEventListener('input',function(){taGrow();if(!_running)setRunBtn(false);});
   ta.addEventListener('keydown',function(e){
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!_running)toggleRun();}
   });
@@ -2787,7 +2789,7 @@ async function runChat(){
   const query=document.getElementById('match-input').value.trim();
   if(!query){document.getElementById('match-input').focus();return;}
   showUserBubble(query);
-  const ta=document.getElementById('match-input');ta.value='';ta.rows=2;
+  const ta=document.getElementById('match-input');taReset(ta);
   if(!apiKey&&!getWorkerUrl()){
     showAgentBubble('Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para conversar com o agente.');
     return;
@@ -2854,7 +2856,7 @@ async function runAnalysis(){
   const apiKey=document.getElementById('api-key-input').value.trim();
   if(!apiKey&&!getWorkerUrl()){
     const q=document.getElementById('match-input').value.trim();
-    showUserBubble(q);document.getElementById('match-input').value='';document.getElementById('match-input').rows=2;
+    showUserBubble(q);taReset(document.getElementById('match-input'));
     showAgentBubble('Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para analisar partidas.');
     return;
   }
@@ -2866,7 +2868,7 @@ async function runAnalysis(){
   setRunBtn(true);
   const ks=document.getElementById('key-status');ks.textContent='Analisando…';ks.style.color='var(--muted)';
 
-  document.getElementById('match-input').value='';
+  taReset(document.getElementById('match-input'));
   showUserBubble(query);
   startThinking();
 

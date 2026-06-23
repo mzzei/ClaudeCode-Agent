@@ -610,10 +610,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .a-title{font-family:var(--sans);font-style:normal;font-weight:800;font-size:1.7rem;letter-spacing:-.02em;color:var(--deep);padding:0 1.1rem .7rem;line-height:1.15}
 .a-subtitle{display:block;font-size:.72rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:0 1.1rem .35rem}
 /* Tab pill slider */
-.a-tabs{position:relative;border-bottom:1px solid rgba(160,240,190,.1);overflow:visible}
-.a-tab-pill{position:absolute;bottom:0;height:100%;background:rgba(255,255,255,.08);border-radius:13px 13px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 -2px 16px rgba(67,224,143,.08);transition:left .34s cubic-bezier(.45,.05,.2,1),width .34s cubic-bezier(.45,.05,.2,1);pointer-events:none;will-change:left,width}
-.a-tab-pill::before{content:'';position:absolute;bottom:0;left:-11px;width:11px;height:11px;background:radial-gradient(circle at top right,transparent 11px,rgba(255,255,255,.08) 11px)}
-.a-tab-pill::after{content:'';position:absolute;bottom:0;right:-11px;width:11px;height:11px;background:radial-gradient(circle at top left,transparent 11px,rgba(255,255,255,.08) 11px)}
+.a-tabs{position:relative;border-bottom:1px solid rgba(160,240,190,.1);overflow:hidden}
+.a-tab-pill{position:absolute;bottom:0;height:100%;background:rgba(255,255,255,.07);border-radius:8px 8px 0 0;border-top:1.5px solid rgba(160,240,190,.35);transition:left .34s cubic-bezier(.45,.05,.2,1),width .34s cubic-bezier(.45,.05,.2,1);pointer-events:none;will-change:left,width}
 .a-tab{color:var(--muted);font-weight:600;border-bottom:none;position:relative;z-index:1}
 .a-tab:hover{color:var(--mid)}
 .a-tab.active{color:#f3faf2}

@@ -109,6 +109,20 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-cal-time{color:var(--muted);font-size:10px}
 .rs-cal-livedot{width:6px;height:6px;border-radius:50%;background:#ff3b30;display:inline-block;animation:lv-pulse 1.1s ease-in-out infinite}
 .rs-cal-livetag{color:#ff3b30;font-weight:700;font-size:9px;letter-spacing:.04em}
+/* Copa stats card */
+.rs-cs-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:.6rem}
+.rs-cs-cell{background:var(--cream);border:1px solid var(--border);border-radius:10px;padding:.55rem .6rem;display:flex;flex-direction:column;gap:1px}
+.rs-cs-num{font-size:18px;font-weight:800;color:var(--terra);font-family:var(--sans);line-height:1}
+.rs-cs-lbl{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);line-height:1.25}
+.rs-cs-sec{margin-top:.55rem;padding-top:.55rem;border-top:1px solid var(--border)}
+.rs-cs-sec-lbl{font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.4rem}
+.rs-cs-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px}
+.rs-cs-rank{width:15px;color:var(--muted);font-weight:600;font-size:10px;flex-shrink:0}
+.rs-cs-team{flex:1;min-width:0;color:var(--deep);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.rs-cs-val{color:var(--terra);font-weight:700;font-size:11px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.rs-cs-empty{font-size:10.5px;color:var(--muted);text-align:center;padding:.5rem 0;line-height:1.5}
+.rs-cs-phase{font-size:11px;color:var(--mid);display:flex;align-items:center;gap:5px}
+.rs-cs-phase b{color:var(--terra);font-weight:600}
 /* Mobile fallback for featured (right sidebar hidden <640px) */
 .es-mobile-featured{display:none}
 .ex-day{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 0 2px;width:100%;flex-basis:100%;margin-top:4px}
@@ -1059,8 +1073,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       </button>
     </nav>
 
-    <div class="ls-live" id="ls-live" style="display:none"></div>
-
     <div class="ls-hist" id="ls-hist">
       <span class="ls-hist-empty">Nenhuma análise ainda</span>
     </div>
@@ -1224,9 +1236,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
   <aside class="r-sb">
     <!-- Featured (empty state) -->
     <div id="rs-featured">
-      <div class="rs-block" id="rs-next-match" style="display:none">
-        <div class="rs-lbl">🎯 Próximo Jogo</div>
-        <div id="rs-next-match-card"></div>
+      <div class="rs-block" id="rs-copa-stats" style="display:none">
+        <div class="rs-lbl">📊 Estatísticas da Copa</div>
+        <div id="rs-copa-stats-body"></div>
       </div>
       <div class="rs-block" id="rs-teams" style="display:none">
         <div class="rs-lbl">⭐ Seleções em Destaque</div>
@@ -2952,33 +2964,68 @@ function _relTime(mins){
   return'em '+d+(d>1?' dias':' dia');
 }
 
-function _nextMatchHTML(){
-  const live=[],upcoming=[];
-  _schedule.forEach(m=>{const s=_matchState(m);if(s.state==='live')live.push({m,s});else if(s.state==='upcoming')upcoming.push({m,s});});
-  upcoming.sort((a,b)=>a.s.k-b.s.k);
-  const pick=live[0]||upcoming[0];
-  if(!pick)return'<div style="font-size:11px;color:var(--muted);text-align:center;padding:.4rem 0">Sem jogos futuros agendados.</div>';
-  const m=pick.m,s=pick.s;
-  const hName=m.mandante||'';const aName=m.visitante||'';
-  const hFlag=(typeof _lv_flag==='function'?_lv_flag(hName,22):'')||'⚽';
-  const aFlag=(typeof _lv_flag==='function'?_lv_flag(aName,22):'')||'⚽';
-  let metaHtml;
-  if(s.state==='live'){
-    metaHtml=`<span class="rs-nm-live">AO VIVO</span>`;
-  }else{
-    const dateStr=s.k.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
-    const timeStr=m.hora_brt||s.k.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    const rel=s.mins<24*60?`<span class="rs-nm-soon">${_relTime(s.mins)}</span>`:`<span>📅 ${esc(dateStr)}</span>`;
-    metaHtml=`${rel}<span>⏰ ${esc(timeStr)}</span>`;
+function _copaStatsHTML(){
+  const c=(typeof _loadCtxCache==='function')?_loadCtxCache():null;
+  const d=c&&c.data?c.data:null;
+  const results=(d&&Array.isArray(d.results))?d.results:[];
+  const standings=(d&&d.standings)?d.standings:null;
+  const faseAtual=d&&d.fase_atual?d.fase_atual:'';
+
+  // Jogos disputados / agendados
+  const jogados=results.length;
+  const liveNow=_schedule.filter(m=>_matchState(m).state==='live').length;
+  const futuros=_schedule.filter(m=>{const st=_matchState(m).state;return st==='upcoming';}).length;
+
+  // Gols por seleção (a partir das classificações: gp) e maiores goleadas (results)
+  const golsPorTime={};
+  if(standings){
+    Object.values(standings).forEach(rows=>{(rows||[]).forEach(r=>{if(r&&r.time!=null)golsPorTime[r.time]=(golsPorTime[r.time]||0)+(parseInt(r.gp)||0);});});
   }
-  return`<div class="rs-nm-card" onclick="_esAnalyze('Analise ${esc(hName)} vs ${esc(aName)}')">
-    <div class="rs-nm-teams">
-      <div class="rs-nm-team"><span class="rs-nm-flag">${hFlag}</span><span class="rs-nm-name">${esc(hName)}</span></div>
-      <div class="rs-nm-vs">×</div>
-      <div class="rs-nm-team"><span class="rs-nm-flag">${aFlag}</span><span class="rs-nm-name">${esc(aName)}</span></div>
-    </div>
-    <div class="rs-nm-meta">${metaHtml}</div>
+  const topGols=Object.entries(golsPorTime).filter(([,g])=>g>0).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  // Maiores diferenças de gols (goleadas) a partir dos resultados
+  const goleadas=results.map(r=>{
+    const mm=(r.placar||'').match(/(\d+)\s*[-x:]\s*(\d+)/);
+    if(!mm)return null;
+    const a=parseInt(mm[1]),b=parseInt(mm[2]);const dif=Math.abs(a-b);
+    if(isNaN(dif)||dif<1)return null;
+    const venc=a>=b?r.mandante:r.visitante;const perd=a>=b?r.visitante:r.mandante;
+    return{venc,perd,placar:`${Math.max(a,b)}-${Math.min(a,b)}`,dif};
+  }).filter(Boolean).sort((x,y)=>y.dif-x.dif).slice(0,3);
+
+  const hasData=jogados>0||topGols.length>0||!!faseAtual;
+  if(!hasData){
+    return`<div class="rs-cs-empty">As estatísticas aparecem assim que os dados do torneio forem carregados.<br><span style="color:var(--terra);cursor:pointer" onclick="loadSchedule(true)">↻ Carregar agora</span></div>`;
+  }
+
+  let html=`<div class="rs-cs-grid">
+    <div class="rs-cs-cell"><span class="rs-cs-num">${jogados}</span><span class="rs-cs-lbl">Jogos disputados</span></div>
+    <div class="rs-cs-cell"><span class="rs-cs-num">${liveNow>0?liveNow:futuros}</span><span class="rs-cs-lbl">${liveNow>0?'Ao vivo agora':'Próximos jogos'}</span></div>
   </div>`;
+
+  if(topGols.length){
+    html+=`<div class="rs-cs-sec"><div class="rs-cs-sec-lbl">⚽ Mais gols marcados</div>${
+      topGols.map(([team,g],i)=>{
+        const flag=(typeof _lv_flag==='function'?_lv_flag(team,13):'')||'';
+        return`<div class="rs-cs-row"><span class="rs-cs-rank">${i+1}</span><span class="rs-cs-team">${flag} ${esc(team)}</span><span class="rs-cs-val">${g}</span></div>`;
+      }).join('')
+    }</div>`;
+  }
+
+  if(goleadas.length){
+    html+=`<div class="rs-cs-sec"><div class="rs-cs-sec-lbl">🔥 Maiores goleadas</div>${
+      goleadas.map(g=>{
+        const flag=(typeof _lv_flag==='function'?_lv_flag(g.venc,13):'')||'';
+        return`<div class="rs-cs-row"><span class="rs-cs-team">${flag} ${esc(g.venc)} <span style="color:var(--muted)">vs ${esc(g.perd)}</span></span><span class="rs-cs-val">${esc(g.placar)}</span></div>`;
+      }).join('')
+    }</div>`;
+  }
+
+  if(faseAtual){
+    html+=`<div class="rs-cs-sec"><div class="rs-cs-sec-lbl">🏆 Fase atual</div><div class="rs-cs-phase"><b>${esc(faseAtual)}</b></div></div>`;
+  }
+
+  return html;
 }
 function _teamsHTML(){
   // Teams from live + upcoming matches only (time-aware)
@@ -3004,7 +3051,10 @@ function _calendarHTML(){
     const dateHtml=s.state==='live'
       ?`<span class="rs-cal-livedot"></span><span class="rs-cal-livetag">AO VIVO</span>`
       :`${esc(d)}${m.hora_brt?` <span class="rs-cal-time">${esc(m.hora_brt)}</span>`:''}`;
-    return`<div class="rs-cal-item" onclick="_esAnalyze('Analise ${esc(m.mandante||'')} vs ${esc(m.visitante||'')}')">
+    const click=s.state==='live'
+      ?`openLiveByTeams('${esc((m.mandante||'').replace(/'/g,"\\'"))}','${esc((m.visitante||'').replace(/'/g,"\\'"))}')`
+      :`_esAnalyze('Analise ${esc(m.mandante||'')} vs ${esc(m.visitante||'')}')`;
+    return`<div class="rs-cal-item" onclick="${click}">
       <span class="rs-cal-date">${dateHtml}</span>
       <span class="rs-cal-teams">${esc(m.mandante||'?')} × ${esc(m.visitante||'?')}</span>
     </div>`;
@@ -3015,22 +3065,22 @@ function renderEmptyStateFeatured(){
   // Only show featured blocks when there's no active conversation
   const hasConvo=document.getElementById('conversation').children.length>0;
   const show=!hasConvo&&_schedule&&_schedule.length>0;
-  ['rs-next-match','rs-teams','rs-calendar'].forEach(id=>{
+  ['rs-copa-stats','rs-teams','rs-calendar'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display=show?'block':'none';
   });
   const mob=document.getElementById('es-mobile-featured');
   if(!show){if(mob)mob.innerHTML='';return;}
 
-  const nextHTML=_nextMatchHTML(),teamsHTML=_teamsHTML(),calHTML=_calendarHTML();
+  const statsHTML=_copaStatsHTML(),teamsHTML=_teamsHTML(),calHTML=_calendarHTML();
 
   // Desktop (right sidebar)
-  document.getElementById('rs-next-match-card').innerHTML=nextHTML;
+  document.getElementById('rs-copa-stats-body').innerHTML=statsHTML;
   document.getElementById('rs-teams-grid').innerHTML=teamsHTML;
   document.getElementById('rs-calendar-list').innerHTML=calHTML;
 
   // Mobile fallback (inside chat empty state)
   if(mob)mob.innerHTML=`
-    <div class="rs-block"><div class="rs-lbl">🎯 Próximo Jogo</div>${nextHTML}</div>
+    <div class="rs-block"><div class="rs-lbl">📊 Estatísticas da Copa</div>${statsHTML}</div>
     <div class="rs-block"><div class="rs-lbl">⭐ Seleções em Destaque</div>${teamsHTML}</div>
     <div class="rs-block"><div class="rs-lbl">📅 Próximos Jogos</div>${calHTML}</div>`;
 }
@@ -3233,45 +3283,6 @@ const LV_REFRESH=30*1000;
 function _lv_abbr(name){name=name||'';const w=name.trim().split(/\s+/);return w.length>1?w[w.length-1]:name.slice(0,3);}
 function _lv_flag(name,sz){sz=sz||13;const code=FLAGS[name]||'';if(!code)return'';return'<img src="https://flagcdn.com/w20/'+code+'.png" width="'+sz+'" height="'+Math.round(sz*.75)+'" style="border-radius:1px;vertical-align:middle" onerror="this.remove()" alt="">';}
 function _lv_hex(c){if(!c)return'#43e08f';return c.startsWith('#')?c:'#'+c.replace(/[^0-9a-fA-F]/g,'').slice(0,6);}
-
-async function refreshLiveSidebar(){
-  var el=document.getElementById('ls-live');if(!el)return;
-  var sb=await fetchEspn('/scoreboard','copa2026_sb_live',25000);
-  var lives=(sb&&sb.events||[]).filter(function(e){return e.status&&e.status.type&&e.status.type.state==='in';});
-  if(!lives.length){
-    el.style.display='';
-    el.innerHTML='<div class="ls-nolive" onclick="showView(\'library\');closeSidebar()">'
-      +'<span class="ls-nolive-icon">📅</span>'
-      +'<span class="ls-nolive-title">Sem jogos ao vivo</span>'
-      +'<span class="ls-nolive-sub">Confira os próximos<br>jogos da Copa 2026</span>'
-      +'<span class="ls-nolive-btn">Ver Biblioteca →</span>'
-      +'</div>';
-    return;
-  }
-  el.style.display='';
-  var html='<div class="ls-live-hdr"><span class="ls-live-pulse"></span>AO VIVO</div>';
-  lives.forEach(function(e,i){
-    var c=e.competitions&&e.competitions[0];
-    var comps=c&&c.competitors||[];
-    var h=comps.find(function(x){return x.homeAway==='home';});
-    var a=comps.find(function(x){return x.homeAway==='away';});
-    var clk=(c&&c.status&&c.status.displayClock)||'';
-    var hn=(h&&h.team&&h.team.displayName)||'';
-    var an=(a&&a.team&&a.team.displayName)||'';
-    var hs=(h&&h.score!=null?h.score:0);
-    var as2=(a&&a.score!=null?a.score:0);
-    if(i>0)html+='<div class="ls-lv-sep"></div>';
-    html+='<div class="ls-live-card" onclick="openLivePanel(\''+e.id+'\')">'
-      +'<div class="ls-lv-row">'
-        +'<span class="ls-lv-team">'+_lv_flag(hn)+' '+esc(_lv_abbr(hn))+'</span>'
-        +'<span class="ls-lv-score">'+hs+' - '+as2+'</span>'
-        +'<span class="ls-lv-team r">'+esc(_lv_abbr(an))+' '+_lv_flag(an)+'</span>'
-      +'</div>'
-      +'<div class="ls-lv-clock">⏱ '+esc(clk)+(clk&&!clk.endsWith("'")?'\'':'')+'</div>'
-    +'</div>';
-  });
-  el.innerHTML=html;
-}
 
 async function openLivePanel(eventId){
   _activeLiveId=eventId;_liveTab='formation';
@@ -3545,8 +3556,21 @@ async function _lv_h2hHTML(h,a,hn,an,hc,ac){
   return'<div class="lp-h2h">'+summaryHtml+'<div class="lp-h2h-hdr">Últimos '+Math.min(total,10)+' confrontos</div>'+matchesHtml+'</div>';
 }
 
-setInterval(refreshLiveSidebar,60*1000);
-setTimeout(refreshLiveSidebar,2000);
+// Abre o painel ao vivo detalhado a partir dos nomes dos times (cards "Próximos Jogos")
+async function openLiveByTeams(home,away){
+  try{
+    const sb=await fetchEspn('/scoreboard','copa2026_sb_live',25000);
+    const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const h=norm(home),a=norm(away);
+    const ev=(sb&&sb.events||[]).find(e=>{
+      const c=e.competitions&&e.competitions[0];const cs=(c&&c.competitors)||[];
+      const names=cs.map(x=>norm(x.team&&x.team.displayName));
+      return names.some(n=>n&&(n.includes(h)||h.includes(n)))&&names.some(n=>n&&(n.includes(a)||a.includes(n)));
+    });
+    if(ev){openLivePanel(ev.id);return;}
+  }catch(e){}
+  _esAnalyze('Analise '+home+' vs '+away);
+}
 
 // ─── News ticker ─────────────────────────────────────────────────────────
 const NEWS_TTL=10*60*1000;
@@ -3698,7 +3722,7 @@ async function runChat(){
       method:'POST',
       headers:getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']),
       body:JSON.stringify({model:currentModel,max_tokens:1024,
-        system:[{type:'text',text:`${t('agent_lang')}\n\nVocê é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda de forma precisa, concisa e conversacional.`,cache_control:{type:'ephemeral'}}],
+        system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
         messages:trimmedThread,stream:true,diagnostics:{previous_message_id:_lastChatId}}),
       signal:_abort.signal
     });
@@ -3732,6 +3756,50 @@ async function runChat(){
     else bubble.innerHTML=simpleMd('Erro: '+e.message);
     _chatThread.pop();
   }finally{_running=false;_abort=null;setRunBtn(false);}
+}
+
+// Flexible analyst persona — broad football/World Cup interpretation
+function analystSystemPrompt(){
+  return `${t('agent_lang')}
+
+Você é o WorldCup Agent, uma IA analista de futebol especializada na Copa do Mundo 2026. Atue como um analista de verdade: interprete livremente o que o usuário pede e cubra um leque amplo de pedidos sobre futebol e a Copa — análises de partidas, táticas, escalações, formações, jogadores, históricos e confrontos diretos, prognósticos, comparações, cenários hipotéticos, regras, estatísticas, curiosidades e contexto do torneio.
+
+Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.`;
+}
+
+// Conversational fallback when the structured pipeline can't complete
+async function conversationalFallback(query,apiKey,reqHeaders,signal){
+  const ctx=getTournamentCtxString?getTournamentCtxString():'';
+  const bubble=showAgentBubble('<span class="ldot" style="display:inline-block;margin:4px"></span>');
+  const res=await fetch(getApiBase()+'/v1/messages',{
+    method:'POST',
+    headers:reqHeaders,
+    body:JSON.stringify({model:currentModel,max_tokens:2048,
+      system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
+      messages:[{role:'user',content:`DATA: ${currentDateFull()}${ctx?`\n\nContexto do torneio:\n${ctx}`:''}\n\n${query}`}],
+      stream:true}),
+    signal
+  });
+  parseRateLimitHeaders(res);
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
+  let text='';const reader=res.body.getReader(),dec=new TextDecoder();
+  while(true){
+    const{done,value}=await reader.read();if(done)break;
+    for(const line of dec.decode(value).split('\n')){
+      if(!line.startsWith('data:'))continue;
+      const d=line.slice(5).trim();if(d==='[DONE]')continue;
+      try{const j=JSON.parse(d);
+        if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){text+=j.delta.text;bubble.innerHTML=simpleMd(text);scrollChat();}
+        if(j.type==='message_start'&&j.message?.usage){tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;}
+        if(j.type==='message_delta'&&j.usage){tokenState.lastOut=j.usage.output_tokens||0;tokenState.sessionOut+=j.usage.output_tokens||0;}
+      }catch{}
+    }
+  }
+  if(!text)throw new Error('sem resposta');
+  _chatThread.push({role:'user',content:query});
+  _chatThread.push({role:'assistant',content:text});
+  setTimeout(()=>{updateTokenBar();updateDockTokens();},1300);
+  return text;
 }
 
 // ─── Main analysis ────────────────────────────────────────────────────────
@@ -3876,9 +3944,19 @@ async function runAnalysis(){
       if(!inp.value.trim())inp.value=_pendingQuery;
       ks.textContent='Análise interrompida · ajuste e tente de novo';ks.style.color='var(--muted)';
     }else{
-      document.getElementById('error-box').style.display='block';
-      document.getElementById('error-msg').innerHTML=(e.message||'Erro inesperado. Verifique sua conexão.')+' <button class="inline-link" onclick="document.getElementById(\'error-box\').style.display=\'none\';toggleRun()">↺ tentar de novo</button>';
-      ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
+      // Graceful fallback: pipeline estruturado falhou → resposta analítica livre
+      let _fellBack=false;
+      if(!(_abort&&_abort.signal&&_abort.signal.aborted)){
+        try{await conversationalFallback(_pendingQuery||query,apiKey,reqHeaders,_abort?_abort.signal:undefined);_fellBack=true;}
+        catch(e2){if(e2&&(e2.name==='AbortError'||e2.message==='cancelled'))_fellBack=true;}
+      }
+      if(_fellBack){
+        ks.textContent='Resposta analítica · não salva como relatório';ks.style.color='var(--muted)';
+      }else{
+        document.getElementById('error-box').style.display='block';
+        document.getElementById('error-msg').innerHTML=(e.message||'Erro inesperado. Verifique sua conexão.')+' <button class="inline-link" onclick="document.getElementById(\'error-box\').style.display=\'none\';toggleRun()">↺ tentar de novo</button>';
+        ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
+      }
     }
   }finally{
     _running=false;_abort=null;

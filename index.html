@@ -2654,7 +2654,7 @@ async function loadFdData(){
       });
     }
     if(matches?.matches){
-      ctx.results=matches.matches.filter(m=>m.status==='FINISHED').slice(-15).map(m=>{
+      ctx.results=matches.matches.filter(m=>m.status==='FINISHED').slice(-120).map(m=>{
         const d=new Date(m.utcDate);const s=m.score?.fullTime;
         return{data:`${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}`,mandante:m.homeTeam.name,placar:s!=null?`${s.home}-${s.away}`:'?-?',visitante:m.awayTeam.name};
       });
@@ -2756,7 +2756,7 @@ async function loadAfData(){
     });
   }
   if(fixtures?.response?.length){
-    ctx.results=fixtures.response.filter(f=>f.fixture.status.short==='FT').slice(-15).map(f=>{
+    ctx.results=fixtures.response.filter(f=>f.fixture.status.short==='FT').slice(-120).map(f=>{
       const d=new Date(f.fixture.date);
       return{data:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`,mandante:f.teams.home.name,placar:`${f.goals.home}-${f.goals.away}`,visitante:f.teams.away.name};
     });
@@ -2890,7 +2890,7 @@ async function loadEspnData(force){
     ctx.standings=groups;
   }
   if(scoreboard?.events){
-    ctx.results=scoreboard.events.filter(e=>e.status?.type?.completed).slice(-15).map(e=>{
+    ctx.results=scoreboard.events.filter(e=>e.status?.type?.completed).slice(-120).map(e=>{
       const c=e.competitions?.[0];const comps=c?.competitors||[];
       const home=comps.find(x=>x.homeAway==='home');const away=comps.find(x=>x.homeAway==='away');
       const d=new Date(e.date);
@@ -2983,15 +2983,21 @@ function _copaStatsHTML(){
   }
   const topGols=Object.entries(golsPorTime).filter(([,g])=>g>0).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-  // Maiores diferenças de gols (goleadas) a partir dos resultados
-  const goleadas=results.map(r=>{
+  // Maiores diferenças de gols (goleadas) a partir dos resultados, deduplicadas
+  const seen=new Set();
+  let goleadas=results.map(r=>{
     const mm=(r.placar||'').match(/(\d+)\s*[-x:]\s*(\d+)/);
     if(!mm)return null;
     const a=parseInt(mm[1]),b=parseInt(mm[2]);const dif=Math.abs(a-b);
     if(isNaN(dif)||dif<1)return null;
     const venc=a>=b?r.mandante:r.visitante;const perd=a>=b?r.visitante:r.mandante;
+    const key=`${venc}|${perd}|${Math.max(a,b)}-${Math.min(a,b)}`;
+    if(seen.has(key))return null;seen.add(key);
     return{venc,perd,placar:`${Math.max(a,b)}-${Math.min(a,b)}`,dif};
-  }).filter(Boolean).sort((x,y)=>y.dif-x.dif).slice(0,3);
+  }).filter(Boolean).sort((x,y)=>y.dif-x.dif);
+  // Goleada de verdade = 3+ de saldo; se houver poucas, mostra as maiores vitórias disponíveis
+  const reais=goleadas.filter(g=>g.dif>=3);
+  goleadas=(reais.length>=2?reais:goleadas.filter(g=>g.dif>=2)).slice(0,10);
 
   const hasData=jogados>0||topGols.length>0||!!faseAtual;
   if(!hasData){

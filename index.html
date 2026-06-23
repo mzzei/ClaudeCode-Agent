@@ -1220,6 +1220,8 @@ const FLAGS = {
 // ─── State ───────────────────────────────────────────────────────────────
 let currentModel  = 'claude-sonnet-4-6';
 let currentEffort = 0;
+let _lastAnalysisId = null;
+let _lastChatId     = null;
 let _schedule     = [];
 let _cardCount    = 0;
 let _history      = [];
@@ -1292,9 +1294,11 @@ function maybeShowWelcome(){try{if(!localStorage.getItem(WELCOME_KEY))document.g
 function getWorkerUrl(){try{return localStorage.getItem(WORKER_URL_STORE)||'';}catch{return'';}}
 function saveWorkerUrl(v){try{localStorage.setItem(WORKER_URL_STORE,v.trim());}catch{}}
 function getApiBase(){const w=getWorkerUrl();return w||'https://api.anthropic.com';}
-function getReqHeaders(apiKey){
-  if(getWorkerUrl())return{'Content-Type':'application/json','anthropic-version':'2023-06-01'};
-  return{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+function getReqHeaders(apiKey,betas=[]){
+  const h={'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+  if(!getWorkerUrl()){h['x-api-key']=apiKey;h['anthropic-dangerous-direct-browser-access']='true';}
+  if(betas.length)h['anthropic-beta']=betas.join(',');
+  return h;
 }
 async function fetchMemoryContext(){
   if(!getWorkerUrl()||!MEMORY_STORE_ID)return'';
@@ -1336,6 +1340,7 @@ function setEffort(val){
 }
 function setModel(btn){
   currentModel=btn?.dataset?.model||btn;
+  _lastAnalysisId=null;
   const isHaiku=currentModel==='claude-haiku-4-5-20251001';
   if(isHaiku)setEffort(0);
   const efBtn=document.getElementById('effort-sel-btn');if(efBtn)efBtn.disabled=isHaiku;
@@ -2728,15 +2733,13 @@ async function gatherFacts(query,apiKey,signal,onUpdate){
   const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-CLASSIFICAÇÃO E RESULTADOS OBTIDOS VIA API — não pesquise esses dados, já estão abaixo.
+CLASSIFICAÇÃO E RESULTADOS OBTIDOS VIA API — não pesquise esses dados, já estão abaixo na mensagem.
 Pesquise APENAS as informações ausentes:
 ① "[Mandante] [Visitante] lesões suspensões escalação Copa 2026" — foque em Transfermarkt, Globo Esporte, Goal
 ② "[Mandante] [Visitante] xG Copa 2026 fbref" — só se xG ausente nos dados da API
 ③ "[Mandante] estilo tático esquema Copa 2026" + "[Visitante] vulnerabilidades defensivas Copa 2026" — preencha estilo_ofensivo e vulnerabilidades_defensivas
 Retorne APENAS JSON válido:
-${SCHEMA}
-DADOS DA API:
-${fdCtx}`
+${SCHEMA}`
     :`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 Execute as 4 pesquisas abaixo na ordem e retorne APENAS JSON válido:
 ${SCHEMA}
@@ -2746,7 +2749,7 @@ SEQUÊNCIA:
 ③ "[Mandante] [Visitante] xG Copa 2026 fbref OR sofascore" — para obter Expected Goals
 ④ "[Mandante] estilo tático esquema Copa 2026" + "[Visitante] vulnerabilidades defensivas Copa 2026" — preencha estilo_ofensivo e vulnerabilidades_defensivas
 Extraia placares, classificação do grupo e xG diretamente das páginas encontradas. RESPONDA APENAS COM O JSON.`;
-  const msgs=[{role:'user',content:query}];
+  const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
   for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
     const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]}),signal});
@@ -2835,10 +2838,10 @@ async function runChat(){
     if(trimmedThread.length>0&&trimmedThread[0].role!=='user')trimmedThread=trimmedThread.slice(1);
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
-      headers:getReqHeaders(apiKey),
+      headers:getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']),
       body:JSON.stringify({model:currentModel,max_tokens:1024,
         system:[{type:'text',text:'Você é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda em português de forma precisa, concisa e conversacional.',cache_control:{type:'ephemeral'}}],
-        messages:trimmedThread,stream:true}),
+        messages:trimmedThread,stream:true,diagnostics:{previous_message_id:_lastChatId}}),
       signal:_abort.signal
     });
     parseRateLimitHeaders(res);if(!res.ok)throw new Error(`Erro ${res.status}`);
@@ -2850,7 +2853,11 @@ async function runChat(){
         const d=line.slice(5).trim();if(d==='[DONE]')continue;
         try{const j=JSON.parse(d);
           if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){text+=j.delta.text;bubble.innerHTML=simpleMd(text);scrollChat();}
-          if(j.type==='message_start'&&j.message?.usage){tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;}
+          if(j.type==='message_start'){
+            if(j.message?.usage){tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;}
+            if(j.message?.id)_lastChatId=j.message.id;
+            if(j.message?.diagnostics?.cache_miss_reason)console.debug('[cache-diag chat] miss:',j.message.diagnostics.cache_miss_reason.type);
+          }
           if(j.type==='message_delta'&&j.usage){tokenState.lastOut=(j.usage.output_tokens||0);tokenState.sessionOut+=j.usage.output_tokens||0;}
         }catch{}
       }
@@ -2903,7 +2910,7 @@ async function runAnalysis(){
   startThinking();
 
   const effort=EFFORT_LEVELS[currentEffort];
-  const reqHeaders=getReqHeaders(apiKey);
+  const reqHeaders=getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']);
 
   let finalText='',lastIn=0,lastOut=0,lastCacheCreated=0,lastCacheRead=0;
 
@@ -2929,10 +2936,11 @@ async function runAnalysis(){
     const finalQuery=useEnriched?buildEnrichedQuery(query,rawFacts,ctx):query;
     const sysText=useEnriched?getSystemPromptPhase2():getSystemPrompt();
     const memCtx=await fetchMemoryContext();
-    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
+    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}],diagnostics:{previous_message_id:_lastAnalysisId}};
     if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search'}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
+    let _newAnalysisId=null;
 
     for(let iter=0;iter<10;iter++){
       let _r2;
@@ -2948,6 +2956,10 @@ async function runAnalysis(){
           throw Object.assign(e2,{message:`Fase 2: ${e2.message}`});
         }
       }
+      if(iter===0&&_r2.id){
+        _newAnalysisId=_r2.id;
+        if(_r2.diagnostics?.cache_miss_reason)console.debug('[cache-diag] miss:',_r2.diagnostics.cache_miss_reason.type,'~'+(_r2.diagnostics.cache_miss_reason.cache_missed_input_tokens??'?')+'tok');
+      }
       const{text,stopReason,allContent,toolUses,inTokens,outTokens,thinkingTokens,cacheCreated,cacheRead}=_r2;
       lastIn=inTokens;lastOut=outTokens;lastCacheCreated+=cacheCreated;lastCacheRead+=cacheRead;
       if(stopReason==='end_turn'){finalText=text;break;}
@@ -2958,6 +2970,7 @@ async function runAnalysis(){
       }else{finalText=text;break;}
     }
 
+    if(_newAnalysisId)_lastAnalysisId=_newAnalysisId;
     tokenState.lastIn=lastIn;tokenState.lastOut=lastOut;tokenState.sessionIn+=lastIn;tokenState.sessionOut+=lastOut;tokenState.runs++;
     tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
     stopThinking(true);
@@ -3010,7 +3023,7 @@ async function streamOnce(body,headers,onUpdate,signal,url=''){url=url||getApiBa
   const res=await fetch(url,{method:'POST',headers,body:JSON.stringify({...body,stream:true}),signal});
   parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
   const reader=res.body.getReader(),decoder=new TextDecoder();
-  let buf='',inTokens=0,outTokens=0,thinkingChars=0,cacheCreated=0,cacheRead=0;
+  let buf='',inTokens=0,outTokens=0,thinkingChars=0,cacheCreated=0,cacheRead=0,msgId=null,msgDiag=undefined;
   let allBlocks=[],currentBlock=null,curText='',curThink='',curToolInput='',stopReason=null;
   try{
     outer:while(true){
@@ -3026,6 +3039,8 @@ async function streamOnce(body,headers,onUpdate,signal,url=''){url=url||getApiBa
             inTokens=e.message?.usage?.input_tokens??0;
             cacheCreated=e.message?.usage?.cache_creation_input_tokens??0;
             cacheRead=e.message?.usage?.cache_read_input_tokens??0;
+            msgId=e.message?.id??null;
+            msgDiag=e.message?.diagnostics;
             onUpdate({inTokens,outTokens,thinkingTokens:0,status:'Analisando…'});break;
           case 'content_block_start':
             currentBlock={type:e.content_block.type,index:e.index};
@@ -3055,7 +3070,7 @@ async function streamOnce(body,headers,onUpdate,signal,url=''){url=url||getApiBa
       }
     }
   }finally{try{reader.releaseLock();}catch{}}
-  return{text:allBlocks.filter(b=>b.type==='text').map(b=>b.text).join(''),stopReason,allContent:allBlocks,toolUses:allBlocks.filter(b=>b.type==='tool_use'),inTokens,outTokens,thinkingTokens:0,cacheCreated,cacheRead};
+  return{text:allBlocks.filter(b=>b.type==='text').map(b=>b.text).join(''),stopReason,allContent:allBlocks,toolUses:allBlocks.filter(b=>b.type==='tool_use'),inTokens,outTokens,thinkingTokens:0,cacheCreated,cacheRead,id:msgId,diagnostics:msgDiag};
 }
 </script>
 

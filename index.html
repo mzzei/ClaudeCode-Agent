@@ -792,6 +792,10 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ds-badge.enterprise{background:rgba(214,249,90,.1);color:#cdef7d}
 .ds-status.ok{color:#7af0b4}
 .ds-status.err{color:#ffaaaa}
+.lang-row{display:flex;gap:6px;margin-top:.4rem}
+.lang-btn{flex:1;padding:.45rem .7rem;border:1px solid rgba(160,240,190,.18);border-radius:9px;background:transparent;color:var(--muted);font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .14s;letter-spacing:.04em}
+.lang-btn:hover{background:rgba(40,217,142,.07);color:var(--mid);border-color:rgba(160,240,190,.3)}
+.lang-btn.active{background:linear-gradient(120deg,rgba(214,249,90,.15),rgba(40,217,142,.12));border-color:rgba(214,249,90,.4);color:var(--lime);font-weight:600}
 #api-key-input,#worker-url-input,.sf input[type=password]{background:rgba(0,0,0,.25);border:1px solid rgba(160,240,190,.14);color:var(--deep);border-radius:12px}
 #api-key-input:focus,#worker-url-input:focus,.sf input[type=password]:focus{border-color:rgba(160,240,190,.36);outline:none}
 #api-key-input::placeholder,#worker-url-input::placeholder{color:var(--muted)}
@@ -1153,7 +1157,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="sf-hint">Quando ativo, a API Key não precisa ficar no browser · chave guardada no Cloudflare</div>
     </div>
     <div class="sf">
-      <label class="sf-lbl">Fontes de Dados</label>
+      <label class="sf-lbl" id="sf-sources-lbl">Fontes de Dados</label>
 
       <div class="ds-row">
         <span class="ds-name">ESPN</span>
@@ -1184,8 +1188,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       </div>
       <input id="op-key-input" type="password" placeholder="Chave Opta (Stats Perform)" autocomplete="off">
     </div>
+    <div class="sf" id="sf-lang-section">
+      <label class="sf-lbl" id="sf-lang-lbl">Idioma</label>
+      <div class="lang-row">
+        <button class="lang-btn active" data-lang="pt" onclick="setLang('pt')">PT-BR</button>
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+      </div>
+    </div>
     <div class="sf" id="sf-tok-usage">
-      <label class="sf-lbl">Uso de API · Sessão</label>
+      <label class="sf-lbl" id="sf-usage-lbl">Uso de API · Sessão</label>
       <div class="tok-sf-empty" id="sf-tok-empty">Nenhuma análise nesta sessão</div>
       <div class="tok-sf-cost-card" id="sf-tok-costcard" style="display:none">
         <div class="tok-sf-cost-val" id="sf-tok-cost">—</div>
@@ -1310,6 +1321,7 @@ let _running      = false, _abort = null, _pendingQuery = '';
 let _currentView  = 'chat';
 let _libFilter    = 'todos';
 let _chatThread   = [];
+let currentLang   = (()=>{try{return localStorage.getItem('copa2026_lang')||'pt';}catch{return'pt';}})();
 
 function looksLikeMatchQuery(t){return /\bPARTIDA\b|(\w[\w\s]*\s+(x|vs|×|contra)\s+[\w\s]+\w)/i.test(t)&&t.length>8;}
 function simpleMd(t){
@@ -1330,9 +1342,138 @@ function showAgentBubble(html){
 }
 function renderSidebarHistory(){
   const el=document.getElementById('ls-hist');if(!el)return;
-  if(!_history.length){el.innerHTML='<span class="ls-hist-empty">Nenhuma análise ainda</span>';return;}
+  if(!_history.length){el.innerHTML=`<span class="ls-hist-empty">${t('hist_empty')}</span>`;return;}
   el.innerHTML='<span class="ls-hist-lbl">Histórico</span>'+
     _history.slice(0,12).map(a=>`<button class="ls-hist-item" onclick="openSaved('${a.hid}')"><span class="ls-hi-dot"></span><span class="ls-hi-name">${esc(a.title)}</span><span class="ls-hi-ts">${esc((a.ts||'').split(' ')[0])}</span></button>`).join('');
+}
+
+// ─── Language system ─────────────────────────────────────────────────────
+const STRINGS={
+  pt:{
+    new_analysis:'+ Nova Análise',
+    nav_chat:'Chat',nav_library:'Biblioteca de Jogos',nav_saved:'Relatórios Salvos',
+    nav_models:'Modelos de Análise',nav_soon:'em breve',nav_settings:'Configurações',
+    hist_empty:'Nenhuma análise ainda',
+    title_chat:'Chat',sub_chat:'Converse com sua IA especialista em futebol.',
+    title_library:'Biblioteca de Jogos',sub_library:'Calendário completo da Copa do Mundo 2026',
+    title_saved:'Relatórios Salvos',sub_saved:'Análises de partidas salvas automaticamente.',
+    btn_stop:'■ Parar',btn_send:'Enviar',btn_analyze:'Analisar',btn_export_lbl:'Exportar relatório',
+    input_placeholder:'Descreva uma partida ou faça uma pergunta…',
+    sched_loading:'Carregando agenda…',sched_lbl:'jogos de hoje e próximos dias',
+    sched_no_games:'Sem jogos nos próximos dias',sched_calendar:'ver calendário →',
+    filter_label:'Filtrar:',filter_all:'Todos',filter_today:'Hoje',filter_tomorrow:'Amanhã',filter_week:'7 dias',
+    saved_autosave:'Partidas analisadas salvas automaticamente',saved_clear:'Limpar tudo',
+    saved_open:'Abrir',saved_empty:'Nenhum relatório salvo ainda.<br>As análises são salvas automaticamente.',
+    sf_apikey:'API Key Anthropic',sf_worker:'Worker URL (Cloudflare)',sf_sources:'Fontes de Dados',
+    sf_lang:'Idioma',sf_usage:'Uso de API · Sessão',sf_usage_empty:'Nenhuma análise nesta sessão',
+    sf_cost_lbl:'custo estimado',sf_tok:'Tokens',sf_cache:'Cache',sf_miss:'Último miss',sf_runs:'Análises',
+    sf_entrada:'entrada',sf_saida:'saída',sf_economizou:'economizou',
+    no_key_chat:'Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para conversar com o agente.',
+    no_key_analyze:'Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para analisar partidas.',
+    agent_lang:'IDIOMA: Responda sempre em português (PT-BR). Use terminologia futebolística brasileira.',
+    game_upcoming:(n)=>`${n} jogo${n!==1?'s':''} próximo${n!==1?'s':''}`,
+    game_all:(n)=>`todos ${n} jogos →`,
+    mnav_library:'Biblioteca',mnav_saved:'Relatórios',mnav_settings:'Config',plan_label:'Plano API · Claude',
+    runs_unit:(n)=>`${n} análise${n!==1?'s':''}`
+  },
+  en:{
+    new_analysis:'+ New Analysis',
+    nav_chat:'Chat',nav_library:'Match Library',nav_saved:'Saved Reports',
+    nav_models:'Analysis Templates',nav_soon:'soon',nav_settings:'Settings',
+    hist_empty:'No analyses yet',
+    title_chat:'Chat',sub_chat:'Chat with your World Cup football AI.',
+    title_library:'Match Library',sub_library:'Full 2026 World Cup calendar',
+    title_saved:'Saved Reports',sub_saved:'Analyses saved automatically.',
+    btn_stop:'■ Stop',btn_send:'Send',btn_analyze:'Analyze',btn_export_lbl:'Export report',
+    input_placeholder:'Describe a match or ask a question…',
+    sched_loading:'Loading schedule…',sched_lbl:'today\'s and upcoming matches',
+    sched_no_games:'No upcoming matches',sched_calendar:'see calendar →',
+    filter_label:'Filter:',filter_all:'All',filter_today:'Today',filter_tomorrow:'Tomorrow',filter_week:'7 days',
+    saved_autosave:'Analysed matches saved automatically',saved_clear:'Clear all',
+    saved_open:'Open',saved_empty:'No saved reports yet.<br>Analyses are saved automatically.',
+    sf_apikey:'Anthropic API Key',sf_worker:'Worker URL (Cloudflare)',sf_sources:'Data Sources',
+    sf_lang:'Language',sf_usage:'API Usage · Session',sf_usage_empty:'No analyses this session',
+    sf_cost_lbl:'estimated cost',sf_tok:'Tokens',sf_cache:'Cache',sf_miss:'Last miss',sf_runs:'Analyses',
+    sf_entrada:'in',sf_saida:'out',sf_economizou:'saved',
+    no_key_chat:'Set your <button onclick="openSettings()" class="inline-link">API Key</button> in Settings to chat with the agent.',
+    no_key_analyze:'Set your <button onclick="openSettings()" class="inline-link">API Key</button> in Settings to analyze matches.',
+    agent_lang:'LANGUAGE: Always respond in English. Use standard international football terminology.',
+    game_upcoming:(n)=>`${n} upcoming match${n!==1?'es':''}`,
+    game_all:(n)=>`all ${n} matches →`,
+    mnav_library:'Library',mnav_saved:'Reports',mnav_settings:'Settings',plan_label:'API Plan · Claude',
+    runs_unit:(n)=>`${n} analysis${n!==1?'es':''}`
+  }
+};
+function t(key){const s=STRINGS[currentLang]||STRINGS.pt;return s[key]!==undefined?s[key]:(STRINGS.pt[key]!==undefined?STRINGS.pt[key]:key);}
+function _setNavTxt(el,txt){
+  if(!el)return;
+  for(let i=el.childNodes.length-1;i>=0;i--){
+    const n=el.childNodes[i];
+    if(n.nodeType===3&&n.textContent.trim()){n.textContent=' '+txt+' ';return;}
+  }
+}
+function setLang(lang){
+  currentLang=lang;
+  try{localStorage.setItem('copa2026_lang',lang);}catch{}
+  applyLang();
+  try{localStorage.removeItem('copa2026_espn_news_v1');}catch{}
+  loadNews();
+}
+function applyLang(){
+  // Sidebar
+  const newBtn=document.querySelector('.ls-new');if(newBtn)newBtn.textContent=t('new_analysis');
+  _setNavTxt(document.getElementById('nav-chat'),t('nav_chat'));
+  _setNavTxt(document.getElementById('nav-library'),t('nav_library'));
+  _setNavTxt(document.getElementById('nav-saved'),t('nav_saved'));
+  _setNavTxt(document.querySelector('.ls-link[onclick*="openSettings"]'),t('nav_settings'));
+  const soonBtn=document.querySelector('.ls-link.soon');
+  if(soonBtn){
+    for(let i=soonBtn.childNodes.length-1;i>=0;i--){
+      const n=soonBtn.childNodes[i];if(n.nodeType===3&&n.textContent.trim()){n.textContent=' '+t('nav_models')+' ';break;}
+    }
+    const soonTag=soonBtn.querySelector('.ls-soon-tag');if(soonTag)soonTag.textContent=t('nav_soon');
+  }
+  const histEmpty=document.querySelector('.ls-hist-empty');if(histEmpty)histEmpty.textContent=t('hist_empty');
+  const planEl=document.querySelector('.ls-uplan');if(planEl)planEl.textContent=t('plan_label');
+  // Mobile nav
+  _setNavTxt(document.getElementById('mnav-library'),t('mnav_library'));
+  _setNavTxt(document.getElementById('mnav-saved'),t('mnav_saved'));
+  _setNavTxt(document.getElementById('mnav-settings'),t('mnav_settings'));
+  // Main header
+  const mTitle=document.querySelector('.m-title'),mSub=document.querySelector('.m-sub');
+  if(mTitle&&mSub){
+    if(_currentView==='library'){mTitle.textContent=t('title_library');mSub.textContent=t('sub_library');}
+    else if(_currentView==='saved'){mTitle.textContent=t('title_saved');mSub.textContent=t('sub_saved');}
+    else{mTitle.textContent=t('title_chat');mSub.textContent=t('sub_chat');}
+  }
+  // Export button
+  const hdrTxt=document.querySelector('.hdr-text');if(hdrTxt)hdrTxt.textContent=' '+t('btn_export_lbl');
+  // Input
+  const ta=document.getElementById('match-input');if(ta)ta.placeholder=t('input_placeholder');
+  // Settings panel
+  const spH2=document.querySelector('#sov .sp-hdr h2');if(spH2)spH2.textContent=t('nav_settings');
+  const sfApiLbl=document.querySelector('label[for="api-key-input"]');if(sfApiLbl)sfApiLbl.textContent=t('sf_apikey');
+  const sfWrkLbl=document.querySelector('label[for="worker-url-input"]');if(sfWrkLbl)sfWrkLbl.textContent=t('sf_worker');
+  const sfSrcLbl=document.getElementById('sf-sources-lbl');if(sfSrcLbl)sfSrcLbl.textContent=t('sf_sources');
+  const sfLangLbl=document.getElementById('sf-lang-lbl');if(sfLangLbl)sfLangLbl.textContent=t('sf_lang');
+  const sfUsageLbl=document.getElementById('sf-usage-lbl');if(sfUsageLbl)sfUsageLbl.textContent=t('sf_usage');
+  const sfEmpty=document.getElementById('sf-tok-empty');if(sfEmpty)sfEmpty.textContent=t('sf_usage_empty');
+  const sfCostLbl=document.querySelector('.tok-sf-cost-lbl');if(sfCostLbl)sfCostLbl.textContent=t('sf_cost_lbl');
+  // Filter buttons
+  document.querySelectorAll('.lib-filter-btn[data-f]').forEach(btn=>{
+    const f=btn.dataset.f;
+    if(f==='todos')btn.textContent=t('filter_all');
+    else if(f==='hoje')btn.textContent=t('filter_today');
+    else if(f==='amanha')btn.textContent=t('filter_tomorrow');
+    else if(f==='semana')btn.textContent=t('filter_week');
+  });
+  // Run button
+  setRunBtn(_running||false);
+  // Re-render schedule chips to update labels (team names are language-independent)
+  if(_schedule&&_schedule.length){renderScheduleChips(_schedule);}
+  else{const schedLbl=document.getElementById('sched-lbl');if(schedLbl)schedLbl.textContent=t('sched_lbl');}
+  // Lang buttons sync
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));
 }
 
 // ─── Welcome popup ────────────────────────────────────────────────────────
@@ -1377,7 +1518,7 @@ function parseRateLimitHeaders(res){
   if(tl){rlState.tokLimit=tl;rlState.tokRemaining=tr;rlState.tokReset=ts;}
   if(rl){rlState.reqLimit=rl;rlState.reqRemaining=rr;}
 }
-function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();updateSettingsTokens();}
+function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
 function updateSettingsTokens(){
   const tot=tokenState.sessionIn+tokenState.sessionOut;
   const emptyEl=document.getElementById('sf-tok-empty');
@@ -1392,13 +1533,13 @@ function updateSettingsTokens(){
   const p2In=tokenState.sessionIn-tokenState.sessionIn_p1,p2Out=tokenState.sessionOut-tokenState.sessionOut_p1;
   const cost=p1Cost+(p2In*mainP.i+p2Out*mainP.o)/1e6;
   document.getElementById('sf-tok-cost').textContent=_fmtCost(cost);
-  document.getElementById('sf-tok-tokens').textContent=`${_fmtTok(tokenState.sessionIn)} entrada · ${_fmtTok(tokenState.sessionOut)} saída`;
+  document.getElementById('sf-tok-tokens').textContent=`${_fmtTok(tokenState.sessionIn)} ${t('sf_entrada')} · ${_fmtTok(tokenState.sessionOut)} ${t('sf_saida')}`;
   const cacheRowEl=document.getElementById('sf-tok-cache-row');
   if(tokenState.sessionCacheRead>0){
     cacheRowEl.style.display='';
     let ct=_fmtTok(tokenState.sessionCacheRead)+' lidos';
     if(tokenState.lastCacheHitPct>0)ct+=' · '+tokenState.lastCacheHitPct+'% hit';
-    if(tokenState.sessionCacheSaved>0.001)ct+=' · economizou '+_fmtCost(tokenState.sessionCacheSaved);
+    if(tokenState.sessionCacheSaved>0.001)ct+=' · '+t('sf_economizou')+' '+_fmtCost(tokenState.sessionCacheSaved);
     document.getElementById('sf-tok-cacherow').textContent=ct;
   }else{cacheRowEl.style.display='none';}
   const missRowEl=document.getElementById('sf-tok-miss-row');
@@ -1407,7 +1548,7 @@ function updateSettingsTokens(){
     document.getElementById('sf-tok-missrow').textContent=tokenState.lastCacheMissReason.replace(/_/g,' ');
   }else{missRowEl.style.display='none';}
   const n=tokenState.runs;
-  document.getElementById('sf-tok-runs').textContent=`${n} análise${n!==1?'s':''} · ${MODEL_SHORT[currentModel]||currentModel}`;
+  document.getElementById('sf-tok-runs').textContent=`${typeof t('runs_unit')==='function'?t('runs_unit')(n):t('runs_unit')} · ${MODEL_SHORT[currentModel]||currentModel}`;
 }
 function closeSettings(e){if(!e||e.target===document.getElementById('sov'))document.getElementById('sov').style.display='none';}
 
@@ -2036,7 +2177,9 @@ function dateLabelFromISO(iso){
 function formatDateBR(iso){if(!iso)return'';const[y,m,dd]=iso.split('-');return`${dd}/${m}/${y}`;}
 
 // ─── System prompt ────────────────────────────────────────────────────────
-function getSystemPrompt(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
+function getSystemPrompt(){return `${t('agent_lang')}
+
+Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
 
 PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados e verificados — NÃO pesquise para confirmar times, data, fase ou sede. Pesquise APENAS: desempenho das seleções nos jogos já disputados na Copa 2026, lesões/suspensões confirmadas, escalação provável, xG e métricas de desempenho. Vá direto à análise.
 
@@ -2160,16 +2303,16 @@ function renderScheduleChips(jogos){
   const today=new Date();today.setHours(0,0,0,0);
   const upcoming=jogos.filter(j=>{if(!j.data_iso)return false;const d=new Date(j.data_iso+'T12:00:00');return d>=today;}).slice(0,5);
   if(!upcoming.length){
-    chips.innerHTML=`<span class="ex-auto-hint">Sem jogos nos próximos dias · <button class="chip chip-cta" onclick="showView('library')">ver calendário →</button></span>`;
-    document.getElementById('sched-lbl').textContent='agenda da copa 2026';
+    chips.innerHTML=`<span class="ex-auto-hint">${t('sched_no_games')} · <button class="chip chip-cta" onclick="showView('library')">${t('sched_calendar')}</button></span>`;
+    document.getElementById('sched-lbl').textContent=t('sched_lbl');
     document.getElementById('reload-btn').style.display='inline';return;
   }
   const grp={};upcoming.forEach(j=>{const k=dateLabelFromISO(j.data_iso);if(!grp[k])grp[k]=[];grp[k].push(j);});
   const order=['hoje','amanhã'];const keys=[...order.filter(k=>grp[k]),...Object.keys(grp).filter(k=>!order.includes(k))];
   let html='';keys.forEach(day=>{grp[day].forEach(j=>{const idx=jogos.indexOf(j);html+=`<button class="chip chip-match" onclick="fillMatch(${idx})"><span class="chip-teams">${esc(j.mandante)} × ${esc(j.visitante)}</span><span class="chip-meta">${j.hora_brt?esc(j.hora_brt):''}</span></button>`;});});
-  if(jogos.length>upcoming.length)html+=`<button class="chip chip-cta" onclick="showView('library')" style="margin-top:4px">todos ${jogos.length} jogos →</button>`;
+  if(jogos.length>upcoming.length)html+=`<button class="chip chip-cta" onclick="showView('library')" style="margin-top:4px">${typeof t('game_all')==='function'?t('game_all')(jogos.length):t('game_all')}</button>`;
   chips.innerHTML=html;document.getElementById('reload-btn').style.display='inline';
-  document.getElementById('sched-lbl').textContent=`${upcoming.length} jogo${upcoming.length!==1?'s':''} próximo${upcoming.length!==1?'s':''}`;
+  document.getElementById('sched-lbl').textContent=typeof t('game_upcoming')==='function'?t('game_upcoming')(upcoming.length):t('game_upcoming');
 }
 // ─── Tournament context cache ─────────────────────────────────────────────
 function _loadCtxCache(){
@@ -2631,15 +2774,15 @@ function showView(view){
   chatEl.style.display='none';libEl.style.display='none';savedEl.style.display='none';dockEl.style.display='none';
   if(view==='library'){
     libEl.style.display='flex';navLib.classList.add('active');
-    mTitle.textContent='Biblioteca de Jogos';mSub.textContent='Calendário completo da Copa do Mundo 2026';
+    mTitle.textContent=t('title_library');mSub.textContent=t('sub_library');
     renderLibrary();
   }else if(view==='saved'){
     savedEl.style.display='flex';navSaved.classList.add('active');
-    mTitle.textContent='Relatórios Salvos';mSub.textContent='Análises de partidas salvas automaticamente.';
+    mTitle.textContent=t('title_saved');mSub.textContent=t('sub_saved');
     renderSavedReports();
   }else{
     chatEl.style.display='';dockEl.style.display='';navChat.classList.add('active');
-    mTitle.textContent='Chat';mSub.textContent='Converse com sua IA especialista em futebol.';
+    mTitle.textContent=t('title_chat');mSub.textContent=t('sub_chat');
   }
   ['chat','library','saved'].forEach(v=>{const b=document.getElementById('mnav-'+v);if(b)b.classList.toggle('active',v===view);});
   const mSet=document.getElementById('mnav-settings');if(mSet)mSet.classList.remove('active');
@@ -2649,7 +2792,7 @@ function renderSavedReports(){
   const clrBtn=document.getElementById('saved-clear-btn');
   if(clrBtn)clrBtn.style.display=_history.length?'inline-flex':'none';
   if(!_history.length){
-    listEl.innerHTML='<div class="lib-empty">Nenhum relatório salvo ainda.<br>As análises são salvas automaticamente.</div>';
+    listEl.innerHTML=`<div class="lib-empty">${t('saved_empty')}</div>`;
     return;
   }
   listEl.innerHTML=_history.map(a=>`
@@ -2658,7 +2801,7 @@ function renderSavedReports(){
         <div class="lib-match-teams">${esc(a.title)}</div>
         <div class="lib-match-meta">${esc(a.fase||'Copa 2026')} · ${esc(a.ts)}</div>
       </div>
-      <button class="lib-match-btn" onclick="event.stopPropagation();openSaved('${a.hid}')">Abrir</button>
+      <button class="lib-match-btn" onclick="event.stopPropagation();openSaved('${a.hid}')">${t('saved_open')}</button>
     </div>`).join('');
 }
 function openSaved(hid){
@@ -2806,7 +2949,8 @@ function taReset(ta){ta.value='';ta.style.height='';ta.rows=1;}
 const NEWS_TTL=10*60*1000;
 async function loadNews(){
   try{
-    const data=await fetchEspn('/news?limit=20','copa2026_espn_news_v1',NEWS_TTL);
+    const newsPath=currentLang==='pt'?'/news?limit=20&lang=pt&region=br':'/news?limit=20';
+    const data=await fetchEspn(newsPath,'copa2026_espn_news_v1',NEWS_TTL);
     const arts=(data?.articles||[]).filter(a=>a.headline);
     if(!arts.length)return;
     const el=document.getElementById('ntick-inner');if(!el)return;
@@ -2818,7 +2962,7 @@ async function loadNews(){
   }catch{}
 }
 setInterval(loadNews,NEWS_TTL);
-loadHistory();renderRecentAnalyses();renderSidebarHistory();maybeShowWelcome();
+loadHistory();renderRecentAnalyses();renderSidebarHistory();maybeShowWelcome();applyLang();
 document.addEventListener('click',e=>{if(!e.target.closest('.sel-pop')&&!e.target.closest('.i-sel-btn'))closeSelPops();});
 // ESPN não requer chave — carrega standings/agenda e notícias imediatamente
 if(!getAfKey()&&!getFdKey())setTimeout(()=>{loadEspnData(false);loadNews();},200);
@@ -2885,7 +3029,9 @@ function buildEnrichedQuery(query,rawFacts,ctx){
   if(ctx){parts.push('\nCONTEXTO DO TORNEIO (standings e resultados recentes):');parts.push(ctx);}
   return parts.join('\n');
 }
-function getSystemPromptPhase2(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
+function getSystemPromptPhase2(){return `${t('agent_lang')}
+
+Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
 
 PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados — NÃO faça pesquisas. Use exatamente os dados fornecidos em DADOS PRÉ-COLETADOS.
 
@@ -2933,7 +3079,7 @@ async function runChat(){
   showUserBubble(query);
   const ta=document.getElementById('match-input');taReset(ta);
   if(!apiKey&&!getWorkerUrl()){
-    showAgentBubble('Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para conversar com o agente.');
+    showAgentBubble(t('no_key_chat'));
     return;
   }
   _running=true;_abort=new AbortController();
@@ -2949,7 +3095,7 @@ async function runChat(){
       method:'POST',
       headers:getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']),
       body:JSON.stringify({model:currentModel,max_tokens:1024,
-        system:[{type:'text',text:'Você é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda em português de forma precisa, concisa e conversacional.',cache_control:{type:'ephemeral'}}],
+        system:[{type:'text',text:`${t('agent_lang')}\n\nVocê é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda de forma precisa, concisa e conversacional.`,cache_control:{type:'ephemeral'}}],
         messages:trimmedThread,stream:true,diagnostics:{previous_message_id:_lastChatId}}),
       signal:_abort.signal
     });
@@ -2997,8 +3143,8 @@ function cancelAnalysis(){if(_running&&_abort){try{_abort.abort();}catch(e){}}}
 function setRunBtn(running){
   const b=document.getElementById('run-btn');
   b.classList.toggle('i-stop',running);
-  if(running)b.textContent='■ Parar';
-  else b.textContent=_chatThread.length>0?'Enviar':'Analisar';
+  if(running)b.textContent=t('btn_stop');
+  else b.textContent=_chatThread.length>0?t('btn_send'):t('btn_analyze');
 }
 
 async function runAnalysis(){
@@ -3007,7 +3153,7 @@ async function runAnalysis(){
   if(!apiKey&&!getWorkerUrl()){
     const q=document.getElementById('match-input').value.trim();
     showUserBubble(q);taReset(document.getElementById('match-input'));
-    showAgentBubble('Configure sua <button onclick="openSettings()" class="inline-link">API Key</button> em Configurações para analisar partidas.');
+    showAgentBubble(t('no_key_analyze'));
     return;
   }
   const query=document.getElementById('match-input').value.trim();

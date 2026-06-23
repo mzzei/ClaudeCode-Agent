@@ -589,9 +589,10 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 /* ── Analysis card ── */
 .a-card{
   position:relative;isolation:isolate;
-  background:linear-gradient(180deg,rgba(20,46,32,.72),rgba(12,30,20,.66));
+  background:linear-gradient(180deg,#0e2318,#091810);
   border:1px solid rgba(160,240,190,.15);border-radius:22px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.4)
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.4);
+  content-visibility:auto;contain-intrinsic-size:0 600px
 }
 .a-card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:130px;
@@ -610,8 +611,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .a-title{font-family:var(--sans);font-style:normal;font-weight:800;font-size:1.7rem;letter-spacing:-.02em;color:var(--deep);padding:0 1.1rem .7rem;line-height:1.15}
 .a-subtitle{display:block;font-size:.72rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);padding:0 1.1rem .35rem}
 /* Tab pill slider */
-.a-tabs{position:relative;border-bottom:1px solid rgba(160,240,190,.1);overflow:hidden}
-.a-tab-pill{position:absolute;bottom:0;height:100%;background:rgba(255,255,255,.07);border-radius:8px 8px 0 0;border-top:1.5px solid rgba(160,240,190,.35);transition:left .34s cubic-bezier(.45,.05,.2,1),width .34s cubic-bezier(.45,.05,.2,1);pointer-events:none;will-change:left,width}
+.a-tabs{position:relative;border-bottom:1px solid rgba(160,240,190,.1);overflow-x:auto;overflow-y:clip;scrollbar-width:none}
+.a-tabs::-webkit-scrollbar{display:none}
+.a-tab-pill{position:absolute;bottom:0;height:100%;background:rgba(255,255,255,.07);border-radius:8px 8px 0 0;border-top:1.5px solid rgba(160,240,190,.35);transition:left .34s cubic-bezier(.45,.05,.2,1),width .34s cubic-bezier(.45,.05,.2,1);pointer-events:none}
 .a-tab{color:var(--muted);font-weight:600;border-bottom:none;position:relative;z-index:1}
 .a-tab:hover{color:var(--mid)}
 .a-tab.active{color:#f3faf2}
@@ -1938,8 +1940,6 @@ function formatDateBR(iso){if(!iso)return'';const[y,m,dd]=iso.split('-');return`
 // ─── System prompt ────────────────────────────────────────────────────────
 function getSystemPrompt(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
 
-DATA ATUAL: ${currentDateFull()}
-
 PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados e verificados — NÃO pesquise para confirmar times, data, fase ou sede. Pesquise APENAS: desempenho das seleções nos jogos já disputados na Copa 2026, lesões/suspensões confirmadas, escalação provável, xG e métricas de desempenho. Vá direto à análise.
 
 CONSCIÊNCIA TEMPORAL:
@@ -2775,8 +2775,6 @@ function buildEnrichedQuery(query,rawFacts,ctx){
 }
 function getSystemPromptPhase2(){return `Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
 
-DATA ATUAL: ${currentDateFull()}
-
 PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados — NÃO faça pesquisas. Use exatamente os dados fornecidos em DADOS PRÉ-COLETADOS.
 
 OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais. Se um dado estiver ausente (lacuna), declare-o na seção "lacunas" sem inventar.
@@ -2839,7 +2837,7 @@ async function runChat(){
       method:'POST',
       headers:getReqHeaders(apiKey),
       body:JSON.stringify({model:currentModel,max_tokens:1024,
-        system:`Você é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda em português de forma precisa, concisa e conversacional. Data: ${new Date().toLocaleDateString('pt-BR')}.`,
+        system:[{type:'text',text:'Você é o WorldCup Agent, especialista em Copa do Mundo 2026. Responda em português de forma precisa, concisa e conversacional.',cache_control:{type:'ephemeral'}}],
         messages:trimmedThread,stream:true}),
       signal:_abort.signal
     });
@@ -2931,7 +2929,7 @@ async function runAnalysis(){
     const finalQuery=useEnriched?buildEnrichedQuery(query,rawFacts,ctx):query;
     const sysText=useEnriched?getSystemPromptPhase2():getSystemPrompt();
     const memCtx=await fetchMemoryContext();
-    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:sysText};
+    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
     if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search'}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
@@ -2964,9 +2962,30 @@ async function runAnalysis(){
     tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
     stopThinking(true);
     setTimeout(()=>{updateTokenBar();updateDockTokens();},1300);
-    const m=finalText.match(/\{[\s\S]*\}/);
-    if(!m)throw new Error('Resposta fora do formato esperado. Reformule a pergunta e tente novamente.');
-    let parsed;try{parsed=JSON.parse(m[0]);}catch{throw new Error('JSON inválido na resposta do modelo. Tente novamente.');}
+    // Extração robusta: tenta strip de bloco markdown antes do regex
+    const cleanText=finalText.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');
+    let m=cleanText.match(/\{[\s\S]*\}/);
+    if(!m){
+      // Auto-retry: pede explicitamente só o JSON
+      updateThinkingToks({status:'Reformulando resposta…',phase:2});
+      const retryMessages=[
+        {role:'user',content:`DATA: ${currentDateFull()}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`},
+        {role:'assistant',content:finalText},
+        {role:'user',content:'Retorne APENAS o JSON estruturado da análise, sem nenhum texto antes ou depois, sem blocos de código markdown.'}
+      ];
+      const retryBody={...baseBody,messages:retryMessages};
+      delete retryBody.tools;
+      const retryR=await streamOnce(retryBody,reqHeaders,()=>{},_abort.signal).catch(()=>null);
+      if(retryR){const c2=retryR.text.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');m=c2.match(/\{[\s\S]*\}/);}
+    }
+    if(!m)throw new Error('O modelo não retornou uma análise estruturada. Tente descrever a partida com "PARTIDA: [Time A] x [Time B]" ou use um dos jogos sugeridos.');
+    let parsed;
+    try{parsed=JSON.parse(m[0]);}
+    catch{
+      // Tenta corrigir JSON truncado adicionando fechamentos
+      try{parsed=JSON.parse(m[0].replace(/,\s*$/,'')+'}}');}
+      catch{throw new Error('Análise recebida mas com formato inválido. Tente novamente — o modelo pode ter sido interrompido.');}
+    }
     renderResults(parsed);
     ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }catch(e){
@@ -2977,7 +2996,7 @@ async function runAnalysis(){
       ks.textContent='Análise interrompida · ajuste e tente de novo';ks.style.color='var(--muted)';
     }else{
       document.getElementById('error-box').style.display='block';
-      document.getElementById('error-msg').textContent=e.message||'Erro inesperado. Verifique sua conexão.';
+      document.getElementById('error-msg').innerHTML=(e.message||'Erro inesperado. Verifique sua conexão.')+' <button class="inline-link" onclick="document.getElementById(\'error-box\').style.display=\'none\';toggleRun()">↺ tentar de novo</button>';
       ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
     }
   }finally{

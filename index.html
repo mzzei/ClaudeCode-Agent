@@ -254,7 +254,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-fase{font-size:12px;font-weight:500;color:var(--terra);margin-bottom:.6rem}
 .rs-teams-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:.65rem}
 .rs-team{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;font-size:11px;font-weight:500;color:var(--deep);text-align:center}
-.rs-flag{font-size:22px}
+.rs-flag-img{width:34px;height:24px;border-radius:3px;object-fit:cover;box-shadow:0 2px 7px rgba(0,0,0,.45);display:block}
+.rs-flag-fb{font-size:22px;line-height:24px}
 .rs-vs{font-size:10px;color:var(--muted);flex-shrink:0}
 .rs-det{font-size:11px;color:var(--mid);margin-bottom:3px;display:flex;align-items:center;gap:4px}
 
@@ -476,9 +477,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 @keyframes wc-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .wc-blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 .wc-blob{position:absolute;border-radius:50%}
-.wc-blob1{width:520px;height:520px;top:-120px;left:18%;background:radial-gradient(circle,rgba(40,217,142,.4),transparent 62%);filter:blur(80px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
-.wc-blob2{width:480px;height:480px;bottom:-160px;right:6%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(90px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
-.wc-blob3{width:420px;height:420px;top:32%;left:38%;background:radial-gradient(circle,rgba(232,196,106,.13),transparent 58%);filter:blur(100px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
+.wc-blob1{width:520px;height:520px;top:-120px;left:18%;background:radial-gradient(circle,rgba(40,217,142,.4),transparent 62%);filter:blur(55px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
+.wc-blob2{width:480px;height:480px;bottom:-160px;right:6%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(60px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
+.wc-blob3{width:420px;height:420px;top:32%;left:38%;background:radial-gradient(circle,rgba(232,196,106,.13),transparent 58%);filter:blur(65px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
 
 /* Gradient text utilities */
 .wc-lime{background:linear-gradient(100deg,#d6f95a,#8fe87a 50%,#28d98e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
@@ -545,7 +546,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .m-sub{color:var(--muted)}
 .hdr-ic{background:rgba(255,255,255,.04);border:1px solid rgba(160,240,190,.14);color:var(--muted)}
 .hdr-ic:hover{background:rgba(255,255,255,.09);color:var(--mid)}
-.hdr-primary{background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid rgba(160,240,190,.18);color:var(--muted);font-weight:500;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:13px;transition:all .16s}
+.hdr-primary{background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid rgba(160,240,190,.18);color:var(--muted);font-weight:500;border-radius:13px;transition:all .16s}
 .hdr-primary:hover{border-color:rgba(214,249,90,.4);box-shadow:0 0 22px rgba(67,224,143,.2);color:var(--deep)}
 .m-burger{color:var(--deep)}
 .m-burger:hover{background:rgba(255,255,255,.06)}
@@ -567,13 +568,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .chip-cta:hover{background:rgba(40,217,142,.2);color:var(--deep)}
 
 /* ── User bubble ── */
-.user-bubble{background:linear-gradient(135deg,rgba(214,249,90,.18),rgba(40,217,142,.12));border:1px solid rgba(160,240,190,.26);border-radius:20px 20px 5px 20px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.user-bubble{background:linear-gradient(135deg,rgba(214,249,90,.18),rgba(40,217,142,.12));border:1px solid rgba(160,240,190,.26);border-radius:20px 20px 5px 20px}
 .ua-ts{color:var(--dim)}
 .ua-btn{color:var(--muted)}
 .ua-btn:hover{color:var(--mid)}
 
 /* ── Thinking indicator ── */
-.thk-compact{background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.thk-compact{background:linear-gradient(160deg,rgba(20,46,32,.7),rgba(12,30,20,.6));border:1px solid rgba(160,240,190,.16)}
 .thk-star{color:#43e08f;filter:drop-shadow(0 0 6px rgba(67,224,143,.8));animation:wc-spin 1.5s linear infinite!important}
 .thk-lbl{color:var(--muted);font-style:normal}
 .thk-pill{background:rgba(40,217,142,.1);color:#7af0b4}
@@ -581,16 +582,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .thk-elapsed{color:var(--muted)}
 
 /* ── Agent bubble ── */
-.agent-bubble{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:18px 18px 18px 4px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.agent-bubble{background:linear-gradient(160deg,rgba(20,46,32,.66),rgba(12,30,20,.58));border:1px solid rgba(160,240,190,.13);border-radius:18px 18px 18px 4px}
 .agent-bubble code{background:rgba(0,0,0,.3);color:var(--lime-mid);border-radius:4px;padding:1px 4px}
 .inline-link{color:var(--green)}
 
 /* ── Analysis card ── */
 .a-card{
   position:relative;isolation:isolate;
-  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  background:linear-gradient(180deg,rgba(20,46,32,.72),rgba(12,30,20,.66));
   border:1px solid rgba(160,240,190,.15);border-radius:22px;
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.4)
 }
 .a-card::before{
@@ -622,7 +622,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .tab-body{color:var(--mid)}
 
 /* ── Probabilities ── */
-.badge{backdrop-filter:blur(8px)}
 .b-ok{background:rgba(40,217,142,.16);color:#7af0b4;border:1px solid rgba(67,224,143,.28)}
 .b-warn{background:rgba(214,249,90,.12);color:#cdef7d;border:1px solid rgba(214,249,90,.28)}
 .pname{color:var(--mid);font-size:14px;font-weight:500}
@@ -633,7 +632,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* ── Stat tiles ── */
 .s3{gap:10px}
-.stile{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:15px;backdrop-filter:blur(8px)}
+.stile{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:15px}
 .slbl{color:var(--muted);font-size:10.5px}
 .sval{color:var(--deep);font-weight:800}
 
@@ -646,7 +645,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ev-reason{color:var(--dim)}
 
 /* ── Tickets ── */
-.ticket{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:14px;backdrop-filter:blur(8px)}
+.ticket{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:14px}
 .ticket-desc{font-family:var(--sans);font-style:normal;font-weight:600}
 .ticket-prob{color:var(--lime-mid)}
 .ticket-reason{color:var(--mid)}
@@ -669,7 +668,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .duelo-det{color:var(--mid)}
 
 /* ── Team cards ── */
-.tcard{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:14px;backdrop-filter:blur(8px)}
+.tcard{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:14px}
 .tname{font-family:var(--sans);font-style:normal;font-weight:700;color:var(--lime-mid)}
 .irow{border-bottom:1px solid rgba(160,240,190,.1)}
 .ilbl{color:var(--muted)}
@@ -731,7 +730,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .sp-tag{background:rgba(255,255,255,.06);color:var(--muted);border-radius:6px}
 
 /* ── Right sidebar blocks ── */
-.rs-block{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:16px;backdrop-filter:blur(8px)}
+.rs-block{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(160,240,190,.13);border-radius:16px}
 .rs-lbl{color:var(--muted)}
 .rs-fase{color:var(--lime-mid);font-weight:600}
 .rs-team{color:var(--deep)}
@@ -1171,12 +1170,21 @@ const EFFORT_LEVELS = [
   {label:'Padrão',budget:0},{label:'Leve',budget:2000},{label:'Médio',budget:5000},
   {label:'Alto',budget:10000},{label:'Máximo',budget:16000}
 ];
-const FLAGS = {'Brasil':'🇧🇷','Argentina':'🇦🇷','França':'🇫🇷','Alemanha':'🇩🇪','Espanha':'🇪🇸',
-  'Portugal':'🇵🇹','Holanda':'🇳🇱','Países Baixos':'🇳🇱','Bélgica':'🇧🇪','Inglaterra':'🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-  'Uruguai':'🇺🇾','México':'🇲🇽','EUA':'🇺🇸','Estados Unidos':'🇺🇸','Canadá':'🇨🇦',
-  'Japão':'🇯🇵','Coreia do Sul':'🇰🇷','Marrocos':'🇲🇦','Senegal':'🇸🇳','Austrália':'🇦🇺',
-  'Croácia':'🇭🇷','Suíça':'🇨🇭','Polônia':'🇵🇱','Dinamarca':'🇩🇰','Suécia':'🇸🇪',
-  'Itália':'🇮🇹','Holand':'🇳🇱','Equador':'🇪🇨','Colômbia':'🇨🇴','Venezuela':'🇻🇪'};
+// Country → ISO 3166-1 alpha-2 (flagcdn.com codes). Flag emoji don't render on Windows,
+// so we render real flag images instead.
+const FLAGS = {'Brasil':'br','Argentina':'ar','França':'fr','Alemanha':'de','Espanha':'es',
+  'Portugal':'pt','Holanda':'nl','Países Baixos':'nl','Bélgica':'be','Inglaterra':'gb-eng',
+  'Escócia':'gb-sct','Gales':'gb-wls','País de Gales':'gb-wls',
+  'Uruguai':'uy','México':'mx','EUA':'us','Estados Unidos':'us','Canadá':'ca',
+  'Japão':'jp','Coreia do Sul':'kr','Coreia':'kr','Marrocos':'ma','Senegal':'sn','Austrália':'au',
+  'Croácia':'hr','Suíça':'ch','Polônia':'pl','Dinamarca':'dk','Suécia':'se',
+  'Itália':'it','Holand':'nl','Equador':'ec','Colômbia':'co','Venezuela':'ve',
+  'Irã':'ir','Iraque':'iq','Jordânia':'jo','Uzbequistão':'uz','Catar':'qa','Qatar':'qa',
+  'Arábia Saudita':'sa','Emirados Árabes Unidos':'ae','Noruega':'no','Peru':'pe','Chile':'cl',
+  'Paraguai':'py','Costa Rica':'cr','Panamá':'pa','Honduras':'hn','Jamaica':'jm',
+  'Nova Zelândia':'nz','África do Sul':'za','Turquia':'tr','Áustria':'at','Sérvia':'rs',
+  'Grécia':'gr','Ucrânia':'ua','Rússia':'ru','China':'cn','Gana':'gh','Camarões':'cm',
+  'Nigéria':'ng','Tunísia':'tn','Argélia':'dz','Egito':'eg','Costa do Marfim':'ci'};
 
 // ─── State ───────────────────────────────────────────────────────────────
 let currentModel  = 'claude-sonnet-4-6';
@@ -1608,18 +1616,24 @@ function copyAnalysis(id){
 
 // ─── Right sidebar ────────────────────────────────────────────────────────
 function updateRightSidebar(d,prob){
-  const fl=n=>FLAGS[n]||'🏟';
+  const flag=name=>{
+    const iso=FLAGS[name]||FLAGS[(name||'').trim()];
+    return iso
+      ? `<img class="rs-flag-img" src="https://flagcdn.com/w80/${iso}.png" alt="${esc(name)}" onerror="this.style.visibility='hidden'">`
+      : `<span class="rs-flag-fb">🏳️</span>`;
+  };
   const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'};
   const cL={alto:'alta confiança',medio:'média confiança',baixo:'baixa confiança'};
-  const hn=esc(d.mandante?.nome||'Mandante'),an=esc(d.visitante?.nome||'Visitante');
+  const rawHn=d.mandante?.nome||'Mandante',rawAn=d.visitante?.nome||'Visitante';
+  const hn=esc(rawHn),an=esc(rawAn);
 
   // Match context
   document.getElementById('rs-match-card').innerHTML=`
     <div class="rs-fase">${esc(d.fase||'Copa do Mundo 2026')}</div>
     <div class="rs-teams-row">
-      <div class="rs-team"><span class="rs-flag">${fl(hn)}</span><span>${hn}</span></div>
+      <div class="rs-team">${flag(rawHn)}<span>${hn}</span></div>
       <div class="rs-vs">vs</div>
-      <div class="rs-team"><span class="rs-flag">${fl(an)}</span><span>${an}</span></div>
+      <div class="rs-team">${flag(rawAn)}<span>${an}</span></div>
     </div>
     ${d.data_hora?`<div class="rs-det">📅 ${esc(d.data_hora)}</div>`:''}
     ${d.sede?`<div class="rs-det">📍 ${esc(d.sede)}</div>`:''}

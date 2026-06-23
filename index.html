@@ -2964,10 +2964,46 @@ function _relTime(mins){
   return'em '+d+(d>1?' dias':' dia');
 }
 
+// Histórico completo de jogos finalizados via ESPN (intervalo de datas do torneio)
+let _copaResults=null,_copaResultsAt=0;
+const COPA_RESULTS_TTL=5*60*1000;
+function _ymd(dt){return dt.getFullYear()+String(dt.getMonth()+1).padStart(2,'0')+String(dt.getDate()).padStart(2,'0');}
+async function _loadCopaResults(){
+  if(_copaResults&&Date.now()-_copaResultsAt<COPA_RESULTS_TTL)return _copaResults;
+  // Copa 2026 começa em 11/06; busca do início até hoje
+  const start='20260611';const end=_ymd(new Date());
+  try{
+    const r=await fetchEspn('/scoreboard?dates='+start+'-'+end,'copa2026_results_'+end,COPA_RESULTS_TTL);
+    const events=(r&&r.events)||[];
+    _copaResults=events.filter(e=>e.status&&e.status.type&&e.status.type.completed).map(e=>{
+      const c=e.competitions&&e.competitions[0];const comps=(c&&c.competitors)||[];
+      const h=comps.find(x=>x.homeAway==='home')||comps[0];
+      const a=comps.find(x=>x.homeAway==='away')||comps[1];
+      const dt=new Date(e.date);
+      return{
+        data:`${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}`,
+        mandante:(h&&h.team&&h.team.displayName)||'',
+        visitante:(a&&a.team&&a.team.displayName)||'',
+        placar:`${(h&&h.score!=null?h.score:'?')}-${(a&&a.score!=null?a.score:'?')}`
+      };
+    });
+    _copaResultsAt=Date.now();
+  }catch(e){if(!_copaResults)_copaResults=[];}
+  return _copaResults;
+}
+
 function _copaStatsHTML(){
   const c=(typeof _loadCtxCache==='function')?_loadCtxCache():null;
   const d=c&&c.data?c.data:null;
-  const results=(d&&Array.isArray(d.results))?d.results:[];
+  const ctxResults=(d&&Array.isArray(d.results))?d.results:[];
+  // Mescla resultados do ESPN (histórico completo) + ctx, deduplicando por placar+times
+  const merged=[],mseen=new Set();
+  (_copaResults||[]).concat(ctxResults).forEach(r=>{
+    if(!r||!r.placar)return;
+    const key=`${(r.mandante||'').toLowerCase()}|${(r.visitante||'').toLowerCase()}|${r.placar}`;
+    if(mseen.has(key))return;mseen.add(key);merged.push(r);
+  });
+  const results=merged.length?merged:ctxResults;
   const standings=(d&&d.standings)?d.standings:null;
   const faseAtual=d&&d.fase_atual?d.fase_atual:'';
 
@@ -2976,10 +3012,17 @@ function _copaStatsHTML(){
   const liveNow=_schedule.filter(m=>_matchState(m).state==='live').length;
   const futuros=_schedule.filter(m=>{const st=_matchState(m).state;return st==='upcoming';}).length;
 
-  // Gols por seleção (a partir das classificações: gp) e maiores goleadas (results)
+  // Gols por seleção: prioriza classificações (gp); senão soma a partir dos resultados
   const golsPorTime={};
-  if(standings){
+  if(standings&&Object.keys(standings).length){
     Object.values(standings).forEach(rows=>{(rows||[]).forEach(r=>{if(r&&r.time!=null)golsPorTime[r.time]=(golsPorTime[r.time]||0)+(parseInt(r.gp)||0);});});
+  }else{
+    results.forEach(r=>{
+      const mm=(r.placar||'').match(/(\d+)\s*[-x:]\s*(\d+)/);if(!mm)return;
+      const a=parseInt(mm[1]),b=parseInt(mm[2]);
+      if(r.mandante)golsPorTime[r.mandante]=(golsPorTime[r.mandante]||0)+a;
+      if(r.visitante)golsPorTime[r.visitante]=(golsPorTime[r.visitante]||0)+b;
+    });
   }
   const topGols=Object.entries(golsPorTime).filter(([,g])=>g>0).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
@@ -3089,6 +3132,16 @@ function renderEmptyStateFeatured(){
     <div class="rs-block"><div class="rs-lbl">📊 Estatísticas da Copa</div>${statsHTML}</div>
     <div class="rs-block"><div class="rs-lbl">⭐ Seleções em Destaque</div>${teamsHTML}</div>
     <div class="rs-block"><div class="rs-lbl">📅 Próximos Jogos</div>${calHTML}</div>`;
+
+  // Enriquece com histórico completo do torneio (ESPN) e re-renderiza as estatísticas
+  _loadCopaResults().then(()=>{
+    const hasConvoNow=document.getElementById('conversation').children.length>0;
+    if(hasConvoNow)return;
+    const fresh=_copaStatsHTML();
+    const dEl=document.getElementById('rs-copa-stats-body');if(dEl)dEl.innerHTML=fresh;
+    const mEl=document.getElementById('es-mobile-featured');
+    if(mEl&&mEl.firstElementChild)mEl.firstElementChild.innerHTML=`<div class="rs-lbl">📊 Estatísticas da Copa</div>${fresh}`;
+  }).catch(()=>{});
 }
 // Refresh time-aware featured every 60s so countdowns/live state stay current
 setInterval(()=>{

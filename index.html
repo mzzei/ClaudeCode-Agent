@@ -91,7 +91,10 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-nm-flag img{border-radius:3px;box-shadow:0 2px 7px rgba(0,0,0,.45)}
 .rs-nm-name{font-size:11px;font-weight:600;color:var(--deep);text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .rs-nm-vs{font-size:11px;color:var(--muted);flex-shrink:0}
-.rs-nm-meta{display:flex;justify-content:center;gap:10px;font-size:10px;color:var(--muted);padding-top:.55rem;border-top:1px solid var(--border)}
+.rs-nm-meta{display:flex;justify-content:center;align-items:center;gap:10px;font-size:10px;color:var(--muted);padding-top:.55rem;border-top:1px solid var(--border)}
+.rs-nm-live{display:inline-flex;align-items:center;gap:4px;color:#ff3b30;font-weight:700;letter-spacing:.04em}
+.rs-nm-live::before{content:'';width:6px;height:6px;border-radius:50%;background:#ff3b30;animation:lv-pulse 1.1s ease-in-out infinite}
+.rs-nm-soon{color:var(--terra);font-weight:600}
 .rs-tg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .rs-team-badge{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;padding:7px 4px;border-radius:11px;transition:background .15s;min-width:0}
 .rs-team-badge:hover{background:var(--cream)}
@@ -101,9 +104,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-cal-item{font-size:11px;color:var(--mid);padding:6px 0;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--border);cursor:pointer;transition:color .12s}
 .rs-cal-item:last-child{border-bottom:none}
 .rs-cal-item:hover .rs-cal-teams{color:var(--terra)}
-.rs-cal-date{color:var(--terra);font-weight:600;font-size:10px}
+.rs-cal-date{color:var(--terra);font-weight:600;font-size:10px;display:flex;align-items:center;gap:5px}
 .rs-cal-teams{color:var(--deep);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rs-cal-time{color:var(--muted);font-size:10px}
+.rs-cal-livedot{width:6px;height:6px;border-radius:50%;background:#ff3b30;display:inline-block;animation:lv-pulse 1.1s ease-in-out infinite}
+.rs-cal-livetag{color:#ff3b30;font-weight:700;font-size:9px;letter-spacing:.04em}
+/* Mobile fallback for featured (right sidebar hidden <640px) */
+.es-mobile-featured{display:none}
 .ex-day{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 0 2px;width:100%;flex-basis:100%;margin-top:4px}
 .ex-day:first-child{margin-top:0}
 .ex-auto-hint{font-size:11px;color:var(--muted);font-style:italic;padding:3px 2px}
@@ -464,6 +471,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
   /* Right sidebar hidden */
   .r-sb{display:none}
+  .es-mobile-featured{display:block;margin-bottom:1.1rem}
+  .es-mobile-featured .rs-block{margin-bottom:.7rem}
+  .es-mobile-featured .rs-tg{grid-template-columns:repeat(3,1fr)}
 
   /* Main fills screen, leaves room for bottom nav */
   .main{display:flex;flex-direction:column;height:100vh;height:100dvh;
@@ -1089,6 +1099,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <h2>Olá, tudo pronto para analisar.</h2>
           <p>Selecione uma partida abaixo ou descreva o que quer analisar.</p>
         </div>
+
+        <!-- Mobile fallback for featured (right sidebar hidden <640px) -->
+        <div class="es-mobile-featured" id="es-mobile-featured"></div>
 
         <!-- Schedule chips -->
         <div class="ex-wrap">
@@ -2914,6 +2927,90 @@ function _esAnalyze(query){
   inp.value=query;inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,220)+'px';inp.focus();
   if(typeof toggleRun==='function')toggleRun();
 }
+// Time awareness: combine data_iso + hora_brt (Brasília UTC-3) into a kickoff Date
+function _matchKick(m){
+  if(!m||!m.data_iso)return null;
+  const t=(m.hora_brt&&/^\d{1,2}:\d{2}/.test(m.hora_brt))?m.hora_brt:'12:00';
+  const d=new Date(m.data_iso+'T'+t+':00-03:00');
+  return isNaN(d.getTime())?null:d;
+}
+// Returns {state:'live'|'upcoming'|'finished'|'unknown', mins, k}
+function _matchState(m){
+  const k=_matchKick(m);
+  if(!k)return{state:'unknown',mins:0,k:null};
+  const el=(Date.now()-k.getTime())/60000;
+  if(el<0)return{state:'upcoming',mins:-el,k};
+  if(el<=130)return{state:'live',mins:el,k};
+  return{state:'finished',mins:el,k};
+}
+function _relTime(mins){
+  if(mins<1)return'agora';
+  if(mins<60)return'em '+Math.round(mins)+' min';
+  const h=Math.floor(mins/60),mm=Math.round(mins%60);
+  if(mins<24*60)return'em '+h+'h'+(mm?(' '+mm+'min'):'');
+  const d=Math.round(mins/(24*60));
+  return'em '+d+(d>1?' dias':' dia');
+}
+
+function _nextMatchHTML(){
+  const live=[],upcoming=[];
+  _schedule.forEach(m=>{const s=_matchState(m);if(s.state==='live')live.push({m,s});else if(s.state==='upcoming')upcoming.push({m,s});});
+  upcoming.sort((a,b)=>a.s.k-b.s.k);
+  const pick=live[0]||upcoming[0];
+  if(!pick)return'<div style="font-size:11px;color:var(--muted);text-align:center;padding:.4rem 0">Sem jogos futuros agendados.</div>';
+  const m=pick.m,s=pick.s;
+  const hName=m.mandante||'';const aName=m.visitante||'';
+  const hFlag=(typeof _lv_flag==='function'?_lv_flag(hName,22):'')||'⚽';
+  const aFlag=(typeof _lv_flag==='function'?_lv_flag(aName,22):'')||'⚽';
+  let metaHtml;
+  if(s.state==='live'){
+    metaHtml=`<span class="rs-nm-live">AO VIVO</span>`;
+  }else{
+    const dateStr=s.k.toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+    const timeStr=m.hora_brt||s.k.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const rel=s.mins<24*60?`<span class="rs-nm-soon">${_relTime(s.mins)}</span>`:`<span>📅 ${esc(dateStr)}</span>`;
+    metaHtml=`${rel}<span>⏰ ${esc(timeStr)}</span>`;
+  }
+  return`<div class="rs-nm-card" onclick="_esAnalyze('Analise ${esc(hName)} vs ${esc(aName)}')">
+    <div class="rs-nm-teams">
+      <div class="rs-nm-team"><span class="rs-nm-flag">${hFlag}</span><span class="rs-nm-name">${esc(hName)}</span></div>
+      <div class="rs-nm-vs">×</div>
+      <div class="rs-nm-team"><span class="rs-nm-flag">${aFlag}</span><span class="rs-nm-name">${esc(aName)}</span></div>
+    </div>
+    <div class="rs-nm-meta">${metaHtml}</div>
+  </div>`;
+}
+function _teamsHTML(){
+  // Teams from live + upcoming matches only (time-aware)
+  const fut=_schedule.filter(m=>{const st=_matchState(m).state;return st==='live'||st==='upcoming';});
+  const teams=new Set();
+  fut.slice(0,8).forEach(m=>{if(m.mandante)teams.add(m.mandante);if(m.visitante)teams.add(m.visitante);});
+  if(!teams.size)return'<div style="font-size:11px;color:var(--muted);text-align:center;padding:.4rem 0">—</div>';
+  return`<div class="rs-tg">${
+    Array.from(teams).slice(0,6).map(team=>{
+      const flag=(typeof _lv_flag==='function'?_lv_flag(team,22):'')||'🏳️';
+      return`<div class="rs-team-badge" onclick="_esAnalyze('Analise ${esc(team)}')"><span class="rs-team-emblem">${flag}</span><span class="rs-team-name">${esc(team)}</span></div>`;
+    }).join('')
+  }</div>`;
+}
+function _calendarHTML(){
+  // Live + upcoming, soonest first
+  const rows=[];
+  _schedule.forEach(m=>{const s=_matchState(m);if(s.state==='live'||s.state==='upcoming')rows.push({m,s});});
+  rows.sort((a,b)=>a.s.k-b.s.k);
+  if(!rows.length)return'<div style="font-size:11px;color:var(--muted);text-align:center;padding:.4rem 0">Sem jogos futuros.</div>';
+  return rows.slice(0,6).map(({m,s})=>{
+    const d=s.k.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+    const dateHtml=s.state==='live'
+      ?`<span class="rs-cal-livedot"></span><span class="rs-cal-livetag">AO VIVO</span>`
+      :`${esc(d)}${m.hora_brt?` <span class="rs-cal-time">${esc(m.hora_brt)}</span>`:''}`;
+    return`<div class="rs-cal-item" onclick="_esAnalyze('Analise ${esc(m.mandante||'')} vs ${esc(m.visitante||'')}')">
+      <span class="rs-cal-date">${dateHtml}</span>
+      <span class="rs-cal-teams">${esc(m.mandante||'?')} × ${esc(m.visitante||'?')}</span>
+    </div>`;
+  }).join('');
+}
+
 function renderEmptyStateFeatured(){
   // Only show featured blocks when there's no active conversation
   const hasConvo=document.getElementById('conversation').children.length>0;
@@ -2921,43 +3018,26 @@ function renderEmptyStateFeatured(){
   ['rs-next-match','rs-teams','rs-calendar'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.style.display=show?'block':'none';
   });
-  if(!show)return;
+  const mob=document.getElementById('es-mobile-featured');
+  if(!show){if(mob)mob.innerHTML='';return;}
 
-  // Próximo jogo
-  const nm=_schedule[0];
-  const hName=nm.mandante||'';const aName=nm.visitante||'';
-  const dateStr=nm.data_iso?new Date(nm.data_iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}):'';
-  const timeStr=nm.hora_brt||'';
-  const hFlag=(typeof _lv_flag==='function'?_lv_flag(hName,22):'')||'⚽';
-  const aFlag=(typeof _lv_flag==='function'?_lv_flag(aName,22):'')||'⚽';
-  document.getElementById('rs-next-match-card').innerHTML=`<div class="rs-nm-card" onclick="_esAnalyze('Analise ${esc(hName)} vs ${esc(aName)}')">
-    <div class="rs-nm-teams">
-      <div class="rs-nm-team"><span class="rs-nm-flag">${hFlag}</span><span class="rs-nm-name">${esc(hName)}</span></div>
-      <div class="rs-nm-vs">×</div>
-      <div class="rs-nm-team"><span class="rs-nm-flag">${aFlag}</span><span class="rs-nm-name">${esc(aName)}</span></div>
-    </div>
-    <div class="rs-nm-meta"><span>📅 ${esc(dateStr)}</span>${timeStr?`<span>⏰ ${esc(timeStr)}</span>`:''}</div>
-  </div>`;
+  const nextHTML=_nextMatchHTML(),teamsHTML=_teamsHTML(),calHTML=_calendarHTML();
 
-  // Seleções em destaque
-  const teams=new Set();
-  _schedule.slice(0,8).forEach(m=>{if(m.mandante)teams.add(m.mandante);if(m.visitante)teams.add(m.visitante);});
-  document.getElementById('rs-teams-grid').innerHTML=`<div class="rs-tg">${
-    Array.from(teams).slice(0,6).map(team=>{
-      const flag=(typeof _lv_flag==='function'?_lv_flag(team,22):'')||'🏳️';
-      return`<div class="rs-team-badge" onclick="_esAnalyze('Analise ${esc(team)}')"><span class="rs-team-emblem">${flag}</span><span class="rs-team-name">${esc(team)}</span></div>`;
-    }).join('')
-  }</div>`;
+  // Desktop (right sidebar)
+  document.getElementById('rs-next-match-card').innerHTML=nextHTML;
+  document.getElementById('rs-teams-grid').innerHTML=teamsHTML;
+  document.getElementById('rs-calendar-list').innerHTML=calHTML;
 
-  // Calendário (próximos jogos)
-  document.getElementById('rs-calendar-list').innerHTML=_schedule.slice(0,6).map(m=>{
-    const d=m.data_iso?new Date(m.data_iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
-    return`<div class="rs-cal-item" onclick="_esAnalyze('Analise ${esc(m.mandante||'')} vs ${esc(m.visitante||'')}')">
-      <span class="rs-cal-date">${esc(d)}${m.hora_brt?` <span class="rs-cal-time">${esc(m.hora_brt)}</span>`:''}</span>
-      <span class="rs-cal-teams">${esc(m.mandante||'?')} × ${esc(m.visitante||'?')}</span>
-    </div>`;
-  }).join('');
+  // Mobile fallback (inside chat empty state)
+  if(mob)mob.innerHTML=`
+    <div class="rs-block"><div class="rs-lbl">🎯 Próximo Jogo</div>${nextHTML}</div>
+    <div class="rs-block"><div class="rs-lbl">⭐ Seleções em Destaque</div>${teamsHTML}</div>
+    <div class="rs-block"><div class="rs-lbl">📅 Próximos Jogos</div>${calHTML}</div>`;
 }
+// Refresh time-aware featured every 60s so countdowns/live state stay current
+setInterval(()=>{
+  if(document.getElementById('empty-state')&&document.getElementById('empty-state').style.display!=='none')renderEmptyStateFeatured();
+},60*1000);
 
 // ─── Biblioteca de Jogos ──────────────────────────────────────────────────
 function showView(view){

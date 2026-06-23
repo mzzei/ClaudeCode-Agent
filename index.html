@@ -309,6 +309,17 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .sf-hint{font-size:11px;color:var(--muted);margin-top:.35rem}
 .ds-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .ds-name{font-size:12px;font-weight:500;color:var(--deep)}
+.tok-sf-empty{font-size:12px;color:var(--dim);text-align:center;padding:10px 0}
+.tok-sf-cost-card{background:rgba(214,249,90,.06);border:1px solid rgba(214,249,90,.12);border-radius:10px;padding:10px 14px;margin-bottom:8px;text-align:center}
+.tok-sf-cost-val{font-size:1.25rem;font-weight:700;color:var(--lime);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.tok-sf-cost-lbl{font-size:10px;color:var(--muted);margin-top:2px}
+.tok-sf-rows{display:flex;flex-direction:column}
+.tok-sf-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(160,240,190,.07)}
+.tok-sf-row:last-child{border-bottom:none}
+.tok-sf-rkey{font-size:11px;color:var(--muted)}
+.tok-sf-rval{font-size:12px;font-weight:500;color:var(--mid);font-variant-numeric:tabular-nums;text-align:right}
+.tok-sf-green{color:var(--terra)}
+.tok-sf-amber{color:#e8a53a}
 .ds-badge{font-size:9px;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:99px;font-weight:600}
 .ds-badge.free{background:rgba(60,160,100,.12);color:#2a8a56}
 .ds-badge.enterprise{background:rgba(140,100,40,.1);color:#7a6020}
@@ -1159,6 +1170,32 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       </div>
       <input id="op-key-input" type="password" placeholder="Chave Opta (Stats Perform)" autocomplete="off">
     </div>
+    <div class="sf" id="sf-tok-usage">
+      <label class="sf-lbl">Uso de API · Sessão</label>
+      <div class="tok-sf-empty" id="sf-tok-empty">Nenhuma análise nesta sessão</div>
+      <div class="tok-sf-cost-card" id="sf-tok-costcard" style="display:none">
+        <div class="tok-sf-cost-val" id="sf-tok-cost">—</div>
+        <div class="tok-sf-cost-lbl">custo estimado</div>
+      </div>
+      <div class="tok-sf-rows" id="sf-tok-rows" style="display:none">
+        <div class="tok-sf-row">
+          <span class="tok-sf-rkey">Tokens</span>
+          <span class="tok-sf-rval" id="sf-tok-tokens">—</span>
+        </div>
+        <div class="tok-sf-row" id="sf-tok-cache-row" style="display:none">
+          <span class="tok-sf-rkey">Cache</span>
+          <span class="tok-sf-rval tok-sf-green" id="sf-tok-cacherow">—</span>
+        </div>
+        <div class="tok-sf-row" id="sf-tok-miss-row" style="display:none">
+          <span class="tok-sf-rkey">Último miss</span>
+          <span class="tok-sf-rval tok-sf-amber" id="sf-tok-missrow">—</span>
+        </div>
+        <div class="tok-sf-row">
+          <span class="tok-sf-rkey">Análises</span>
+          <span class="tok-sf-rval" id="sf-tok-runs">—</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1326,7 +1363,38 @@ function parseRateLimitHeaders(res){
   if(tl){rlState.tokLimit=tl;rlState.tokRemaining=tr;rlState.tokReset=ts;}
   if(rl){rlState.reqLimit=rl;rlState.reqRemaining=rr;}
 }
-function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();}
+function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();updateSettingsTokens();}
+function updateSettingsTokens(){
+  const tot=tokenState.sessionIn+tokenState.sessionOut;
+  const emptyEl=document.getElementById('sf-tok-empty');
+  const costCard=document.getElementById('sf-tok-costcard');
+  const rowsEl=document.getElementById('sf-tok-rows');
+  if(!emptyEl)return;
+  if(!tot){emptyEl.style.display='';costCard.style.display='none';rowsEl.style.display='none';return;}
+  emptyEl.style.display='none';costCard.style.display='';rowsEl.style.display='';
+  const haikuP=MODEL_PRICE['claude-haiku-4-5-20251001'];
+  const mainP=MODEL_PRICE[currentModel]||MODEL_PRICE['claude-sonnet-4-6'];
+  const p1Cost=(tokenState.sessionIn_p1*haikuP.i+tokenState.sessionOut_p1*haikuP.o)/1e6;
+  const p2In=tokenState.sessionIn-tokenState.sessionIn_p1,p2Out=tokenState.sessionOut-tokenState.sessionOut_p1;
+  const cost=p1Cost+(p2In*mainP.i+p2Out*mainP.o)/1e6;
+  document.getElementById('sf-tok-cost').textContent=_fmtCost(cost);
+  document.getElementById('sf-tok-tokens').textContent=`${_fmtTok(tokenState.sessionIn)} entrada · ${_fmtTok(tokenState.sessionOut)} saída`;
+  const cacheRowEl=document.getElementById('sf-tok-cache-row');
+  if(tokenState.sessionCacheRead>0){
+    cacheRowEl.style.display='';
+    let ct=_fmtTok(tokenState.sessionCacheRead)+' lidos';
+    if(tokenState.lastCacheHitPct>0)ct+=' · '+tokenState.lastCacheHitPct+'% hit';
+    if(tokenState.sessionCacheSaved>0.001)ct+=' · economizou '+_fmtCost(tokenState.sessionCacheSaved);
+    document.getElementById('sf-tok-cacherow').textContent=ct;
+  }else{cacheRowEl.style.display='none';}
+  const missRowEl=document.getElementById('sf-tok-miss-row');
+  if(tokenState.lastCacheMissReason){
+    missRowEl.style.display='';
+    document.getElementById('sf-tok-missrow').textContent=tokenState.lastCacheMissReason.replace(/_/g,' ');
+  }else{missRowEl.style.display='none';}
+  const n=tokenState.runs;
+  document.getElementById('sf-tok-runs').textContent=`${n} análise${n!==1?'s':''} · ${MODEL_SHORT[currentModel]||currentModel}`;
+}
 function closeSettings(e){if(!e||e.target===document.getElementById('sov'))document.getElementById('sov').style.display='none';}
 
 // ─── Model / Effort ──────────────────────────────────────────────────────
@@ -1493,6 +1561,7 @@ function updateTokenBar(){
     ce.textContent=(_hasMiss?'⚠':'⚡')+' '+_parts.join(' · ');
   }else{ce.textContent='';ce.title='';}
   document.getElementById('token-bar').style.display='block';
+  updateSettingsTokens();
 }
 
 // ─── Clear ───────────────────────────────────────────────────────────────

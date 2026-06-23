@@ -1169,20 +1169,51 @@ const EFFORT_LEVELS = [
   {label:'Alto',budget:10000},{label:'Máximo',budget:16000}
 ];
 // Country → ISO 3166-1 alpha-2 (flagcdn.com codes). Flag emoji don't render on Windows,
-// so we render real flag images instead.
-const FLAGS = {'Brasil':'br','Argentina':'ar','França':'fr','Alemanha':'de','Espanha':'es',
+// so we render real flag images instead. Keys in both Portuguese and English so ESPN API
+// names (English) and Claude responses (Portuguese) both resolve correctly.
+const FLAGS = {
+  // Portuguese names
+  'Brasil':'br','Argentina':'ar','França':'fr','Alemanha':'de','Espanha':'es',
   'Portugal':'pt','Holanda':'nl','Países Baixos':'nl','Bélgica':'be','Inglaterra':'gb-eng',
   'Escócia':'gb-sct','Gales':'gb-wls','País de Gales':'gb-wls',
   'Uruguai':'uy','México':'mx','EUA':'us','Estados Unidos':'us','Canadá':'ca',
   'Japão':'jp','Coreia do Sul':'kr','Coreia':'kr','Marrocos':'ma','Senegal':'sn','Austrália':'au',
   'Croácia':'hr','Suíça':'ch','Polônia':'pl','Dinamarca':'dk','Suécia':'se',
-  'Itália':'it','Holand':'nl','Equador':'ec','Colômbia':'co','Venezuela':'ve',
+  'Itália':'it','Equador':'ec','Colômbia':'co','Venezuela':'ve',
   'Irã':'ir','Iraque':'iq','Jordânia':'jo','Uzbequistão':'uz','Catar':'qa','Qatar':'qa',
   'Arábia Saudita':'sa','Emirados Árabes Unidos':'ae','Noruega':'no','Peru':'pe','Chile':'cl',
   'Paraguai':'py','Costa Rica':'cr','Panamá':'pa','Honduras':'hn','Jamaica':'jm',
   'Nova Zelândia':'nz','África do Sul':'za','Turquia':'tr','Áustria':'at','Sérvia':'rs',
   'Grécia':'gr','Ucrânia':'ua','Rússia':'ru','China':'cn','Gana':'gh','Camarões':'cm',
-  'Nigéria':'ng','Tunísia':'tn','Argélia':'dz','Egito':'eg','Costa do Marfim':'ci'};
+  'Nigéria':'ng','Tunísia':'tn','Argélia':'dz','Egito':'eg','Costa do Marfim':'ci',
+  'Eslovênia':'si','Eslováquia':'sk','Hungria':'hu','Romênia':'ro','Albânia':'al',
+  'Geórgia':'ge','Irlanda':'ie','Islândia':'is','Armênia':'am','Kosovo':'xk',
+  'República Tcheca':'cz','Tchéquia':'cz','Bolívia':'bo','El Salvador':'sv',
+  'Guatemala':'gt','Cuba':'cu','Haiti':'ht','Suriname':'sr','Trinidad e Tobago':'tt',
+  'Indonésia':'id','República Democrática do Congo':'cd','Congo RD':'cd',
+  // English names (ESPN API returns these)
+  'Brazil':'br','France':'fr','Germany':'de','Spain':'es','England':'gb-eng',
+  'Scotland':'gb-sct','Wales':'gb-wls','Netherlands':'nl','Holland':'nl','Belgium':'be',
+  'Uruguay':'uy','Mexico':'mx','United States':'us','USA':'us','Canada':'ca',
+  'Japan':'jp','South Korea':'kr','Korea Republic':'kr','Morocco':'ma','Australia':'au',
+  'Croatia':'hr','Switzerland':'ch','Poland':'pl','Denmark':'dk','Sweden':'se',
+  'Italy':'it','Ecuador':'ec','Colombia':'co',
+  'Iran':'ir','Iraq':'iq','Jordan':'jo','Uzbekistan':'uz',
+  'Saudi Arabia':'sa','UAE':'ae','United Arab Emirates':'ae','Norway':'no',
+  'Peru':'pe','Chile':'cl','Paraguay':'py','Panama':'pa','Honduras':'hn','Jamaica':'jm',
+  'New Zealand':'nz','South Africa':'za','Turkey':'tr','Türkiye':'tr','Austria':'at',
+  'Serbia':'rs','Greece':'gr','Ukraine':'ua','Russia':'ru','China':'cn',
+  'Ghana':'gh','Cameroon':'cm','Nigeria':'ng','Tunisia':'tn','Algeria':'dz',
+  'Egypt':'eg',"Ivory Coast":'ci',"Côte d'Ivoire":'ci',"Cote d'Ivoire":'ci',
+  'Slovenia':'si','Slovakia':'sk','Hungary':'hu','Romania':'ro','Albania':'al',
+  'Georgia':'ge','Ireland':'ie','Iceland':'is','Armenia':'am',
+  'Czech Republic':'cz','Czechia':'cz','Bolivia':'bo','Guatemala':'gt',
+  'Cuba':'cu','Haiti':'ht','Suriname':'sr','Trinidad and Tobago':'tt','Trinidad & Tobago':'tt',
+  'Indonesia':'id','Congo DR':'cd','DR Congo':'cd','Democratic Republic of Congo':'cd',
+  'Bosnia-Herzegovina':'ba','Bosnia Herzegovina':'ba','Bosnia & Herzegovina':'ba',
+  'Bosnia and Herzegovina':'ba','El Salvador':'sv','Korea DPR':'kp','North Korea':'kp',
+  'New Caledonia':'nc','Tahiti':'pf','Cuba':'cu','Curacao':'cw','Curaçao':'cw',
+};
 
 // ─── State ───────────────────────────────────────────────────────────────
 let currentModel  = 'claude-sonnet-4-6';
@@ -1614,10 +1645,12 @@ function copyAnalysis(id){
 
 // ─── Right sidebar ────────────────────────────────────────────────────────
 function updateRightSidebar(d,prob){
+  const _flagsLower=Object.fromEntries(Object.entries(FLAGS).map(([k,v])=>[k.toLowerCase(),v]));
   const flag=name=>{
-    const iso=FLAGS[name]||FLAGS[(name||'').trim()];
+    const n=(name||'').trim();
+    const iso=FLAGS[n]||_flagsLower[n.toLowerCase()];
     return iso
-      ? `<img class="rs-flag-img" src="https://flagcdn.com/w80/${iso}.png" alt="${esc(name)}" onerror="this.style.visibility='hidden'">`
+      ? `<img class="rs-flag-img" src="https://flagcdn.com/w80/${iso}.png" alt="${esc(n)}" onerror="this.style.visibility='hidden'">`
       : `<span class="rs-flag-fb">🏳️</span>`;
   };
   const cM={alto:'b-ok',medio:'b-warn',baixo:'b-warn'};

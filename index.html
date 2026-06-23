@@ -1245,8 +1245,8 @@ const OP_KEY_STORE= 'copa2026_op_key';
 const FD_BASE     = 'https://api.football-data.org/v4';
 const FD_TTL      = 20 * 60 * 1000;
 const WORKER_URL_STORE='copa2026_worker_url';
-const tokenState  = {sessionIn:0,sessionOut:0,sessionIn_p1:0,sessionOut_p1:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0};
-const MODEL_PRICE = {'claude-haiku-4-5-20251001':{i:0.80,o:4.00},'claude-sonnet-4-6':{i:3.00,o:15.00},'claude-opus-4-8':{i:15.00,o:75.00}};
+const tokenState  = {sessionIn:0,sessionOut:0,sessionIn_p1:0,sessionOut_p1:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0,sessionCacheSaved:0,lastCacheHitPct:0,lastCacheMissReason:null};
+const MODEL_PRICE = {'claude-haiku-4-5-20251001':{i:0.80,o:4.00,crs:0.72},'claude-sonnet-4-6':{i:3.00,o:15.00,crs:2.70},'claude-opus-4-8':{i:15.00,o:75.00,crs:13.50}};
 const MODEL_DOCK  = {'claude-haiku-4-5-20251001':'Haiku','claude-sonnet-4-6':'Sonnet','claude-opus-4-8':'Opus'};
 const AGENT_PESQUISA_ID  = 'agent_018yogv9RUisgKsjXkaQj7AM';
 const AGENT_ANALISE_ID   = 'agent_01KEV4VR44NPKiY3FCXhHcid';
@@ -1481,7 +1481,17 @@ function updateTokenBar(){
   const n=tokenState.runs;
   document.getElementById('tok-runs-footer').textContent=`${n} análise${n!==1?'s':''}`;
   const ce=document.getElementById('tok-cache-footer');
-  if(tokenState.sessionCacheRead>0){ce.textContent=`⚡ ${fmt(tokenState.sessionCacheRead)} do cache`;}else{ce.textContent='';}
+  const _hasMiss=!!tokenState.lastCacheMissReason,_hasHit=tokenState.sessionCacheRead>0;
+  if(_hasHit||_hasMiss){
+    ce.style.color=_hasMiss?'#e8a53a':'var(--terra)';
+    const _parts=[];
+    if(_hasHit)_parts.push(`${fmt(tokenState.sessionCacheRead)} cache`);
+    if(tokenState.lastCacheHitPct>0)_parts.push(`${tokenState.lastCacheHitPct}% hit`);
+    if(tokenState.sessionCacheSaved>0.001)_parts.push(`-$${tokenState.sessionCacheSaved.toFixed(3)}`);
+    if(_hasMiss){_parts.push(tokenState.lastCacheMissReason.replace('_changed','').replace('_',' '));ce.title='miss: '+tokenState.lastCacheMissReason;}
+    else ce.title='';
+    ce.textContent=(_hasMiss?'⚠':'⚡')+' '+_parts.join(' · ');
+  }else{ce.textContent='';ce.title='';}
   document.getElementById('token-bar').style.display='block';
 }
 
@@ -2854,7 +2864,11 @@ async function runChat(){
         try{const j=JSON.parse(d);
           if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){text+=j.delta.text;bubble.innerHTML=simpleMd(text);scrollChat();}
           if(j.type==='message_start'){
-            if(j.message?.usage){tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;}
+            if(j.message?.usage){
+              tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;
+              const _chatCR=j.message.usage.cache_read_input_tokens||0;
+              if(_chatCR>0){tokenState.sessionCacheRead+=_chatCR;const _cP=MODEL_PRICE[currentModel]||MODEL_PRICE['claude-sonnet-4-6'];tokenState.sessionCacheSaved+=(_chatCR*(_cP.crs||0))/1e6;}
+            }
             if(j.message?.id)_lastChatId=j.message.id;
             if(j.message?.diagnostics?.cache_miss_reason)console.debug('[cache-diag chat] miss:',j.message.diagnostics.cache_miss_reason.type);
           }
@@ -2958,7 +2972,11 @@ async function runAnalysis(){
       }
       if(iter===0&&_r2.id){
         _newAnalysisId=_r2.id;
-        if(_r2.diagnostics?.cache_miss_reason)console.debug('[cache-diag] miss:',_r2.diagnostics.cache_miss_reason.type,'~'+(_r2.diagnostics.cache_miss_reason.cache_missed_input_tokens??'?')+'tok');
+        const{cacheRead:_cr0,inTokens:_in0,cacheCreated:_cc0}=_r2;
+        const _tot0=_in0+_cr0+_cc0;
+        tokenState.lastCacheHitPct=_tot0>0?Math.round(_cr0/_tot0*100):0;
+        tokenState.lastCacheMissReason=_r2.diagnostics?.cache_miss_reason?.type||null;
+        if(tokenState.lastCacheMissReason)console.debug('[cache-diag] miss:',tokenState.lastCacheMissReason,'~'+(_r2.diagnostics.cache_miss_reason.cache_missed_input_tokens??'?')+'tok');
       }
       const{text,stopReason,allContent,toolUses,inTokens,outTokens,thinkingTokens,cacheCreated,cacheRead}=_r2;
       lastIn=inTokens;lastOut=outTokens;lastCacheCreated+=cacheCreated;lastCacheRead+=cacheRead;
@@ -2971,6 +2989,8 @@ async function runAnalysis(){
     }
 
     if(_newAnalysisId)_lastAnalysisId=_newAnalysisId;
+    const _mainP=MODEL_PRICE[currentModel]||MODEL_PRICE['claude-sonnet-4-6'];
+    tokenState.sessionCacheSaved+=(lastCacheRead*(_mainP.crs||0))/1e6;
     tokenState.lastIn=lastIn;tokenState.lastOut=lastOut;tokenState.sessionIn+=lastIn;tokenState.sessionOut+=lastOut;tokenState.runs++;
     tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
     stopThinking(true);

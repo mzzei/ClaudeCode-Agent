@@ -82,37 +82,28 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ex-loading{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);padding:5px 2px}
 .ldot{width:6px;height:6px;border-radius:50%;background:var(--terra);flex-shrink:0;animation:breathe 1.3s ease-in-out infinite}
 
-/* Empty state featured sections */
-.es-featured-match{margin-bottom:1.4rem;background:linear-gradient(135deg,var(--terra-pale) 0%,rgba(200,86,60,.08) 100%);border:1.5px solid rgba(200,86,60,.25);border-radius:16px;padding:1.1rem;cursor:pointer;transition:all .18s}
-.es-featured-match:hover{background:linear-gradient(135deg,rgba(200,86,60,.12),rgba(200,86,60,.14));border-color:rgba(200,86,60,.42)}
-.es-fm-label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--terra);font-weight:600;margin-bottom:.4rem}
-.es-fm-teams{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:.7rem}
-.es-fm-team{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
-.es-fm-flag{font-size:28px;line-height:1}
-.es-fm-name{font-size:11px;font-weight:600;color:var(--deep);text-align:center;line-height:1.2}
-.es-fm-vs{font-size:12px;color:var(--muted)}
-.es-fm-meta{display:flex;justify-content:center;gap:12px;font-size:10px;color:var(--muted);padding-top:.6rem;border-top:1px solid rgba(200,86,60,.15)}
-.es-qa-templates{margin-bottom:1.4rem}
-.es-qa-label{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem;display:block;font-weight:600}
-.es-qa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.es-qa-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:.75rem;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;font-family:var(--sans)}
-.es-qa-card:hover{background:var(--cream);border-color:rgba(200,86,60,.3);box-shadow:0 4px 12px rgba(0,0,0,.06)}
-.es-qa-icon{font-size:24px;margin-bottom:.4rem}
-.es-qa-txt{font-size:11px;font-weight:500;color:var(--deep);line-height:1.3}
-.es-featured-teams{margin-bottom:1.4rem}
-.es-ft-label{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem;display:block;font-weight:600}
-.es-ft-grid{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
-.es-ft-grid::-webkit-scrollbar{display:none}
-.es-team-badge{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;cursor:pointer;padding:8px;border-radius:14px;transition:all .15s;background:transparent}
-.es-team-badge:hover{background:var(--cream)}
-.es-team-emblem{font-size:42px;line-height:1}
-.es-team-name{font-size:10px;font-weight:600;color:var(--deep);text-align:center;white-space:nowrap;width:56px;overflow:hidden;text-overflow:ellipsis}
-.es-upcoming-dates{margin-top:1.2rem;padding-top:1.2rem;border-top:1px solid var(--border)}
-.es-ud-label{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;display:block;font-weight:600}
-.es-ud-list{display:flex;flex-direction:column;gap:4px}
-.es-ud-item{font-size:11px;color:var(--mid);padding:4px 0;display:flex;justify-content:space-between;align-items:center}
-.es-ud-date{color:var(--terra);font-weight:500}
-.es-ud-teams{text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+/* Right sidebar featured sections */
+.rs-nm-card{cursor:pointer;border-radius:11px;transition:background .15s;margin:-.3rem;padding:.3rem}
+.rs-nm-card:hover{background:var(--cream)}
+.rs-nm-teams{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:.6rem}
+.rs-nm-team{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0}
+.rs-nm-flag{font-size:26px;line-height:1}
+.rs-nm-flag img{border-radius:3px;box-shadow:0 2px 7px rgba(0,0,0,.45)}
+.rs-nm-name{font-size:11px;font-weight:600;color:var(--deep);text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rs-nm-vs{font-size:11px;color:var(--muted);flex-shrink:0}
+.rs-nm-meta{display:flex;justify-content:center;gap:10px;font-size:10px;color:var(--muted);padding-top:.55rem;border-top:1px solid var(--border)}
+.rs-tg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.rs-team-badge{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;padding:7px 4px;border-radius:11px;transition:background .15s;min-width:0}
+.rs-team-badge:hover{background:var(--cream)}
+.rs-team-emblem{font-size:26px;line-height:1}
+.rs-team-emblem img{border-radius:3px;box-shadow:0 1px 5px rgba(0,0,0,.4)}
+.rs-team-name{font-size:9.5px;font-weight:600;color:var(--deep);text-align:center;white-space:nowrap;width:100%;overflow:hidden;text-overflow:ellipsis}
+.rs-cal-item{font-size:11px;color:var(--mid);padding:6px 0;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--border);cursor:pointer;transition:color .12s}
+.rs-cal-item:last-child{border-bottom:none}
+.rs-cal-item:hover .rs-cal-teams{color:var(--terra)}
+.rs-cal-date{color:var(--terra);font-weight:600;font-size:10px}
+.rs-cal-teams{color:var(--deep);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs-cal-time{color:var(--muted);font-size:10px}
 .ex-day{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 0 2px;width:100%;flex-basis:100%;margin-top:4px}
 .ex-day:first-child{margin-top:0}
 .ex-auto-hint{font-size:11px;color:var(--muted);font-style:italic;padding:3px 2px}
@@ -1099,15 +1090,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <p>Selecione uma partida abaixo ou descreva o que quer analisar.</p>
         </div>
 
-        <!-- Featured match -->
-        <div id="es-featured-match-wrap"></div>
-
-        <!-- Quick analysis templates -->
-        <div id="es-qa-wrap"></div>
-
-        <!-- Featured teams -->
-        <div id="es-featured-teams-wrap"></div>
-
         <!-- Schedule chips -->
         <div class="ex-wrap">
           <div class="ex-hdr">
@@ -1119,8 +1101,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           </div>
         </div>
 
-        <!-- Upcoming dates -->
-        <div id="es-upcoming-dates-wrap"></div>
       </div>
 
       <!-- Conversation -->
@@ -1229,6 +1209,22 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
   <!-- ── RIGHT SIDEBAR ── -->
   <aside class="r-sb">
+    <!-- Featured (empty state) -->
+    <div id="rs-featured">
+      <div class="rs-block" id="rs-next-match" style="display:none">
+        <div class="rs-lbl">🎯 Próximo Jogo</div>
+        <div id="rs-next-match-card"></div>
+      </div>
+      <div class="rs-block" id="rs-teams" style="display:none">
+        <div class="rs-lbl">⭐ Seleções em Destaque</div>
+        <div id="rs-teams-grid"></div>
+      </div>
+      <div class="rs-block" id="rs-calendar" style="display:none">
+        <div class="rs-lbl">📅 Próximos Jogos</div>
+        <div id="rs-calendar-list"></div>
+      </div>
+    </div>
+
     <!-- Match context -->
     <div class="rs-block" id="rs-match" style="display:none">
       <div class="rs-lbl">Contexto da Partida</div>
@@ -1800,6 +1796,7 @@ let _lastQuery='';
 function showUserBubble(text){
   _lastQuery=text;
   document.getElementById('empty-state').style.display='none';
+  renderEmptyStateFeatured();
   const now=new Date();
   const ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const el=document.createElement('div');
@@ -1877,6 +1874,7 @@ function clearAll(){
   if(_running&&_abort){try{_abort.abort();}catch(e){}}
   document.getElementById('conversation').innerHTML='';
   document.getElementById('empty-state').style.display='block';
+  renderEmptyStateFeatured();
   taReset(document.getElementById('match-input'));
   document.getElementById('error-box').style.display='none';
   if(_thkEl){_thkEl.remove();_thkEl=null;}
@@ -2910,86 +2908,55 @@ function closeSidebar(){
   bd.classList.remove('open');
 }
 
-// ─── Empty state featured sections ────────────────────────────────────────
-const QA_TEMPLATES=[
-  {icon:'⚔️',label:'Comparar\nFormações',prompt:'Analise as diferenças nas formações dos times. Quais são os pontos fortes e fracos de cada uma?'},
-  {icon:'🛡️',label:'Vulnerabilidades\nDefensivas',prompt:'Identifique as fragilidades defensivas das equipes envolvidas.'},
-  {icon:'🎯',label:'Estratégia\nOfensiva',prompt:'Analise a estratégia ofensiva: passes, infiltrações e finalizações.'},
-  {icon:'📊',label:'Prognóstico',prompt:'Faça um prognóstico sobre o resultado e os principais destaques esperados.'}
-];
+// ─── Right sidebar featured sections (empty state) ────────────────────────
+function _esAnalyze(query){
+  const inp=document.getElementById('match-input');
+  inp.value=query;inp.style.height='auto';inp.style.height=Math.min(inp.scrollHeight,220)+'px';inp.focus();
+  if(typeof toggleRun==='function')toggleRun();
+}
+function renderEmptyStateFeatured(){
+  // Only show featured blocks when there's no active conversation
+  const hasConvo=document.getElementById('conversation').children.length>0;
+  const show=!hasConvo&&_schedule&&_schedule.length>0;
+  ['rs-next-match','rs-teams','rs-calendar'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display=show?'block':'none';
+  });
+  if(!show)return;
 
-async function renderEmptyStateFeatured(){
-  if(!_schedule||!_schedule.length)return;
+  // Próximo jogo
+  const nm=_schedule[0];
+  const hName=nm.mandante||'';const aName=nm.visitante||'';
+  const dateStr=nm.data_iso?new Date(nm.data_iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'}):'';
+  const timeStr=nm.hora_brt||'';
+  const hFlag=(typeof _lv_flag==='function'?_lv_flag(hName,22):'')||'⚽';
+  const aFlag=(typeof _lv_flag==='function'?_lv_flag(aName,22):'')||'⚽';
+  document.getElementById('rs-next-match-card').innerHTML=`<div class="rs-nm-card" onclick="_esAnalyze('Analise ${esc(hName)} vs ${esc(aName)}')">
+    <div class="rs-nm-teams">
+      <div class="rs-nm-team"><span class="rs-nm-flag">${hFlag}</span><span class="rs-nm-name">${esc(hName)}</span></div>
+      <div class="rs-nm-vs">×</div>
+      <div class="rs-nm-team"><span class="rs-nm-flag">${aFlag}</span><span class="rs-nm-name">${esc(aName)}</span></div>
+    </div>
+    <div class="rs-nm-meta"><span>📅 ${esc(dateStr)}</span>${timeStr?`<span>⏰ ${esc(timeStr)}</span>`:''}</div>
+  </div>`;
 
-  // Featured match (próximo jogo)
-  const nextMatch=_schedule[0];
-  if(nextMatch){
-    const wrap=document.getElementById('es-featured-match-wrap');
-    const hName=nextMatch.mandante||'';const aName=nextMatch.visitante||'';
-    const dateStr=nextMatch.data_iso?new Date(nextMatch.data_iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',month:'short',day:'numeric'}):'';
-    const timeStr=nextMatch.hora_brt||'';
-    const hFlag=(typeof _lv_flag==='function'?_lv_flag(hName,16):'')||'⚽';const aFlag=(typeof _lv_flag==='function'?_lv_flag(aName,16):'')||'⚽';
-    wrap.innerHTML=`<div class="es-featured-match" onclick="document.getElementById('match-input').value='Analise ${esc(hName)} vs ${esc(aName)}';document.getElementById('match-input').focus();document.getElementById('analyze-btn').click();">
-      <div class="es-fm-label">🎯 Próximo Jogo</div>
-      <div class="es-fm-teams">
-        <div class="es-fm-team"><span class="es-fm-flag">${hFlag}</span><span class="es-fm-name">${esc(hName)}</span></div>
-        <div class="es-fm-vs">vs</div>
-        <div class="es-fm-team"><span class="es-fm-flag">${aFlag}</span><span class="es-fm-name">${esc(aName)}</span></div>
-      </div>
-      <div class="es-fm-meta">
-        <span>📅 ${esc(dateStr)}</span>
-        <span>⏰ ${esc(timeStr)}</span>
-      </div>
-    </div>`;
-  }
-
-  // Quick analysis templates
-  const qaWrap=document.getElementById('es-qa-wrap');
-  qaWrap.innerHTML=`<label class="es-qa-label">💡 Análises Rápidas</label><div class="es-qa-grid">${
-    QA_TEMPLATES.map(qa=>`<div class="es-qa-card" onclick="document.getElementById('match-input').value='${esc(qa.prompt)}';document.getElementById('match-input').focus();document.getElementById('analyze-btn').click();">
-      <span class="es-qa-icon">${qa.icon}</span>
-      <span class="es-qa-txt">${qa.label}</span>
-    </div>`).join('')
+  // Seleções em destaque
+  const teams=new Set();
+  _schedule.slice(0,8).forEach(m=>{if(m.mandante)teams.add(m.mandante);if(m.visitante)teams.add(m.visitante);});
+  document.getElementById('rs-teams-grid').innerHTML=`<div class="rs-tg">${
+    Array.from(teams).slice(0,6).map(team=>{
+      const flag=(typeof _lv_flag==='function'?_lv_flag(team,22):'')||'🏳️';
+      return`<div class="rs-team-badge" onclick="_esAnalyze('Analise ${esc(team)}')"><span class="rs-team-emblem">${flag}</span><span class="rs-team-name">${esc(team)}</span></div>`;
+    }).join('')
   }</div>`;
 
-  // Featured teams (próximas seleções com jogos)
-  const featuredTeams=new Set();
-  _schedule.slice(0,8).forEach(m=>{
-    if(m.mandante)featuredTeams.add(m.mandante);
-    if(m.visitante)featuredTeams.add(m.visitante);
-  });
-  if(featuredTeams.size>0){
-    const ftWrap=document.getElementById('es-featured-teams-wrap');
-    ftWrap.innerHTML=`<label class="es-ft-label">⭐ Seleções em Destaque</label><div class="es-ft-grid">${
-      Array.from(featuredTeams).slice(0,6).map(team=>{
-        const flag=(typeof _lv_flag==='function'?_lv_flag(team,20):'')||'🏳️';
-        return`<div class="es-team-badge" onclick="document.getElementById('match-input').value='Analise ${esc(team)}';document.getElementById('match-input').focus();document.getElementById('analyze-btn').click();">
-          <span class="es-team-emblem">${flag}</span>
-          <span class="es-team-name">${esc(team)}</span>
-        </div>`;
-      }).join('')
-    }</div>`;
-  }
-
-  // Upcoming dates
-  const upcomingDates=new Map();
-  _schedule.forEach(m=>{
-    const d=m.data_iso?new Date(m.data_iso+'T12:00:00').toLocaleDateString('pt-BR'):null;
-    if(!d)return;
-    if(!upcomingDates.has(d))upcomingDates.set(d,[]);
-    upcomingDates.get(d).push(`${m.mandante||'?'} vs ${m.visitante||'?'}`);
-  });
-  if(upcomingDates.size>0){
-    const udWrap=document.getElementById('es-upcoming-dates-wrap');
-    udWrap.innerHTML=`<div class="es-upcoming-dates"><label class="es-ud-label">📅 Próximos Jogos por Data</label><div class="es-ud-list">${
-      Array.from(upcomingDates.entries()).slice(0,5).map(([date,matches])=>`
-        <div class="es-ud-item">
-          <span class="es-ud-date">${esc(date)}</span>
-          <span class="es-ud-teams">${matches.map(m=>esc(m.split(' vs ')[0])).join(', ')}</span>
-        </div>
-      `).join('')
-    }</div></div>`;
-  }
+  // Calendário (próximos jogos)
+  document.getElementById('rs-calendar-list').innerHTML=_schedule.slice(0,6).map(m=>{
+    const d=m.data_iso?new Date(m.data_iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
+    return`<div class="rs-cal-item" onclick="_esAnalyze('Analise ${esc(m.mandante||'')} vs ${esc(m.visitante||'')}')">
+      <span class="rs-cal-date">${esc(d)}${m.hora_brt?` <span class="rs-cal-time">${esc(m.hora_brt)}</span>`:''}</span>
+      <span class="rs-cal-teams">${esc(m.mandante||'?')} × ${esc(m.visitante||'?')}</span>
+    </div>`;
+  }).join('');
 }
 
 // ─── Biblioteca de Jogos ──────────────────────────────────────────────────

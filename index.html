@@ -3770,29 +3770,31 @@ async function gatherFacts(query,apiKey,signal,onUpdate){
   }
   const hasFd=!!fdCtx;
   const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
+  // Buscas consolidadas: web_search é o que mais consome tokens (cada resultado traz o
+  // conteúdo das páginas). Agrupar tópicos numa busca por linha reduz o custo sem perder
+  // cobertura — o Haiku ainda condensa tudo no SCHEMA compacto. max_uses limita o teto.
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO E RESULTADOS OBTIDOS VIA API — não pesquise esses dados, já estão abaixo na mensagem.
-Pesquise APENAS as informações ausentes:
-① "[Mandante] [Visitante] lesões suspensões escalação Copa 2026" — foque em Transfermarkt, Globo Esporte, Goal
-② "[Mandante] [Visitante] xG Copa 2026 fbref" — só se xG ausente nos dados da API
-③ "[Mandante] estilo tático esquema Copa 2026" + "[Visitante] vulnerabilidades defensivas Copa 2026" — preencha estilo_ofensivo e vulnerabilidades_defensivas
+Faça NO MÁXIMO 2 buscas, apenas para o que falta:
+① "[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Globo Esporte, Goal
+② "[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore
 Retorne APENAS JSON válido:
 ${SCHEMA}`
     :`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-Execute as 4 pesquisas abaixo na ordem e retorne APENAS JSON válido:
+Faça NO MÁXIMO 3 buscas (uma por linha) e retorne APENAS JSON válido:
 ${SCHEMA}
-SEQUÊNCIA:
-① "[Mandante] [Visitante] Copa 2026 resultado forma recente" — ESPN, Sofascore, Globo Esporte
-② "[Mandante] [Visitante] lesões suspensões escalação Copa 2026" — Transfermarkt, Goal, UOL Esporte
-③ "[Mandante] [Visitante] xG Copa 2026 fbref OR sofascore" — para obter Expected Goals
-④ "[Mandante] estilo tático esquema Copa 2026" + "[Visitante] vulnerabilidades defensivas Copa 2026" — preencha estilo_ofensivo e vulnerabilidades_defensivas
-Extraia placares, classificação do grupo e xG diretamente das páginas encontradas. RESPONDA APENAS COM O JSON.`;
+BUSCAS:
+① "[Mandante] [Visitante] Copa 2026 resultado forma recente classificação" — ESPN, Sofascore, Globo Esporte
+② "[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Goal, UOL Esporte
+③ "[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore
+Extraia placares, classificação do grupo, xG e estilo diretamente das páginas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
+  const _maxUses=hasFd?2:3;
   let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)
   for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
-    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]}),signal});
+    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:_maxUses}]}),signal});
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
     const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
@@ -3809,6 +3811,38 @@ Extraia placares, classificação do grupo e xG diretamente das páginas encontr
     }else break;
   }
   return{rawFacts:null,inTokens:accIn,outTokens:accOut};
+}
+// Fecha chaves/colchetes pendentes e aspas abertas → recupera JSON cortado no max_tokens.
+function repairJson(s){
+  let t=s.replace(/,\s*$/,'');
+  let inStr=false,esc=false;const stack=[];
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(esc){esc=false;continue;}
+    if(c==='\\'){esc=true;continue;}
+    if(c==='"'){inStr=!inStr;continue;}
+    if(inStr)continue;
+    if(c==='{'||c==='[')stack.push(c);
+    else if(c==='}'||c===']')stack.pop();
+  }
+  if(inStr)t+='"';
+  t=t.replace(/,\s*$/,'');
+  while(stack.length)t+=(stack.pop()==='{'?'}':']');
+  return t;
+}
+// Extrai o objeto JSON da resposta do modelo, tolerando markdown e truncamento.
+function parseAnalysisJson(raw){
+  const clean=(raw||'').replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');
+  const start=clean.indexOf('{');if(start<0)return null;
+  const lastClose=clean.lastIndexOf('}');
+  if(lastClose>start){
+    const cand=clean.slice(start,lastClose+1);
+    try{return JSON.parse(cand);}catch{}
+    try{return JSON.parse(repairJson(cand));}catch{}
+  }
+  // Truncado no max_tokens (sem } final): repara do primeiro { até o fim.
+  try{return JSON.parse(repairJson(clean.slice(start)));}catch{}
+  return null;
 }
 function buildEnrichedQuery(query,rawFacts,ctx){
   const parts=[query];
@@ -4051,9 +4085,12 @@ async function runAnalysis(){
     const finalQuery=useEnriched?buildEnrichedQuery(query,rawFacts,ctx):query;
     const sysText=useEnriched?getSystemPromptPhase2():getSystemPrompt();
     const memCtx=await fetchMemoryContext();
-    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
+    // Teto generoso: o JSON estruturado cheio passa de 6k tokens e truncava (→ fallback).
+    // Cobra-se pelo uso real, não pelo teto, então elevar não aumenta custo. Soma-se o
+    // budget de raciocínio porque thinking consome desse mesmo teto.
+    const baseBody={model:currentModel,max_tokens:9000+(effort.budget>0?effort.budget:0),system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
     if(getWorkerUrl())baseBody.diagnostics={previous_message_id:_lastAnalysisId};
-    if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search'}];
+    if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search',max_uses:4}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
     let _newAnalysisId=null;
@@ -4103,34 +4140,26 @@ async function runAnalysis(){
     tokenState.lastCacheCreated=lastCacheCreated;tokenState.lastCacheRead=lastCacheRead;tokenState.sessionCacheRead+=lastCacheRead;
     stopThinking(true);
     setTimeout(()=>{updateTokenBar();updateDockTokens();},1300);
-    // Extração robusta: tenta strip de bloco markdown antes do regex
-    const cleanText=finalText.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');
-    let m=cleanText.match(/\{[\s\S]*\}/);
-    if(!m){
-      // Auto-retry: pede explicitamente só o JSON
+    // Extração robusta: aceita blocos markdown e repara JSON truncado.
+    let parsed=parseAnalysisJson(finalText);
+    if(!parsed){
+      // Re-pedido SEM raciocínio estendido. Thinking ("Leve"/"Médio"+) deixa o modelo
+      // conversador → ele responde em prosa ou JSON truncado. Sem thinking, com teto alto
+      // de tokens e contrato explícito, o JSON estruturado sai limpo. Dispara em QUALQUER
+      // falha de parse (chaves ausentes OU JSON malformado/truncado), não só a primeira.
       updateThinkingToks({status:'Reformulando resposta…',phase:2});
       const retryMessages=[
         {role:'user',content:`DATA: ${currentDateFull()}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`},
-        {role:'assistant',content:finalText},
-        {role:'user',content:'Retorne APENAS o JSON estruturado da análise, sem nenhum texto antes ou depois, sem blocos de código markdown.'}
+        {role:'assistant',content:finalText.slice(0,2000)},
+        {role:'user',content:'Retorne APENAS o JSON estruturado da análise, começando com { e terminando com }, sem texto antes ou depois, sem blocos de código markdown.'}
       ];
       const retryBody={...baseBody,messages:retryMessages};
-      delete retryBody.tools;
-      // Raciocínio estendido ("Leve"/"Médio") deixa o modelo conversador e ele responde
-      // em prosa em vez de JSON puro. No re-pedido desligamos thinking p/ forçar JSON limpo.
-      delete retryBody.thinking;delete retryBody.temperature;
-      retryBody.max_tokens=Math.max(retryBody.max_tokens||0,8000);
-      const retryR=await streamOnce(retryBody,reqHeaders,()=>{},_abort.signal).catch(()=>null);
-      if(retryR){const c2=retryR.text.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');m=c2.match(/\{[\s\S]*\}/);}
+      delete retryBody.tools;delete retryBody.thinking;delete retryBody.temperature;
+      retryBody.max_tokens=Math.max(retryBody.max_tokens||0,9000);
+      const retryR=await streamOnce(retryBody,reqHeaders,(upd)=>updateThinkingToks({...upd,phase:2}),_abort.signal).catch(()=>null);
+      if(retryR){lastOut+=retryR.outTokens||0;parsed=parseAnalysisJson(retryR.text);}
     }
-    if(!m)throw new Error('O modelo não retornou uma análise estruturada. Tente descrever a partida com "PARTIDA: [Time A] x [Time B]" ou use um dos jogos sugeridos.');
-    let parsed;
-    try{parsed=JSON.parse(m[0]);}
-    catch{
-      // Tenta corrigir JSON truncado adicionando fechamentos
-      try{parsed=JSON.parse(m[0].replace(/,\s*$/,'')+'}}');}
-      catch{throw new Error('Análise recebida mas com formato inválido. Tente novamente — o modelo pode ter sido interrompido.');}
-    }
+    if(!parsed)throw new Error('O modelo não retornou uma análise estruturada. Tente descrever a partida com "PARTIDA: [Time A] x [Time B]" ou use um dos jogos sugeridos.');
     renderResults(parsed);
     ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }catch(e){

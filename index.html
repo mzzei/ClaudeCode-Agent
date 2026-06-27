@@ -123,6 +123,21 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .rs-cs-empty{font-size:10.5px;color:var(--muted);text-align:center;padding:.5rem 0;line-height:1.5}
 .rs-cs-phase{font-size:11px;color:var(--mid);display:flex;align-items:center;gap:5px}
 .rs-cs-phase b{color:var(--terra);font-weight:600}
+/* Classificação por grupo */
+.rs-cl summary::-webkit-details-marker{display:none}
+.rs-cl[open] summary{margin-bottom:.5rem}
+.rs-cl-body{display:flex;flex-direction:column;gap:.7rem}
+.rs-cl-grp{border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.rs-cl-gh{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--terra);background:var(--cream);padding:4px 8px;border-bottom:1px solid var(--border)}
+.rs-cl-row{display:flex;align-items:center;gap:5px;padding:3px 8px;font-size:10.5px;border-bottom:1px solid var(--border)}
+.rs-cl-row:last-child{border-bottom:none}
+.rs-cl-head{font-size:8.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600}
+.rs-cl-q{background:rgba(34,197,94,.07)}
+.rs-cl-q .rs-cl-pos{color:#16a34a;font-weight:700}
+.rs-cl-pos{width:13px;flex-shrink:0;color:var(--muted);font-variant-numeric:tabular-nums;text-align:center}
+.rs-cl-team{flex:1;min-width:0;color:var(--deep);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px}
+.rs-cl-n{width:24px;flex-shrink:0;text-align:center;color:var(--mid);font-variant-numeric:tabular-nums}
+.rs-cl-pts{width:24px;flex-shrink:0;text-align:right;color:var(--terra);font-weight:700;font-variant-numeric:tabular-nums}
 /* Mobile fallback for featured (right sidebar hidden <640px) */
 .es-mobile-featured{display:none}
 .ex-day{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 0 2px;width:100%;flex-basis:100%;margin-top:4px}
@@ -2825,7 +2840,7 @@ async function loadAfData(){
 let _espnLastError='';
 async function fetchEspn(path,cacheKey,ttl=ESPN_TTL){
   try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
-  const direct=`${ESPN_BASE}${path}`;
+  const direct=path.startsWith('http')?path:`${ESPN_BASE}${path}`;
   const proxies=_fdNeedProxy
     ?[`https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`,
       `https://corsproxy.io/?url=${encodeURIComponent(direct)}`,
@@ -2842,7 +2857,7 @@ async function fetchEspn(path,cacheKey,ttl=ESPN_TTL){
   }
   return null;
 }
-async function getEspnStandings(){return fetchEspn('/standings','copa2026_espn_standings_v1');}
+async function getEspnStandings(){return fetchEspn('https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings?season=2026','copa2026_espn_standings_v2');}
 async function getEspnScoreboard(){
   const from=new Date().toISOString().slice(0,10).replace(/-/g,'');
   const to=new Date(Date.now()+14*864e5).toISOString().slice(0,10).replace(/-/g,'');
@@ -2914,7 +2929,7 @@ function espnScoreboardToSchedule(sbData){
   }).filter(Boolean);
 }
 async function loadEspnData(force){
-  if(force){try{localStorage.removeItem('copa2026_espn_standings_v1');localStorage.removeItem('copa2026_espn_scores_v1');localStorage.removeItem('copa2026_espn_scores_v2');}catch{}}
+  if(force){try{['copa2026_espn_standings_v1','copa2026_espn_standings_v2','copa2026_espn_scores_v1','copa2026_espn_scores_v2'].forEach(k=>localStorage.removeItem(k));}catch{}}
   const espnEl=document.getElementById('espn-status');
   // Dispara as duas chamadas em paralelo, mas renderiza a AGENDA assim que o scoreboard chega —
   // sem bloquear no /standings (que vem vazio e lento). Standings só alimenta o contexto.
@@ -2934,13 +2949,18 @@ async function loadEspnData(force){
   }
   // Contexto do torneio (standings + resultados) — fora do caminho crítico da agenda
   const ctx={fase_atual:'',standings:{},results:[]};
-  if(standings?.standings?.[0]?.entries){
+  // Estrutura do endpoint apis/v2/.../standings?season=2026: children[] = grupos, cada um com standings.entries[]
+  const grpNodes=standings?.children?.length?standings.children:(standings?.standings?Array.isArray(standings.standings)?standings.standings:[standings.standings]:[]);
+  if(grpNodes.length){
     const groups={};
-    standings.standings[0].entries.forEach(e=>{
-      const g=e.team?.group?.displayName||'Grupo';
-      if(!groups[g])groups[g]=[];
-      const stats=Object.fromEntries((e.stats||[]).map(s=>[s.name,s.value]));
-      groups[g].push({time:e.team.displayName,pts:stats.points??0,j:stats.gamesPlayed??0,v:stats.wins??0,e:stats.ties??0,d:stats.losses??0,gp:stats.pointsFor??0,gc:stats.pointsAgainst??0});
+    grpNodes.forEach(node=>{
+      const gname=node.name||node.displayName||'Grupo';
+      const entries=node.standings?.entries||node.entries||[];
+      if(!entries.length)return;
+      groups[gname]=entries.map(e=>{
+        const st=Object.fromEntries((e.stats||[]).map(s=>[s.name,s.value]));
+        return{time:e.team?.displayName||'',pts:st.points??0,j:st.gamesPlayed??0,v:st.wins??0,e:st.ties??0,d:st.losses??0,gp:st.pointsFor??0,gc:st.pointsAgainst??0,sg:st.pointDifferential??((st.pointsFor??0)-(st.pointsAgainst??0)),rank:st.rank??0};
+      }).sort((a,b)=>(a.rank||99)-(b.rank||99)||b.pts-a.pts||b.sg-a.sg);
     });
     ctx.standings=groups;
   }
@@ -2956,6 +2976,8 @@ async function loadEspnData(force){
     if(live||next)ctx.fase_atual=(live||next).competitions?.[0]?.notes?.[0]?.headline||'';
   }
   _saveCtxCache(ctx);
+  // Re-renderiza os destaques agora que a classificação (standings) chegou
+  if(typeof renderEmptyStateFeatured==='function')renderEmptyStateFeatured();
 }
 
 function fillMatch(i){
@@ -3123,6 +3145,21 @@ function _copaStatsHTML(){
 
   if(faseAtual){
     html+=`<div class="rs-cs-sec"><div class="rs-cs-sec-lbl">🏆 Fase atual</div><div class="rs-cs-phase"><b>${esc(faseAtual)}</b></div></div>`;
+  }
+
+  // Classificação por grupo (dados gratuitos do ESPN) — recolhível p/ não ocupar o card todo
+  if(standings&&Object.keys(standings).length){
+    const grpHtml=Object.entries(standings).map(([gname,rows])=>{
+      if(!rows||!rows.length)return'';
+      const head=`<div class="rs-cl-row rs-cl-head"><span class="rs-cl-pos">#</span><span class="rs-cl-team">Seleção</span><span class="rs-cl-n">P</span><span class="rs-cl-n">SG</span><span class="rs-cl-pts">Pts</span></div>`;
+      const body=rows.map((r,i)=>{
+        const flag=(typeof _lv_flag==='function'?_lv_flag(r.time,12):'')||'';
+        const sg=(r.sg>0?'+':'')+r.sg;
+        return`<div class="rs-cl-row${i<2?' rs-cl-q':''}"><span class="rs-cl-pos">${r.rank||i+1}</span><span class="rs-cl-team">${flag} ${esc(r.time)}</span><span class="rs-cl-n">${r.j}</span><span class="rs-cl-n">${sg}</span><span class="rs-cl-pts">${r.pts}</span></div>`;
+      }).join('');
+      return`<div class="rs-cl-grp"><div class="rs-cl-gh">${esc(gname).replace(/^Group/i,'Grupo')}</div>${head}${body}</div>`;
+    }).join('');
+    if(grpHtml)html+=`<div class="rs-cs-sec"><details class="rs-cl"><summary class="rs-cs-sec-lbl" style="cursor:pointer;list-style:none">📋 Classificação por grupo <span style="color:var(--muted);font-weight:400">· tocar para abrir</span></summary><div class="rs-cl-body">${grpHtml}</div></details></div>`;
   }
 
   return html;

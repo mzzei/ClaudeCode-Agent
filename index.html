@@ -3689,25 +3689,26 @@ SEQUÊNCIA:
 ④ "[Mandante] estilo tático esquema Copa 2026" + "[Visitante] vulnerabilidades defensivas Copa 2026" — preencha estilo_ofensivo e vulnerabilidades_defensivas
 Extraia placares, classificação do grupo e xG diretamente das páginas encontradas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
+  let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)
   for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
     const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search'}]}),signal});
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
+    const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
+    onUpdate({inTokens:accIn,outTokens:accOut,status:'Pesquisando dados…',phase:1});
     if(data.stop_reason==='end_turn'){
       const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
       const m=txt.match(/\{[\s\S]*\}/);
       let rawFacts=null;try{if(m)rawFacts=JSON.parse(m[0]);}catch{}
-      const u=data.usage||{};
-      return{rawFacts,inTokens:u.input_tokens||0,outTokens:u.output_tokens||0};
+      return{rawFacts,inTokens:accIn,outTokens:accOut};
     }
     if(data.stop_reason==='tool_use'){
       msgs.push({role:'assistant',content:data.content});
       msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
-      onUpdate({status:'Pesquisando dados…',phase:1});
     }else break;
   }
-  return{rawFacts:null,inTokens:0,outTokens:0};
+  return{rawFacts:null,inTokens:accIn,outTokens:accOut};
 }
 function buildEnrichedQuery(query,rawFacts,ctx){
   const parts=[query];
@@ -3932,17 +3933,23 @@ async function runAnalysis(){
     let _newAnalysisId=null;
 
     for(let iter=0;iter<10;iter++){
-      let _r2;
-      try{
-        _r2=await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks({...upd,phase:2});},_abort.signal);
-      }catch(e2){
-        if((e2.name==='TypeError'||e2.message==='Failed to fetch')&&iter===0&&!_abort.signal.aborted){
-          updateThinkingToks({status:'Reconectando…',phase:2});
-          await new Promise(r=>setTimeout(r,1500));
-          try{_r2=await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks({...upd,phase:2});},_abort.signal);}
-          catch(e3){throw Object.assign(e3,{message:`Fase 2: ${e3.message}`});}
-        }else{
-          throw Object.assign(e2,{message:`Fase 2: ${e2.message}`});
+      let _r2,_netAttempt=0;
+      // Reconecta em qualquer iteração após queda de rede/proxy (não só na primeira)
+      while(true){
+        try{
+          _r2=await streamOnce({...baseBody,messages},reqHeaders,(upd)=>{updateThinkingToks({...upd,phase:2});},_abort.signal);
+          break;
+        }catch(e2){
+          if(e2.name==='AbortError'||e2.message==='cancelled')throw e2;
+          const isNet=(e2.name==='TypeError'||e2.message==='Failed to fetch');
+          if(isNet&&_netAttempt<2&&!_abort.signal.aborted){
+            _netAttempt++;
+            updateThinkingToks({status:'Reconectando…',phase:2});
+            await new Promise(r=>setTimeout(r,1200*_netAttempt));
+            continue;
+          }
+          const msg=isNet?'Fase 2: falha de conexão com a API (rede ou proxy CORS). Verifique sua internet/chave e tente de novo.':`Fase 2: ${e2.message}`;
+          throw Object.assign(e2,{message:msg});
         }
       }
       if(iter===0&&_r2.id){

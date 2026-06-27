@@ -2907,15 +2907,23 @@ function espnScoreboardToSchedule(sbData){
 }
 async function loadEspnData(force){
   if(force){try{localStorage.removeItem('copa2026_espn_standings_v1');localStorage.removeItem('copa2026_espn_scores_v1');localStorage.removeItem('copa2026_espn_scores_v2');}catch{}}
-  const[standings,scoreboard]=await Promise.all([getEspnStandings(),getEspnScoreboard()]);
   const espnEl=document.getElementById('espn-status');
+  // Dispara as duas chamadas em paralelo, mas renderiza a AGENDA assim que o scoreboard chega —
+  // sem bloquear no /standings (que vem vazio e lento). Standings só alimenta o contexto.
+  const scoreboardP=getEspnScoreboard(),standingsP=getEspnStandings();
+  const scoreboard=await scoreboardP;
+  if(scoreboard?.events?.length){
+    if(espnEl){espnEl.textContent='ativo';espnEl.className='ds-status ok';}
+    const jogos=espnScoreboardToSchedule(scoreboard);
+    if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}
+  }
+  const standings=await standingsP;
   if(!standings&&!scoreboard){
     if(espnEl){espnEl.textContent=_espnLastError||'indisponível';espnEl.className='ds-status err';}
     if(!_schedule.length){const ch=document.getElementById('ex-chips');if(ch)ch.innerHTML='<span class="ex-auto-hint">Agenda indisponível · <button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">buscar via IA →</button></span>';}
     fetchScheduleFromApi(false);return;
   }
-  if(espnEl){espnEl.textContent='ativo';espnEl.className='ds-status ok';}
-  // Update tournament context
+  // Contexto do torneio (standings + resultados) — fora do caminho crítico da agenda
   const ctx={fase_atual:'',standings:{},results:[]};
   if(standings?.standings?.[0]?.entries){
     const groups={};
@@ -2939,10 +2947,6 @@ async function loadEspnData(force){
     if(live||next)ctx.fase_atual=(live||next).competitions?.[0]?.notes?.[0]?.headline||'';
   }
   _saveCtxCache(ctx);
-  if(scoreboard?.events?.length){
-    const jogos=espnScoreboardToSchedule(scoreboard);
-    if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}
-  }
 }
 
 function fillMatch(i){

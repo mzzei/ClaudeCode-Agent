@@ -2839,23 +2839,25 @@ async function loadAfData(){
 // ─── ESPN unofficial API (gratuito · sem key · WC 2026) ──────────────────
 let _espnLastError='';
 async function fetchEspn(path,cacheKey,ttl=ESPN_TTL){
-  try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
+  let stale=null;
+  try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c){if((Date.now()-c.ts)<ttl)return c.data;stale=c.data;}}catch{}
   const direct=path.startsWith('http')?path:`${ESPN_BASE}${path}`;
-  const proxies=_fdNeedProxy
-    ?[`https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`,
-      `https://corsproxy.io/?url=${encodeURIComponent(direct)}`,
-      direct]
-    :[direct];
+  // Em http(s) tenta direto; se direto falhar, tenta proxies CORS como rede de segurança (não só em file://)
+  const proxies=[direct,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(direct)}`];
   for(const url of proxies){
+    const ctl=new AbortController();const tid=setTimeout(()=>ctl.abort(),8000); // não trava pra sempre
     try{
-      const res=await fetch(url);
+      const res=await fetch(url,{signal:ctl.signal});
+      clearTimeout(tid);
       if(!res.ok){_espnLastError=`HTTP ${res.status}`;continue;}
       const data=await res.json();
       try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),data}));}catch{}
       return data;
-    }catch(e){_espnLastError=`rede: ${e?.message||'timeout'}`;}
+    }catch(e){clearTimeout(tid);_espnLastError=e?.name==='AbortError'?'timeout (8s)':`rede: ${e?.message||'falha'}`;}
   }
-  return null;
+  return stale; // rede falhou: usa cache antigo (se houver) em vez de deixar travado em "Carregando…"
 }
 async function getEspnStandings(){return fetchEspn('https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings?season=2026','copa2026_espn_standings_v2');}
 async function getEspnScoreboard(){

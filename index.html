@@ -1426,6 +1426,10 @@ const EFFORT_LEVELS = [
   {label:'Padrão',budget:0},{label:'Leve',budget:2000},{label:'Médio',budget:5000},
   {label:'Alto',budget:10000},{label:'Máximo',budget:16000}
 ];
+// Buscas web por nível de esforço (Padrão→Máximo). web_search ingere o conteúdo das
+// páginas como tokens — é o maior gasto e NÃO é raciocínio. Escala com o esforço para
+// manter o consumo congruente: a profundidade vem do thinking budget acima, não da coleta.
+const EFFORT_SEARCHES = [1,1,2,3,3];
 // Country → ISO 3166-1 alpha-2 (flagcdn.com codes). Flag emoji don't render on Windows,
 // so we render real flag images instead. Keys in both Portuguese and English so ESPN API
 // names (English) and Claude responses (Portuguese) both resolve correctly.
@@ -3754,7 +3758,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sel-pop')&&!e.targe
 if(!getAfKey()&&!getFdKey())setTimeout(()=>{loadEspnData(false);loadNews();},200);
 
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
-async function gatherFacts(query,apiKey,signal,onUpdate){
+async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // Pre-fetch structured data: AF (paid) > FD (paid, no WC) > ESPN (free, automatic)
   let fdCtx='';
   if(getAfKey()){
@@ -3770,27 +3774,34 @@ async function gatherFacts(query,apiKey,signal,onUpdate){
   }
   const hasFd=!!fdCtx;
   const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
-  // Buscas consolidadas: web_search é o que mais consome tokens (cada resultado traz o
-  // conteúdo das páginas). Agrupar tópicos numa busca por linha reduz o custo sem perder
-  // cobertura — o Haiku ainda condensa tudo no SCHEMA compacto. max_uses limita o teto.
+  // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
+  // Os tópicos abaixo estão em ordem de prioridade; o esforço escolhido define quantos
+  // executar (maxSearches → max_uses). Assim a coleta escala com o esforço, sem mexer na
+  // profundidade de raciocínio (que vem do thinking budget da Fase 2).
+  const topics=hasFd?[
+    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Globo Esporte, Goal',
+    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore'
+  ]:[
+    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Goal, UOL Esporte',
+    '"[Mandante] [Visitante] Copa 2026 resultado forma recente classificação" — ESPN, Sofascore, Globo Esporte',
+    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore'
+  ];
+  const _maxUses=Math.max(1,Math.min(maxSearches??topics.length,topics.length));
+  const _dir=topics.slice(0,_maxUses).map((s,i)=>`${'①②③④'[i]} ${s}`).join('\n');
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO E RESULTADOS OBTIDOS VIA API — não pesquise esses dados, já estão abaixo na mensagem.
-Faça NO MÁXIMO 2 buscas, apenas para o que falta:
-① "[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Globo Esporte, Goal
-② "[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore
+Faça NO MÁXIMO ${_maxUses} busca(s), apenas para o que falta:
+${_dir}
 Retorne APENAS JSON válido:
 ${SCHEMA}`
     :`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-Faça NO MÁXIMO 3 buscas (uma por linha) e retorne APENAS JSON válido:
+Faça NO MÁXIMO ${_maxUses} busca(s) (uma por linha) e retorne APENAS JSON válido:
 ${SCHEMA}
 BUSCAS:
-① "[Mandante] [Visitante] Copa 2026 resultado forma recente classificação" — ESPN, Sofascore, Globo Esporte
-② "[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Goal, UOL Esporte
-③ "[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore
+${_dir}
 Extraia placares, classificação do grupo, xG e estilo diretamente das páginas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
-  const _maxUses=hasFd?2:3;
   let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)
   for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
@@ -4068,7 +4079,7 @@ async function runAnalysis(){
     updateThinkingToks({status:'Pesquisando dados…',phase:1});
     let rawFacts=null,p1in=0,p1out=0;
     try{
-      const r1=await gatherFacts(query,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
+      const r1=await gatherFacts(query,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}),EFFORT_SEARCHES[currentEffort]??1);
       rawFacts=r1.rawFacts;p1in=r1.inTokens;p1out=r1.outTokens;
     }catch(e1){
       if(e1.message==='cancelled'||e1.name==='AbortError')throw e1;

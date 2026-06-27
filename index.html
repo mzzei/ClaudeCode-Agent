@@ -2930,6 +2930,8 @@ function espnScoreboardToSchedule(sbData){
 }
 async function loadEspnData(force){
   if(force){try{['copa2026_espn_standings_v1','copa2026_espn_standings_v2','copa2026_espn_scores_v1','copa2026_espn_scores_v2'].forEach(k=>localStorage.removeItem(k));}catch{}}
+  // Stale-while-revalidate: pinta a última agenda salva IMEDIATAMENTE, depois atualiza com dados frescos
+  if(!force&&!_schedule.length){try{const sc=_loadSchedCache();if(sc?.jogos?.length){_schedule=sc.jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}}catch{}}
   const espnEl=document.getElementById('espn-status');
   // Dispara as duas chamadas em paralelo, mas renderiza a AGENDA assim que o scoreboard chega —
   // sem bloquear no /standings (que vem vazio e lento). Standings só alimenta o contexto.

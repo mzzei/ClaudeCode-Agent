@@ -1664,6 +1664,30 @@ function getReqHeaders(apiKey,betas=[]){
   if(betas.length)h['anthropic-beta']=betas.join(',');
   return h;
 }
+// Roda no navegador do usuário para transformar um "Failed to fetch" opaco na causa real
+async function diagnoseConnection(apiKey){
+  if(location.protocol==='file:')
+    return 'O app foi aberto como arquivo local (file://) — a origem fica "null" e a API da Anthropic bloqueia isso. Sirva por http://localhost ou pela URL do GitHub Pages.';
+  if(getWorkerUrl()){
+    try{const r=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1,messages:[{role:'user',content:'.'}]})});return r.status>=500?`O Worker proxy respondeu com erro ${r.status}.`:null;}
+    catch{return 'Não foi possível alcançar o Worker proxy ('+getApiBase()+'). Confira se a URL está correta e online, ou remova-a nas Configurações para usar a chave direto.';}
+  }
+  // Sem worker: testa o TRANSPORTE com chave fictícia (não usa a sua)
+  let transportOk=false;
+  try{await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':'sk-ant-probe000','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1,messages:[{role:'user',content:'.'}]})});transportOk=true;}
+  catch{transportOk=false;}
+  if(!transportOk)
+    return 'O navegador não conseguiu alcançar api.anthropic.com. Causa provável: extensão de bloqueio (ad-block/privacidade), VPN/firewall ou rede corporativa barrando o domínio. Teste em janela anônima sem extensões ou em outra rede.';
+  if(!apiKey||!apiKey.startsWith('sk-ant-'))
+    return 'A conexão funciona, mas nenhuma chave de API válida foi informada. Cole sua chave (sk-ant-…) nas Configurações.';
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1,messages:[{role:'user',content:'.'}]})});
+    if(r.status===401)return 'A conexão funciona, mas a chave foi recusada (401). Gere uma nova em console.anthropic.com e cole completa, sem espaços.';
+    return null; // chave OK agora → a falha foi transitória, tente de novo
+  }catch{
+    return 'A conexão funciona com uma chave de teste, mas falha com a sua — provavelmente há um caractere inválido (espaço, quebra de linha ou símbolo) na chave colada. Apague o campo e cole a chave de novo, limpa.';
+  }
+}
 async function fetchMemoryContext(){
   if(!getWorkerUrl()||!MEMORY_STORE_ID)return'';
   if(_memCache&&(Date.now()-_memCacheAt)<MEM_CACHE_TTL)return _memCache;
@@ -4037,8 +4061,11 @@ async function runAnalysis(){
       if(_fellBack){
         ks.textContent='Resposta analítica · não salva como relatório';ks.style.color='var(--muted)';
       }else{
+        let _msg=e.message||'Erro inesperado. Verifique sua conexão.';
+        const _isNet=(e&&e.name==='TypeError')||/Failed to fetch|falha de conex/i.test(_msg);
+        if(_isNet){const _diag=await diagnoseConnection(apiKey).catch(()=>null);if(_diag)_msg='Diagnóstico: '+_diag;}
         document.getElementById('error-box').style.display='block';
-        document.getElementById('error-msg').innerHTML=(e.message||'Erro inesperado. Verifique sua conexão.')+' <button class="inline-link" onclick="document.getElementById(\'error-box\').style.display=\'none\';toggleRun()">↺ tentar de novo</button>';
+        document.getElementById('error-msg').innerHTML=esc(_msg)+' <button class="inline-link" onclick="document.getElementById(\'error-box\').style.display=\'none\';toggleRun()">↺ tentar de novo</button>';
         ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
       }
     }

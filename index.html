@@ -3775,24 +3775,28 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   const hasFd=!!fdCtx;
   const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
-  // Os tópicos abaixo estão em ordem de prioridade; o esforço escolhido define quantos
-  // executar (maxSearches → max_uses). Assim a coleta escala com o esforço, sem mexer na
-  // profundidade de raciocínio (que vem do thinking budget da Fase 2).
+  // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
+  // esforço: a 1ª busca é abrangente e a forma já vem do ESPN/API de graça. O esforço só
+  // adiciona buscas que APROFUNDAM/cruzam fontes — não destrava tópicos. A profundidade de
+  // raciocínio vem do thinking budget da Fase 2, separada da coleta.
   const topics=hasFd?[
-    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Globo Esporte, Goal',
-    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore'
+    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável xG estilo tático" — Sofascore, Transfermarkt, fbref (cubra lesões, escalação, xG e estilo numa busca)',
+    '"[Mandante] desfalques e [Visitante] vulnerabilidades defensivas Copa 2026 esquema tático" — Globo Esporte, Goal (aprofunda tática e desfalques)',
+    '"[Mandante] [Visitante] Copa 2026 fbref xG expected goals estatísticas avançadas" — fbref, Understat (aprofunda xG/estatística)'
   ]:[
-    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável" — Transfermarkt, Goal, UOL Esporte',
-    '"[Mandante] [Visitante] Copa 2026 resultado forma recente classificação" — ESPN, Sofascore, Globo Esporte',
-    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore'
+    '"[Mandante] [Visitante] Copa 2026 forma recente resultados lesões escalação provável" — ESPN, Sofascore, Transfermarkt (cubra forma, lesões e escalação)',
+    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore (cubra xG e tática)',
+    '"[Mandante] [Visitante] Copa 2026 classificação grupo estatísticas fbref" — fbref, ESPN (aprofunda dados/estatística)'
   ];
   const _maxUses=Math.max(1,Math.min(maxSearches??topics.length,topics.length));
   const _dir=topics.slice(0,_maxUses).map((s,i)=>`${'①②③④'[i]} ${s}`).join('\n');
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. Declare em "lacunas" só o que realmente não encontrar.';
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
-CLASSIFICAÇÃO E RESULTADOS OBTIDOS VIA API — não pesquise esses dados, já estão abaixo na mensagem.
-Faça NO MÁXIMO ${_maxUses} busca(s), apenas para o que falta:
+CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
+Faça NO MÁXIMO ${_maxUses} busca(s) para complementar:
 ${_dir}
+${_coverNote}
 Retorne APENAS JSON válido:
 ${SCHEMA}`
     :`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
@@ -3800,6 +3804,7 @@ Faça NO MÁXIMO ${_maxUses} busca(s) (uma por linha) e retorne APENAS JSON vál
 ${SCHEMA}
 BUSCAS:
 ${_dir}
+${_coverNote}
 Extraia placares, classificação do grupo, xG e estilo diretamente das páginas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
   let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)

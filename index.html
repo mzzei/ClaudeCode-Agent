@@ -1317,6 +1317,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="sf-hint" style="color:var(--terra);margin-top:.3rem">⚠ Não compartilhe este arquivo publicamente — a chave ficaria exposta.</div>
     </div>
     <div class="sf">
+      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="auto-ai-toggle" onchange="setAutoAi(this.checked)" style="width:auto;margin:0;cursor:pointer">
+        Enriquecer dados via IA automaticamente
+      </label>
+      <div class="sf-hint">Desligado (padrão · economia): no automático usa só dados gratuitos do ESPN — créditos da API são gastos <b>somente nas análises que você pede</b>. Ligado: ao abrir, a IA pesquisa classificação/contexto extra (consome créditos).</div>
+    </div>
+    <div class="sf">
       <label class="sf-lbl" for="worker-url-input">Worker URL (Cloudflare)</label>
       <input id="worker-url-input" type="text" placeholder="https://worldcup-proxy.gcerqueira2012.workers.dev" autocomplete="off" oninput="saveWorkerUrl(this.value)">
       <div class="sf-hint">Quando ativo, a API Key não precisa ficar no browser · chave guardada no Cloudflare</div>
@@ -1714,7 +1721,7 @@ function parseRateLimitHeaders(res){
   if(tl){rlState.tokLimit=tl;rlState.tokRemaining=tr;rlState.tokReset=ts;}
   if(rl){rlState.reqLimit=rl;rlState.reqRemaining=rr;}
 }
-function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
+function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();const aa=document.getElementById('auto-ai-toggle');if(aa)aa.checked=autoAiEnabled();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
 function updateSettingsTokens(){
   const tot=tokenState.sessionIn+tokenState.sessionOut;
   const emptyEl=document.getElementById('sf-tok-empty');
@@ -2552,6 +2559,7 @@ function getTournamentCtxString(){
 }
 function loadTournamentCtx(force){
   if(getAfKey()||getFdKey())return; // loadAfData/loadFdData já atualiza CTX_STORE — evita race condition
+  if(!autoAiEnabled()&&!force)return; // modo economia: não gasta créditos no automático (force = ação explícita)
   const cache=_loadCtxCache();
   if(cache&&!force){const age=Date.now()-(cache.fetched_at||0);if(age<CTX_TTL)return;}
   fetchTournamentCtxFromApi();
@@ -2921,7 +2929,8 @@ async function loadEspnData(force){
   if(!standings&&!scoreboard){
     if(espnEl){espnEl.textContent=_espnLastError||'indisponível';espnEl.className='ds-status err';}
     if(!_schedule.length){const ch=document.getElementById('ex-chips');if(ch)ch.innerHTML='<span class="ex-auto-hint">Agenda indisponível · <button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">buscar via IA →</button></span>';}
-    fetchScheduleFromApi(false);return;
+    if(autoAiEnabled())fetchScheduleFromApi(false); // modo economia: só busca via IA se o usuário permitir (botão manual continua)
+    return;
   }
   // Contexto do torneio (standings + resultados) — fora do caminho crítico da agenda
   const ctx={fase_atual:'',standings:{},results:[]};
@@ -3289,6 +3298,10 @@ function renderLibrary(){
 }
 
 const KEY_STORE='copa2026_api_key';
+// Modo economia (padrão): chamadas de IA automáticas desligadas; créditos só nas análises pedidas
+const AUTO_AI_STORE='copa2026_auto_ai';
+function autoAiEnabled(){try{return localStorage.getItem(AUTO_AI_STORE)==='1';}catch{return false;}}
+function setAutoAi(on){try{localStorage.setItem(AUTO_AI_STORE,on?'1':'0');}catch{}if(on){loadTournamentCtx(true);}}
 let _keyDebounce=null;
 document.getElementById('api-key-input').addEventListener('input',function(){
   clearTimeout(_keyDebounce);

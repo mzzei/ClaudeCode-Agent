@@ -1348,7 +1348,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
       <div class="ds-row">
         <span class="ds-name">ESPN</span>
-        <span class="ds-status ok" id="espn-status">ativo</span>
+        <span class="ds-status" id="espn-status">carregando…</span>
       </div>
 
       <div class="ds-row">
@@ -2939,16 +2939,20 @@ async function loadEspnData(force){
   // sem bloquear no /standings (que vem vazio e lento). Standings só alimenta o contexto.
   const scoreboardP=getEspnScoreboard(),standingsP=getEspnStandings();
   const scoreboard=await scoreboardP;
-  if(scoreboard?.events?.length){
-    if(espnEl){espnEl.textContent='ativo';espnEl.className='ds-status ok';}
+  const sbOk=!!(scoreboard?.events?.length);
+  if(sbOk){
     const jogos=espnScoreboardToSchedule(scoreboard);
     if(jogos.length){_saveSchedCache(jogos);_schedule=jogos;renderScheduleChips(_schedule);if(_currentView==='library')renderLibrary();}
   }
+  // Status reflete a REALIDADE do scoreboard (não um "ativo" fixo)
+  if(espnEl){espnEl.textContent=sbOk?'ativo':(_espnLastError||'indisponível');espnEl.className='ds-status '+(sbOk?'ok':'err');}
   const standings=await standingsP;
-  if(!standings&&!scoreboard){
-    if(espnEl){espnEl.textContent=_espnLastError||'indisponível';espnEl.className='ds-status err';}
-    if(!_schedule.length){const ch=document.getElementById('ex-chips');if(ch)ch.innerHTML='<span class="ex-auto-hint">Agenda indisponível · <button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">buscar via IA →</button></span>';}
-    if(autoAiEnabled())fetchScheduleFromApi(false); // modo economia: só busca via IA se o usuário permitir (botão manual continua)
+  // Se a agenda continua vazia, NUNCA deixa travado em "Carregando…": mostra o erro real + tentar de novo
+  if(!_schedule.length){
+    const ch=document.getElementById('ex-chips');
+    if(ch)ch.innerHTML=`<span class="ex-auto-hint">Não foi possível carregar a agenda${_espnLastError?` (${esc(_espnLastError)})`:''} · <button class="chip chip-cta" onclick="loadSchedule(true)">↻ tentar de novo</button>${autoAiEnabled()?'':` <button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">buscar via IA →</button>`}</span>`;
+    if(typeof renderLibrary==='function'&&_currentView==='library')renderLibrary();
+    if(autoAiEnabled())fetchScheduleFromApi(false);
     return;
   }
   // Contexto do torneio (standings + resultados) — fora do caminho crítico da agenda

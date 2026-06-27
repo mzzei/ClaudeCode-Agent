@@ -310,11 +310,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* Right: stats */
 .rs-sh{display:flex;justify-content:space-between;font-size:10px;font-weight:600;color:var(--muted);margin-bottom:.5rem;letter-spacing:.03em}
-.rs-srow{display:flex;align-items:center;gap:5px;padding:5px 0;font-size:11px;border-bottom:1px solid var(--border)}
+.rs-srow{display:flex;align-items:flex-start;gap:5px;padding:5px 0;font-size:11px;border-bottom:1px solid var(--border)}
 .rs-srow:last-child{border-bottom:none}
-.rs-sv-l{font-variant-numeric:tabular-nums;font-weight:600;color:var(--terra);min-width:30px;font-size:12px}
-.rs-slbl{flex:1;color:var(--muted);text-align:center;font-size:10px}
-.rs-sv-r{font-variant-numeric:tabular-nums;font-weight:600;color:var(--mid);min-width:30px;text-align:right;font-size:12px}
+.rs-sv-l{font-variant-numeric:tabular-nums;font-weight:600;color:var(--terra);min-width:0;max-width:38%;font-size:12px;word-break:break-word;overflow-wrap:break-word}
+.rs-slbl{flex:1;min-width:0;color:var(--muted);text-align:center;font-size:10px;padding-top:1px}
+.rs-sv-r{font-variant-numeric:tabular-nums;font-weight:600;color:var(--mid);min-width:0;max-width:38%;text-align:right;font-size:12px;word-break:break-word;overflow-wrap:break-word}
 .rs-sbar{height:3px;background:var(--cream-mid);border-radius:2px;overflow:hidden;margin:-2px 0 3px;display:flex}
 .rs-bh{height:100%;background:var(--terra)}
 .rs-ba{height:100%;background:var(--mid)}

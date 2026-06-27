@@ -3792,12 +3792,14 @@ async function runChat(){
   try{
     let trimmedThread=_chatThread.length>20?_chatThread.slice(-20):_chatThread;
     if(trimmedThread.length>0&&trimmedThread[0].role!=='user')trimmedThread=trimmedThread.slice(1);
+    const _chatBody={model:currentModel,max_tokens:1024,
+      system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
+      messages:trimmedThread,stream:true};
+    if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
-      headers:getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']),
-      body:JSON.stringify({model:currentModel,max_tokens:1024,
-        system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
-        messages:trimmedThread,stream:true,diagnostics:{previous_message_id:_lastChatId}}),
+      headers:getReqHeaders(apiKey,getWorkerUrl()?['cache-diagnosis-2026-04-07']:[]),
+      body:JSON.stringify(_chatBody),
       signal:_abort.signal
     });
     parseRateLimitHeaders(res);if(!res.ok)throw new Error(`Erro ${res.status}`);
@@ -3914,7 +3916,8 @@ async function runAnalysis(){
   startThinking();
 
   const effort=EFFORT_LEVELS[currentEffort];
-  const reqHeaders=getReqHeaders(apiKey,['cache-diagnosis-2026-04-07']);
+  // diagnostics + beta cache-diagnosis são internos do proxy; em modo browser direto quebram o CORS → só com Worker
+  const reqHeaders=getReqHeaders(apiKey,getWorkerUrl()?['cache-diagnosis-2026-04-07']:[]);
 
   let finalText='',lastIn=0,lastOut=0,lastCacheCreated=0,lastCacheRead=0;
 
@@ -3940,7 +3943,8 @@ async function runAnalysis(){
     const finalQuery=useEnriched?buildEnrichedQuery(query,rawFacts,ctx):query;
     const sysText=useEnriched?getSystemPromptPhase2():getSystemPrompt();
     const memCtx=await fetchMemoryContext();
-    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}],diagnostics:{previous_message_id:_lastAnalysisId}};
+    const baseBody={model:currentModel,max_tokens:effort.budget>0?effort.budget+6000:4000,system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
+    if(getWorkerUrl())baseBody.diagnostics={previous_message_id:_lastAnalysisId};
     if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search'}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];

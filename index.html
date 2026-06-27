@@ -3930,13 +3930,35 @@ Não se prenda a um formato rígido: estruture a resposta da forma mais útil pa
 }
 
 // Conversational fallback when the structured pipeline can't complete
+// Card exportável para o fallback: se o pipeline estruturado não montar o JSON,
+// a resposta em texto livre ainda vira um .a-card (logo, o botão Exportar a enxerga).
+function showFallbackCard(query){
+  const ts=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const el=document.createElement('div');
+  el.innerHTML=`<div class="a-card">
+    <div class="a-hdr">
+      <div class="a-agent"><div class="a-ball">🏆</div><div><span class="a-name">WorldCup Agent</span></div></div>
+      <div class="a-hdr-r"><span class="a-ts">${ts}</span></div>
+    </div>
+    <div class="a-subtitle">Análise em texto · modo simplificado</div>
+    <div class="a-title">${esc(query||'Análise').slice(0,80)}</div>
+    <div class="a-tc" style="padding:1rem 1.25rem;line-height:1.6"><span class="ldot" style="display:inline-block;margin:4px"></span></div>
+    <div class="disc">Gerada em texto livre porque o relatório estruturado não pôde ser montado nesta resposta. Pode ser exportada normalmente. Para o relatório completo com abas, tente de novo (de preferência sem o raciocínio estendido "Leve/Médio").</div>
+  </div>`;
+  const card=el.firstElementChild;
+  card.dataset.hid='fb'+Date.now().toString(36);
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('conversation').appendChild(card);
+  scrollChat();
+  return card.querySelector('.a-tc');
+}
 async function conversationalFallback(query,apiKey,reqHeaders,signal){
   const ctx=getTournamentCtxString?getTournamentCtxString():'';
-  const bubble=showAgentBubble('<span class="ldot" style="display:inline-block;margin:4px"></span>');
+  const bubble=showFallbackCard(query);
   const res=await fetch(getApiBase()+'/v1/messages',{
     method:'POST',
     headers:reqHeaders,
-    body:JSON.stringify({model:currentModel,max_tokens:2048,
+    body:JSON.stringify({model:currentModel,max_tokens:3500,
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
       messages:[{role:'user',content:`DATA: ${currentDateFull()}${ctx?`\n\nContexto do torneio:\n${ctx}`:''}\n\n${query}`}],
       stream:true}),
@@ -4094,6 +4116,10 @@ async function runAnalysis(){
       ];
       const retryBody={...baseBody,messages:retryMessages};
       delete retryBody.tools;
+      // Raciocínio estendido ("Leve"/"Médio") deixa o modelo conversador e ele responde
+      // em prosa em vez de JSON puro. No re-pedido desligamos thinking p/ forçar JSON limpo.
+      delete retryBody.thinking;delete retryBody.temperature;
+      retryBody.max_tokens=Math.max(retryBody.max_tokens||0,8000);
       const retryR=await streamOnce(retryBody,reqHeaders,()=>{},_abort.signal).catch(()=>null);
       if(retryR){const c2=retryR.text.replace(/```(?:json)?\s*/gi,'').replace(/```/g,'');m=c2.match(/\{[\s\S]*\}/);}
     }
@@ -4121,7 +4147,7 @@ async function runAnalysis(){
         catch(e2){if(e2&&(e2.name==='AbortError'||e2.message==='cancelled'))_fellBack=true;}
       }
       if(_fellBack){
-        ks.textContent='Resposta analítica · não salva como relatório';ks.style.color='var(--muted)';
+        ks.textContent='Análise em texto (modo simplificado) · exportável';ks.style.color='var(--muted)';
       }else{
         let _msg=e.message||'Erro inesperado. Verifique sua conexão.';
         const _isNet=(e&&e.name==='TypeError')||/Failed to fetch|falha de conex/i.test(_msg);

@@ -2426,6 +2426,19 @@ function _loadSchedCache(){
 function _saveSchedCache(jogos){
   try{localStorage.setItem(SCHED_STORE,JSON.stringify({fetched_at:Date.now(),jogos}));}catch(e){}
 }
+// Jogos confirmados que as fontes dinâmicas (ESPN/IA) às vezes omitem — garantidos no calendário
+const KNOWN_FIXTURES=[
+  {mandante:'Egito',visitante:'Irã',fase:'Fase de Grupos',grupo:null,data_iso:'2026-06-27',hora_brt:'00:00',sede:''},
+  {mandante:'Bélgica',visitante:'Nova Zelândia',fase:'Fase de Grupos',grupo:null,data_iso:'2026-06-27',hora_brt:'00:00',sede:''}
+];
+function _mergeKnownFixtures(jogos){
+  jogos=Array.isArray(jogos)?jogos.slice():[];
+  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const key=j=>[norm(j.mandante),norm(j.visitante)].sort().join('|')+'@'+(j.data_iso||'');
+  const seen=new Set(jogos.map(key));
+  KNOWN_FIXTURES.forEach(f=>{if(!seen.has(key(f))){jogos.push({...f});seen.add(key(f));}});
+  return jogos;
+}
 function loadSchedule(force){
   if(getAfKey()){
     if(force){try{localStorage.removeItem('copa2026_af_fixtures_v1');}catch{}}
@@ -2472,6 +2485,7 @@ async function fetchScheduleFromApi(silent){
   }catch(e){if(!silent)chips.innerHTML=`<button class="chip chip-cta" onclick="fetchScheduleFromApi(false)">↻ tentar novamente</button>`;}
 }
 function renderScheduleChips(jogos){
+  jogos=_mergeKnownFixtures(jogos);
   _schedule=jogos;const chips=document.getElementById('ex-chips');
   if(!jogos.length){chips.innerHTML='<span class="ex-loading">Nenhuma partida encontrada</span>';document.getElementById('reload-btn').style.display='inline';return;}
   const today=new Date();today.setHours(0,0,0,0);

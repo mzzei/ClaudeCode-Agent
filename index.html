@@ -1987,6 +1987,7 @@ function renderAttachChips(){
       :`<span class="att-ic">${a.kind==='pdf'?'📄':'📃'}</span>`;
     return `<div class="att-chip">${thumb}<div class="att-meta"><span class="att-name">${esc(a.name)}</span><span class="att-sz">${_fmtBytes(a.size)}</span></div><button class="att-x" onclick="removeAttachment(${a.id})" title="Remover" aria-label="Remover anexo">×</button></div>`;
   }).join('');
+  if(!_running)setRunBtn(false);   // "Analisar" → "Enviar" quando há anexo
 }
 // Monta o conteúdo multimodal da API: blocos de mídia + texto. A mídia segue só neste turno.
 function buildUserContent(query,atts){
@@ -4182,7 +4183,7 @@ function setRunBtn(running){
   const b=document.getElementById('run-btn');
   b.classList.toggle('i-stop',running);
   if(running)b.textContent=t('btn_stop');
-  else b.textContent=_chatThread.length>0?t('btn_send'):t('btn_analyze');
+  else b.textContent=(_attachments.length||_chatThread.length>0)?t('btn_send'):t('btn_analyze');
 }
 
 async function runAnalysis(){

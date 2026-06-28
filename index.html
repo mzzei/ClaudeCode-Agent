@@ -285,6 +285,25 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .tok-ring-fill{fill:none;stroke:var(--terra);stroke-width:3;stroke-linecap:round;transition:stroke-dasharray .9s cubic-bezier(.22,.61,.36,1)}
 .i-clear{width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:none;font-size:15px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0}
 .i-clear:hover{background:var(--cream)}
+.i-attach{width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;flex-shrink:0}
+.i-attach:hover{background:var(--cream);color:var(--terra)}
+/* ── Anexos (chips + thumbnails) ── */
+.attach-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.5rem}
+.attach-chips:empty{display:none}
+.att-chip{display:flex;align-items:center;gap:7px;background:var(--cream);border:1px solid var(--border);border-radius:9px;padding:4px 6px 4px 4px;max-width:215px}
+.att-chip img{width:30px;height:30px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block}
+.att-ic{width:28px;height:28px;border-radius:6px;background:var(--cream-mid);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.att-meta{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.att-name{font-size:11px;color:var(--deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att-sz{font-size:10px;color:var(--muted)}
+.att-x{border:none;background:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0 3px;flex-shrink:0;border-radius:5px}
+.att-x:hover{color:var(--terra);background:var(--cream-mid)}
+.ub-atts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:6px}
+.ub-atts img{max-width:150px;max-height:150px;border-radius:9px;object-fit:cover;border:1px solid var(--border)}
+.ub-doc{display:inline-flex;align-items:center;gap:6px;background:var(--cream);border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:12px;color:var(--deep)}
+/* ── Toast ── */
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(8px);background:var(--deep);color:#fff;font-size:12.5px;padding:8px 14px;border-radius:9px;box-shadow:0 6px 22px rgba(0,0,0,.22);z-index:300;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:80vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 /* ── Selector popups ── */
 .sel-pop{position:absolute;bottom:calc(100% + 7px);left:0;background:var(--white);border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.1),0 1px 3px rgba(0,0,0,.06);padding:6px;min-width:236px;z-index:90;display:none}
 .sel-pop.open{display:block}
@@ -791,6 +810,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .tok-ring-fill{fill:none;stroke:var(--lime-mid);stroke-width:3;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(120,240,120,.7))}
 .i-clear{background:rgba(255,255,255,.04);border:1px solid rgba(160,240,190,.14);color:var(--muted)}
 .i-clear:hover{background:rgba(255,255,255,.08);color:var(--mid)}
+.i-attach{background:rgba(255,255,255,.04);border:1px solid rgba(160,240,190,.14);color:var(--muted)}
+.i-attach:hover{background:rgba(255,255,255,.08);color:var(--lime-mid)}
+.att-chip{background:rgba(255,255,255,.05);border:1px solid rgba(160,240,190,.14)}
+.att-ic{background:rgba(255,255,255,.07)}
+.att-name{color:var(--deep)}
+.att-x:hover{color:var(--lime-mid);background:rgba(255,255,255,.08)}
+.ub-atts img{border:1px solid rgba(160,240,190,.18)}
+.ub-doc{background:rgba(255,255,255,.05);border:1px solid rgba(160,240,190,.14);color:var(--deep)}
+#toast{background:#0d2a1e;border:1px solid rgba(160,240,190,.22);color:#dff7e4}
 .i-analyze{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;font-weight:700;border-radius:12px;box-shadow:0 10px 26px rgba(67,224,143,.34),inset 0 1px 0 rgba(255,255,255,.55);transition:transform .15s,box-shadow .15s}
 .i-analyze:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 14px 34px rgba(67,224,143,.5),inset 0 1px 0 rgba(255,255,255,.55)}
 .i-analyze:disabled{opacity:.45;cursor:not-allowed}
@@ -1172,6 +1200,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
     <!-- Input dock -->
     <div class="i-dock">
       <div id="error-box" class="err-box" style="display:none"><span id="error-msg"></span></div>
+      <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none" onchange="onAttachInput(this)">
+      <div class="attach-chips" id="attach-chips"></div>
       <textarea id="match-input" rows="1" placeholder="Descreva uma partida ou faça uma pergunta…"></textarea>
       <div class="i-bar">
         <div class="i-selectors">
@@ -1194,6 +1224,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <span class="i-tok-c" id="i-tok-cost">$0.00</span>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+          <button class="i-attach" onclick="document.getElementById('attach-input').click()" title="Anexar imagem (ou cole com Ctrl+V)" aria-label="Anexar imagem">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
           <button class="i-clear" onclick="clearAll()" title="Limpar">↺</button>
           <button class="i-analyze" id="run-btn" onclick="toggleRun()">Analisar</button>
         </div>
@@ -1878,7 +1911,7 @@ function fmt(n){return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 let _lastQuery='';
-function showUserBubble(text){
+function showUserBubble(text,atts){
   _lastQuery=text;
   document.getElementById('empty-state').style.display='none';
   renderEmptyStateFeatured();
@@ -1886,11 +1919,68 @@ function showUserBubble(text){
   const ts=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const el=document.createElement('div');
   el.className='msg-user';
-  el.innerHTML=`<div class="user-bubble">${esc(text)}</div><div class="user-meta"><button class="ua-btn" onclick="copyUserMsg()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>copiar</button><span class="ua-ts">${ts} ✓</span></div>`;
+  let attsHtml='';
+  if(atts&&atts.length){
+    attsHtml='<div class="ub-atts">'+atts.map(a=>a.kind==='image'
+      ?`<img src="data:${a.mediaType};base64,${a.data}" alt="${esc(a.name)}">`
+      :`<span class="ub-doc">${a.kind==='pdf'?'📄':'📃'} ${esc(a.name)}</span>`).join('')+'</div>';
+  }
+  const bubbleHtml=text?`<div class="user-bubble">${esc(text)}</div>`:'';
+  el.innerHTML=`${attsHtml}${bubbleHtml}<div class="user-meta"><button class="ua-btn" onclick="copyUserMsg()"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>copiar</button><span class="ua-ts">${ts} ✓</span></div>`;
   document.getElementById('conversation').appendChild(el);
   scrollChat();
 }
 function copyUserMsg(){navigator.clipboard.writeText(_lastQuery).catch(()=>{});}
+
+// ─── Anexos (imagens) ───────────────────────────────────────────────────────
+// Mídia em base64 nunca entra no _chatThread (evita bloat de memória e re-cobrança
+// de tokens): é enviada só no turno em que é anexada; o histórico guarda um stub.
+let _attachments=[],_attSeq=0;
+const ATT_MAX_IMG=5*1024*1024;       // limite da API por imagem
+const ATT_MAX_COUNT=6;
+function _fmtBytes(n){return n<1024?n+'B':n<1048576?(n/1024).toFixed(0)+'KB':(n/1048576).toFixed(1)+'MB';}
+function toast(msg){
+  let t=document.getElementById('toast');
+  if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function onAttachInput(input){const files=[...input.files];input.value='';files.forEach(addAttachment);}
+function addAttachment(file){
+  if(_attachments.length>=ATT_MAX_COUNT){toast(`Máximo de ${ATT_MAX_COUNT} anexos por mensagem.`);return;}
+  const isImg=/^image\/(png|jpeg|webp|gif)$/.test(file.type);
+  if(!isImg){toast('Formato não suportado. Use PNG, JPG, WEBP ou GIF.');return;}
+  if(file.size>ATT_MAX_IMG){toast(`"${file.name}" excede 5MB.`);return;}
+  const reader=new FileReader();
+  reader.onerror=()=>toast('Falha ao ler o arquivo.');
+  reader.onload=()=>{
+    const data=String(reader.result).split(',')[1]||'';
+    if(!data){toast('Arquivo vazio ou ilegível.');return;}
+    _attachments.push({id:++_attSeq,kind:'image',name:file.name||'imagem',mediaType:file.type,data,size:file.size});
+    renderAttachChips();
+  };
+  reader.readAsDataURL(file);
+}
+function removeAttachment(id){_attachments=_attachments.filter(a=>a.id!==id);renderAttachChips();}
+function clearAttachments(){_attachments=[];renderAttachChips();}
+function renderAttachChips(){
+  const box=document.getElementById('attach-chips');if(!box)return;
+  box.innerHTML=_attachments.map(a=>{
+    const thumb=a.kind==='image'
+      ?`<img src="data:${a.mediaType};base64,${a.data}" alt="">`
+      :`<span class="att-ic">${a.kind==='pdf'?'📄':'📃'}</span>`;
+    return `<div class="att-chip">${thumb}<div class="att-meta"><span class="att-name">${esc(a.name)}</span><span class="att-sz">${_fmtBytes(a.size)}</span></div><button class="att-x" onclick="removeAttachment(${a.id})" title="Remover" aria-label="Remover anexo">×</button></div>`;
+  }).join('');
+}
+// Monta o conteúdo multimodal da API: blocos de mídia + texto. A mídia segue só neste turno.
+function buildUserContent(query,atts){
+  const blocks=[];
+  for(const a of atts){
+    if(a.kind==='image')blocks.push({type:'image',source:{type:'base64',media_type:a.mediaType,data:a.data}});
+  }
+  blocks.push({type:'text',text:query||'Analise o(s) anexo(s) acima no contexto de futebol / Copa do Mundo 2026.'});
+  return blocks;
+}
 
 // ─── Thinking ─────────────────────────────────────────────────────────────
 function startThinking(){
@@ -1955,6 +2045,7 @@ function updateTokenBar(){
 // ─── Clear ───────────────────────────────────────────────────────────────
 function clearAll(){
   _chatThread=[];_pendingQuery='';
+  clearAttachments();
   if(_currentView!=='chat')showView('chat');
   if(_running&&_abort){try{_abort.abort();}catch(e){}}
   document.getElementById('conversation').innerHTML='';
@@ -3447,6 +3538,13 @@ function taReset(ta){ta.value='';ta.style.height='';ta.rows=1;}
   ta.addEventListener('keydown',function(e){
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!_running)toggleRun();}
   });
+  // Colar imagem direto (Ctrl+V de print de escalação/formação)
+  ta.addEventListener('paste',function(e){
+    const items=e.clipboardData&&e.clipboardData.items;if(!items)return;
+    let handled=false;
+    for(const it of items){if(it.kind==='file'&&/^image\//.test(it.type)){const f=it.getAsFile();if(f){addAttachment(f);handled=true;}}}
+    if(handled)e.preventDefault();
+  });
 })();
 
 // ─── Live match panel ────────────────────────────────────────────────────
@@ -3922,9 +4020,10 @@ async function runChat(){
   if(_running)return;
   const apiKey=document.getElementById('api-key-input').value.trim();
   const query=document.getElementById('match-input').value.trim();
-  if(!query){document.getElementById('match-input').focus();return;}
-  showUserBubble(query);
-  const ta=document.getElementById('match-input');taReset(ta);
+  const atts=_attachments.slice();
+  if(!query&&!atts.length){document.getElementById('match-input').focus();return;}
+  showUserBubble(query,atts);
+  const ta=document.getElementById('match-input');taReset(ta);clearAttachments();
   if(!apiKey&&!getWorkerUrl()){
     showAgentBubble(t('no_key_chat'));
     return;
@@ -3932,15 +4031,20 @@ async function runChat(){
   _running=true;_abort=new AbortController();
   document.getElementById('error-box').style.display='none';
   setRunBtn(true);
-  _chatThread.push({role:'user',content:query});
+  // O thread guarda só texto (stub p/ anexos) — base64 jamais persiste no histórico.
+  const histStub=atts.length?[query,...atts.map(a=>`[anexo: ${a.name}]`)].filter(Boolean).join('\n'):query;
+  _chatThread.push({role:'user',content:histStub});
   const bubble=showAgentBubble('<span class="ldot" style="display:inline-block;margin:4px"></span>');
   startThinking();
   try{
     let trimmedThread=_chatThread.length>20?_chatThread.slice(-20):_chatThread;
     if(trimmedThread.length>0&&trimmedThread[0].role!=='user')trimmedThread=trimmedThread.slice(1);
-    const _chatBody={model:currentModel,max_tokens:2048,
+    // Mídia só no turno atual: substitui o stub final pelo conteúdo multimodal real.
+    let reqMessages=trimmedThread;
+    if(atts.length)reqMessages=trimmedThread.slice(0,-1).concat([{role:'user',content:buildUserContent(query,atts)}]);
+    const _chatBody={model:currentModel,max_tokens:atts.length?4096:2048,
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
-      messages:trimmedThread,stream:true};
+      messages:reqMessages,stream:true};
     if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
@@ -4050,6 +4154,7 @@ async function conversationalFallback(query,apiKey,reqHeaders,signal){
 function toggleRun(){
   if(_running){cancelAnalysis();return;}
   const q=document.getElementById('match-input').value.trim();
+  if(_attachments.length){runChat();return;}               // anexos → interpretação multimodal (chat)
   if(_chatThread.length>0&&!looksLikeMatchQuery(q)){runChat();}
   else if(looksLikeMatchQuery(q)){runAnalysis();}
   else{runChat();}

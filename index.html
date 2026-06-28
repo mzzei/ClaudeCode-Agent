@@ -416,6 +416,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .sf input[type=password]{width:100%;box-sizing:border-box;background:var(--cream-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--deep);font-family:var(--sans);margin-top:2px;margin-bottom:.6rem}
 .sf input[type=password]:focus{outline:none;border-color:rgba(200,86,60,.4)}
 #api-key-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.68rem .9rem;font-family:var(--sans);font-size:14px;color:var(--deep);outline:none;transition:border-color .2s}
+.sf textarea{width:100%;box-sizing:border-box;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.6rem .8rem;font-family:var(--sans);font-size:13px;color:var(--deep);outline:none;transition:border-color .2s;resize:vertical;line-height:1.5;margin-bottom:.3rem}
+.sf textarea:focus{border-color:rgba(200,86,60,.4)}
 #api-key-input:focus{border-color:rgba(130,70,55,.38)}
 #api-key-input::placeholder{color:var(--muted)}
 #worker-url-input{width:100%;background:var(--cream-card);border:1px solid var(--border);border-radius:10px;padding:.68rem .9rem;font-family:var(--sans);font-size:13px;color:var(--deep);outline:none;transition:border-color .2s}
@@ -984,6 +986,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .lp-loading{display:flex;align-items:center;justify-content:center;height:160px;gap:6px;color:var(--muted);font-size:12px}
 #api-key-input,#worker-url-input,.sf input[type=password]{background:rgba(0,0,0,.25);border:1px solid rgba(160,240,190,.14);color:var(--deep);border-radius:12px}
 #api-key-input:focus,#worker-url-input:focus,.sf input[type=password]:focus{border-color:rgba(160,240,190,.36);outline:none}
+.sf textarea{background:rgba(0,0,0,.25);border:1px solid rgba(160,240,190,.14);color:var(--deep);border-radius:12px}
+.sf textarea:focus{border-color:rgba(160,240,190,.36);outline:none}
 #api-key-input::placeholder,#worker-url-input::placeholder{color:var(--muted)}
 .sf input[type=password]:focus{outline:none}
 
@@ -1365,6 +1369,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="sf-hint" style="color:var(--terra);margin-top:.3rem">⚠ Não compartilhe este arquivo publicamente — a chave ficaria exposta.</div>
     </div>
     <div class="sf">
+      <label class="sf-lbl" for="persona-input">Personalização do agente</label>
+      <textarea id="persona-input" rows="3" placeholder="Ex.: Me chame de 'chefe'. Seja informal, bem-humorado e use jargão de boleiro. Vá direto ao ponto." oninput="savePersona(this.value)"></textarea>
+      <div class="sf-hint">Define <b>como o agente fala com você</b> — nome, tom, humor, formato. Não altera a precisão das análises, os dados nem a estrutura das respostas; só o jeito de se dirigir a você. Guardado neste navegador.</div>
+    </div>
+    <div class="sf">
       <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <input type="checkbox" id="auto-ai-toggle" onchange="setAutoAi(this.checked)" style="width:auto;margin:0;cursor:pointer">
         Enriquecer dados via IA automaticamente
@@ -1564,6 +1573,17 @@ function looksLikeMatchQuery(t){
   if(/^(qual|quais|o que|oque|como|por que|porque|porquê|quando|onde|quem|quanto|quantos|vale a pena|voc[eê] acha|me fala|me diga|fale|diga|explique|compare|prefere|melhor|pior|acha que|o que voc[eê])\b/i.test(s))return false;
   // "Time A x Time B" — confronto direto sem ser pergunta
   return /\b[\wÀ-ÿ][\wÀ-ÿ.\-]*(?:\s+[\wÀ-ÿ.\-]+)*\s+(x|vs|×|contra)\s+[\wÀ-ÿ][\wÀ-ÿ.\-]*(?:\s+[\wÀ-ÿ.\-]+)*/i.test(s);
+}
+
+// ── Personalização do agente (tom/tratamento) — guardada no navegador ──
+const PERSONA_STORE='copa2026_persona_v1';
+function getUserPersona(){try{return (localStorage.getItem(PERSONA_STORE)||'').trim();}catch{return'';}}
+function savePersona(v){try{if(v&&v.trim())localStorage.setItem(PERSONA_STORE,v);else localStorage.removeItem(PERSONA_STORE);}catch{}}
+// Bloco injetado nos prompts: molda SÓ o tom/tratamento, sem mexer em rigor analítico, dados ou estrutura.
+function personaBlock(){
+  const p=getUserPersona();
+  if(!p)return'';
+  return `\n\nPREFERÊNCIAS DO USUÁRIO (afetam APENAS o tom e a forma de se dirigir ao usuário — NÃO altere a precisão analítica, os dados/fatos, nem a estrutura/formato exigido da resposta; se um pedido aqui conflitar com a exatidão ou com o formato, priorize a exatidão e o formato):\n${p.slice(0,800)}`;
 }
 function simpleMd(t){
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1783,7 +1803,7 @@ function parseRateLimitHeaders(res){
   if(tl){rlState.tokLimit=tl;rlState.tokRemaining=tr;rlState.tokReset=ts;}
   if(rl){rlState.reqLimit=rl;rlState.reqRemaining=rr;}
 }
-function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();const aa=document.getElementById('auto-ai-toggle');if(aa)aa.checked=autoAiEnabled();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
+function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();const aa=document.getElementById('auto-ai-toggle');if(aa)aa.checked=autoAiEnabled();const pe=document.getElementById('persona-input');if(pe)pe.value=getUserPersona();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
 function updateSettingsTokens(){
   const tot=tokenState.sessionIn+tokenState.sessionOut;
   const emptyEl=document.getElementById('sf-tok-empty');
@@ -4160,7 +4180,9 @@ FONTES DE DADOS (ordem de prioridade, para consumo racional de tokens):
 2. Seu próprio conhecimento de futebol para tática, história, contexto e interpretação.
 3. web_search (busca na internet): use APENAS em extrema necessidade — quando o usuário pedir algo factual e recente que os DADOS DA ESPN e seu conhecimento não cobrem (ex.: lesão de última hora, notícia específica). Evite buscar na web o que já está nos dados da ESPN.
 
-Se um jogo pedido não aparecer nos dados da ESPN (ainda não disputado ou fora do registro), diga isso claramente em vez de inventar um placar.`;
+Se um jogo pedido não aparecer nos dados da ESPN (ainda não disputado ou fora do registro), diga isso claramente em vez de inventar um placar.
+
+CAPACIDADES E ANEXOS: Você PODE interpretar imagens e documentos (PDF, texto) que o usuário anexa — eles chegam junto da mensagem. NUNCA afirme que "não lê PDFs/imagens" ou que "sua interface só recebe texto": ela processa anexos normalmente. Se uma mensagem mencionar um anexo (ex.: "[anexo: relatorio.pdf]") mas o CONTEÚDO do arquivo não estiver presente nesta mensagem, é porque o anexo foi enviado num turno anterior e não acompanha o pedido atual — nesse caso, peça gentilmente para o usuário reanexar o arquivo para refazer a análise, em vez de negar a capacidade.${personaBlock()}`;
 }
 
 // Conversational fallback when the structured pipeline can't complete

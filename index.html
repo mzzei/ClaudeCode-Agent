@@ -4035,6 +4035,35 @@ RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 {"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Conversational chat ─────────────────────────────────────────────────
+// Detecta se a pergunta pede dados REAIS (resultado/placar/classificação/estado atual).
+// Anexos (ex.: relatório pré-jogo) quase sempre referenciam um jogo cujo resultado o usuário quer comparar.
+function _chatNeedsLiveData(q,hasAtts){
+  if(hasAtts)return true;
+  // Radicais (sem \b final): "venc" casa "venceu", "encerr" casa "encerrado", "classifica" casa "classificação".
+  return /\b(resultado|placar|ganh|venc|perd|empat|gol|classifica|tabela|como foi|encerr|termin|acab|quanto foi|vencedor|eliminad|avanç|próxim|proxim|quando joga|agenda|calend|ao vivo|jogou|marcou|sofreu|saldo|líder|lider|ponto)/i.test(q||'');
+}
+// Coleta dados reais da Copa pela ESPN (fonte gratuita JÁ integrada) — barato em tokens,
+// sem ingestão de páginas web. Reaproveita o repertório existente do agente.
+async function gatherEspnForChat(){
+  try{
+    const [results,standings,scoreboard]=await Promise.all([
+      _loadCopaResults().catch(()=>null),
+      getEspnStandings().catch(()=>null),
+      getEspnScoreboard().catch(()=>null)
+    ]);
+    const L=[];
+    if(results&&results.length){
+      L.push('=== RESULTADOS DO TORNEIO (ESPN · jogos finalizados) ===');
+      results.slice(-80).forEach(r=>L.push(`${r.data}  ${r.mandante} ${r.placar} ${r.visitante}`));
+    }
+    if(standings||scoreboard){
+      const ctx=formatEspnContext(standings,scoreboard); // classificação + ao vivo + próximas
+      if(ctx)L.push(ctx);
+    }
+    return L.join('\n').trim();
+  }catch(e){return '';}
+}
+
 async function runChat(){
   if(_running)return;
   const apiKey=document.getElementById('api-key-input').value.trim();
@@ -4056,14 +4085,29 @@ async function runChat(){
   const bubble=showAgentBubble('<span class="ldot" style="display:inline-block;margin:4px"></span>');
   startThinking();
   try{
+    // ── Dados reais via ESPN (repertório já integrado) ANTES do modelo: barato e sem
+    // ingestão de páginas. Só busca quando a pergunta/anexo pede fatos atuais.
+    let liveData='';
+    if(_chatNeedsLiveData(query,atts.length)){
+      const lbl=document.getElementById('thk-label');if(lbl)lbl.textContent='consultando dados (ESPN)…';
+      liveData=await gatherEspnForChat();
+    }
+    const effectiveQuery=liveData
+      ? `${query||'(sem texto — analise o anexo)'}\n\n=== DADOS REAIS DA COPA 2026 · fonte ESPN · trate como FATOS CONFIRMADOS ===\n${liveData}`
+      : query;
     let trimmedThread=_chatThread.length>20?_chatThread.slice(-20):_chatThread;
     if(trimmedThread.length>0&&trimmedThread[0].role!=='user')trimmedThread=trimmedThread.slice(1);
-    // Mídia só no turno atual: substitui o stub final pelo conteúdo multimodal real.
+    // Mídia/dados ESPN só no turno atual (efêmeros): substitui o stub final pelo conteúdo real.
     let reqMessages=trimmedThread;
-    if(atts.length)reqMessages=trimmedThread.slice(0,-1).concat([{role:'user',content:buildUserContent(query,atts)}]);
-    const _chatBody={model:currentModel,max_tokens:atts.length?4096:2048,
+    if(atts.length||liveData){
+      const lastContent=atts.length?buildUserContent(effectiveQuery,atts):effectiveQuery;
+      reqMessages=trimmedThread.slice(0,-1).concat([{role:'user',content:lastContent}]);
+    }
+    const _chatBody={model:currentModel,max_tokens:(atts.length||liveData)?4096:2048,
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
-      messages:reqMessages,stream:true};
+      messages:reqMessages,stream:true,
+      // web_search como ÚLTIMO recurso (extrema necessidade): lesões/notícias que a ESPN não cobre.
+      tools:[{type:'web_search_20250305',name:'web_search',max_uses:1}]};
     if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
@@ -4109,7 +4153,14 @@ function analystSystemPrompt(){
 
 Você é o WorldCup Agent, uma IA analista de futebol especializada na Copa do Mundo 2026. Atue como um analista de verdade: interprete livremente o que o usuário pede e cubra um leque amplo de pedidos sobre futebol e a Copa — análises de partidas, táticas, escalações, formações, jogadores, históricos e confrontos diretos, prognósticos, comparações, cenários hipotéticos, regras, estatísticas, curiosidades e contexto do torneio.
 
-Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.`;
+Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.
+
+FONTES DE DADOS (ordem de prioridade, para consumo racional de tokens):
+1. DADOS REAIS DA COPA (ESPN): quando a mensagem incluir um bloco "=== DADOS REAIS DA COPA 2026 · fonte ESPN ===", ele traz resultados/placares de jogos finalizados, jogos ao vivo, próximas partidas e classificação — tudo REAL e atualizado. Trate esses dados como FATOS CONFIRMADOS. NUNCA diga que não tem acesso a resultados/placares se eles estiverem nesse bloco — localize o jogo pedido e responda com o placar real. Baseie estatísticas (gols, saldo, pontos, forma) nesses dados.
+2. Seu próprio conhecimento de futebol para tática, história, contexto e interpretação.
+3. web_search (busca na internet): use APENAS em extrema necessidade — quando o usuário pedir algo factual e recente que os DADOS DA ESPN e seu conhecimento não cobrem (ex.: lesão de última hora, notícia específica). Evite buscar na web o que já está nos dados da ESPN.
+
+Se um jogo pedido não aparecer nos dados da ESPN (ainda não disputado ou fora do registro), diga isso claramente em vez de inventar um placar.`;
 }
 
 // Conversational fallback when the structured pipeline can't complete

@@ -1200,7 +1200,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
     <!-- Input dock -->
     <div class="i-dock">
       <div id="error-box" class="err-box" style="display:none"><span id="error-msg"></span></div>
-      <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none" onchange="onAttachInput(this)">
+      <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.pdf,.txt,.md,.markdown,.csv" multiple style="display:none" onchange="onAttachInput(this)">
       <div class="attach-chips" id="attach-chips"></div>
       <textarea id="match-input" rows="1" placeholder="Descreva uma partida ou faça uma pergunta…"></textarea>
       <div class="i-bar">
@@ -1224,7 +1224,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <span class="i-tok-c" id="i-tok-cost">$0.00</span>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
-          <button class="i-attach" onclick="document.getElementById('attach-input').click()" title="Anexar imagem (ou cole com Ctrl+V)" aria-label="Anexar imagem">
+          <button class="i-attach" onclick="document.getElementById('attach-input').click()" title="Anexar imagem, PDF ou texto (ou cole imagem com Ctrl+V)" aria-label="Anexar arquivo">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
           <button class="i-clear" onclick="clearAll()" title="Limpar">↺</button>
@@ -1937,6 +1937,8 @@ function copyUserMsg(){navigator.clipboard.writeText(_lastQuery).catch(()=>{});}
 // de tokens): é enviada só no turno em que é anexada; o histórico guarda um stub.
 let _attachments=[],_attSeq=0;
 const ATT_MAX_IMG=5*1024*1024;       // limite da API por imagem
+const ATT_MAX_PDF=12*1024*1024;      // PDF base64 (cuidado: cada página consome muitos tokens)
+const ATT_MAX_TXT=200*1024;          // texto inline (.txt/.md/.csv) — ~50k tokens no pior caso
 const ATT_MAX_COUNT=6;
 function _fmtBytes(n){return n<1024?n+'B':n<1048576?(n/1024).toFixed(0)+'KB':(n/1048576).toFixed(1)+'MB';}
 function toast(msg){
@@ -1948,19 +1950,33 @@ function toast(msg){
 function onAttachInput(input){const files=[...input.files];input.value='';files.forEach(addAttachment);}
 function addAttachment(file){
   if(_attachments.length>=ATT_MAX_COUNT){toast(`Máximo de ${ATT_MAX_COUNT} anexos por mensagem.`);return;}
+  const name=file.name||'arquivo';
   const isImg=/^image\/(png|jpeg|webp|gif)$/.test(file.type);
-  if(!isImg){toast('Formato não suportado. Use PNG, JPG, WEBP ou GIF.');return;}
-  if(file.size>ATT_MAX_IMG){toast(`"${file.name}" excede 5MB.`);return;}
+  const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(name);
+  const isTxt=/^text\//.test(file.type)||/\.(txt|md|markdown|csv|log|json|tsv)$/i.test(name);
+  if(isImg){
+    if(file.size>ATT_MAX_IMG){toast(`"${name}" excede 5MB.`);return;}
+    _readB64(file,data=>_pushAtt({kind:'image',name,mediaType:file.type,data,size:file.size}));
+  }else if(isPdf){
+    if(file.size>ATT_MAX_PDF){toast(`"${name}" excede 12MB.`);return;}
+    _readB64(file,data=>{_pushAtt({kind:'pdf',name,mediaType:'application/pdf',data,size:file.size});if(file.size>3*1024*1024)toast('PDF grande — pode consumir muitos tokens (cada página conta).');});
+  }else if(isTxt){
+    if(file.size>ATT_MAX_TXT){toast(`"${name}" excede 200KB.`);return;}
+    const reader=new FileReader();
+    reader.onerror=()=>toast('Falha ao ler o arquivo.');
+    reader.onload=()=>{const txt=String(reader.result||'');if(!txt.trim()){toast('Arquivo de texto vazio.');return;}_pushAtt({kind:'text',name,data:txt,size:file.size});};
+    reader.readAsText(file);
+  }else{
+    toast('Formato não suportado. Use imagem, PDF ou texto (.txt/.md/.csv).');
+  }
+}
+function _readB64(file,cb){
   const reader=new FileReader();
   reader.onerror=()=>toast('Falha ao ler o arquivo.');
-  reader.onload=()=>{
-    const data=String(reader.result).split(',')[1]||'';
-    if(!data){toast('Arquivo vazio ou ilegível.');return;}
-    _attachments.push({id:++_attSeq,kind:'image',name:file.name||'imagem',mediaType:file.type,data,size:file.size});
-    renderAttachChips();
-  };
+  reader.onload=()=>{const data=String(reader.result).split(',')[1]||'';if(!data){toast('Arquivo vazio ou ilegível.');return;}cb(data);};
   reader.readAsDataURL(file);
 }
+function _pushAtt(att){att.id=++_attSeq;_attachments.push(att);renderAttachChips();}
 function removeAttachment(id){_attachments=_attachments.filter(a=>a.id!==id);renderAttachChips();}
 function clearAttachments(){_attachments=[];renderAttachChips();}
 function renderAttachChips(){
@@ -1977,6 +1993,8 @@ function buildUserContent(query,atts){
   const blocks=[];
   for(const a of atts){
     if(a.kind==='image')blocks.push({type:'image',source:{type:'base64',media_type:a.mediaType,data:a.data}});
+    else if(a.kind==='pdf')blocks.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:a.data}});
+    else if(a.kind==='text')blocks.push({type:'text',text:`--- Documento anexado: "${a.name}" ---\n${a.data}\n--- fim de "${a.name}" ---`});
   }
   blocks.push({type:'text',text:query||'Analise o(s) anexo(s) acima no contexto de futebol / Copa do Mundo 2026.'});
   return blocks;

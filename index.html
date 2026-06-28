@@ -1521,7 +1521,17 @@ let _libFilter    = 'todos';
 let _chatThread   = [];
 let currentLang   = (()=>{try{return localStorage.getItem('copa2026_lang')||'pt';}catch{return'pt';}})();
 
-function looksLikeMatchQuery(t){return /\bPARTIDA\b|(\w[\w\s]*\s+(x|vs|×|contra)\s+[\w\s]+\w)/i.test(t)&&t.length>8;}
+function looksLikeMatchQuery(t){
+  const s=(t||'').trim();
+  if(s.length<=8)return false;
+  if(/\bPARTIDA\b/i.test(s))return true;                       // gatilho explícito (clique em jogo destaque)
+  // Perguntas/opiniões livres NÃO são análise de partida — vão ao chat leve (sem busca, barato),
+  // mesmo contendo "x/vs/contra" (ex.: "4-3-3 vs 4-4-2?", "Compare Brasil e Argentina").
+  if(/[?]\s*$/.test(s))return false;
+  if(/^(qual|quais|o que|oque|como|por que|porque|porquê|quando|onde|quem|quanto|quantos|vale a pena|voc[eê] acha|me fala|me diga|fale|diga|explique|compare|prefere|melhor|pior|acha que|o que voc[eê])\b/i.test(s))return false;
+  // "Time A x Time B" — confronto direto sem ser pergunta
+  return /\b[\wÀ-ÿ][\wÀ-ÿ.\-]*(?:\s+[\wÀ-ÿ.\-]+)*\s+(x|vs|×|contra)\s+[\wÀ-ÿ][\wÀ-ÿ.\-]*(?:\s+[\wÀ-ÿ.\-]+)*/i.test(s);
+}
 function simpleMd(t){
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
@@ -3928,7 +3938,7 @@ async function runChat(){
   try{
     let trimmedThread=_chatThread.length>20?_chatThread.slice(-20):_chatThread;
     if(trimmedThread.length>0&&trimmedThread[0].role!=='user')trimmedThread=trimmedThread.slice(1);
-    const _chatBody={model:currentModel,max_tokens:1024,
+    const _chatBody={model:currentModel,max_tokens:2048,
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
       messages:trimmedThread,stream:true};
     if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};

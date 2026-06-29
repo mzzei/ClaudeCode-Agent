@@ -1464,22 +1464,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 // ─── Constants ───────────────────────────────────────────────────────────
 const MODEL_CTX   = {'claude-haiku-4-5-20251001':200000,'claude-sonnet-4-6':200000,'claude-opus-4-8':200000};
 const MODEL_SHORT = {'claude-haiku-4-5-20251001':'Haiku 4.5','claude-sonnet-4-6':'Sonnet 4.6','claude-opus-4-8':'Opus 4.8'};
-// effort = mecanismo nativo (adaptive thinking + output_config.effort) nos modelos 4.6+.
-// budget = fallback p/ Haiku 4.5 e modelos antigos, que NÃO suportam effort (usam o thinking
-// clássico por orçamento de tokens). Mapeamento conservador: o padrão (Padrão) não pensa.
 const EFFORT_LEVELS = [
-  {label:'Padrão',effort:null,budget:0},{label:'Leve',effort:'low',budget:2000},{label:'Médio',effort:'medium',budget:5000},
-  {label:'Alto',effort:'high',budget:10000},{label:'Máximo',effort:'max',budget:16000}
+  {label:'Padrão',budget:0},{label:'Leve',budget:2000},{label:'Médio',budget:5000},
+  {label:'Alto',budget:10000},{label:'Máximo',budget:16000}
 ];
-// Modelos que usam adaptive thinking + effort (API atual). Haiku 4.5/antigos caem no fallback
-// de budget_tokens. NUNCA mandar budget_tokens/temperature p/ Opus 4.8/4.7 (retorna 400).
-function supportsAdaptive(model){return /claude-(sonnet-4-6|opus-4-8|opus-4-7|opus-4-6|fable-5)/.test(model||'');}
-// web_search ingere o conteúdo das páginas como tokens — maior gasto e NÃO é raciocínio.
-// Restringir a busca a fontes de alto rigor estatístico corta páginas de baixo sinal
-// (blogs, agregadores), reduzindo tokens ingeridos E melhorando a qualidade dos dados.
-const WEB_ALLOWLIST=['sofascore.com','fbref.com','transfermarkt.com','transfermarkt.com.br','espn.com','espn.com.br','ge.globo.com','understat.com','whoscored.com','bbc.com','goal.com'];
-// Buscas web por nível de esforço (Padrão→Máximo). Escala com o esforço para manter o
-// consumo congruente: a profundidade vem do thinking, não da coleta.
+// Buscas web por nível de esforço (Padrão→Máximo). web_search ingere o conteúdo das
+// páginas como tokens — é o maior gasto e NÃO é raciocínio. Escala com o esforço para
+// manter o consumo congruente: a profundidade vem do thinking budget acima, não da coleta.
 const EFFORT_SEARCHES = [1,1,2,3,3];
 // Country → ISO 3166-1 alpha-2 (flagcdn.com codes). Flag emoji don't render on Windows,
 // so we render real flag images instead. Keys in both Portuguese and English so ESPN API
@@ -3966,7 +3957,7 @@ Extraia placares, classificação do grupo, xG e estilo diretamente das páginas
   let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)
   for(let i=0;i<4;i++){
     if(signal.aborted)throw new Error('cancelled');
-    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:_maxUses,allowed_domains:WEB_ALLOWLIST}]}),signal});
+    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:_maxUses}]}),signal});
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
     const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
@@ -4136,7 +4127,7 @@ async function runChat(){
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
       messages:reqMessages,stream:true,
       // web_search como ÚLTIMO recurso (extrema necessidade): lesões/notícias que a ESPN não cobre.
-      tools:[{type:'web_search_20250305',name:'web_search',max_uses:1,allowed_domains:WEB_ALLOWLIST}]};
+      tools:[{type:'web_search_20250305',name:'web_search',max_uses:1}]};
     if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
@@ -4322,12 +4313,8 @@ async function runAnalysis(){
     // budget de raciocínio porque thinking consome desse mesmo teto.
     const baseBody={model:currentModel,max_tokens:9000+(effort.budget>0?effort.budget:0),system:[{type:'text',text:sysText,cache_control:{type:'ephemeral'}}]};
     if(getWorkerUrl())baseBody.diagnostics={previous_message_id:_lastAnalysisId};
-    if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search',max_uses:4,allowed_domains:WEB_ALLOWLIST}];
-    // Raciocínio: adaptive + effort (API atual) nos modelos 4.6+; budget_tokens só no fallback Haiku.
-    if(effort.effort){
-      if(supportsAdaptive(currentModel)){baseBody.thinking={type:'adaptive'};baseBody.output_config={effort:effort.effort};}
-      else{baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
-    }
+    if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search',max_uses:4}];
+    if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
     let _newAnalysisId=null;
 
@@ -4390,8 +4377,7 @@ async function runAnalysis(){
         {role:'user',content:'Retorne APENAS o JSON estruturado da análise, começando com { e terminando com }, sem texto antes ou depois, sem blocos de código markdown.'}
       ];
       const retryBody={...baseBody,messages:retryMessages};
-      delete retryBody.tools;delete retryBody.thinking;delete retryBody.temperature;delete retryBody.output_config;
-      if(supportsAdaptive(currentModel))retryBody.output_config={effort:'low'};   // reenvio enxuto, sem raciocínio
+      delete retryBody.tools;delete retryBody.thinking;delete retryBody.temperature;
       retryBody.max_tokens=Math.max(retryBody.max_tokens||0,9000);
       const retryR=await streamOnce(retryBody,reqHeaders,(upd)=>updateThinkingToks({...upd,phase:2}),_abort.signal).catch(()=>null);
       if(retryR){lastOut+=retryR.outTokens||0;parsed=parseAnalysisJson(retryR.text);}

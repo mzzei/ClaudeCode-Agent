@@ -3933,24 +3933,24 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     fdCtx=formatEspnContext(standings,scoreboard);
   }
   const hasFd=!!fdCtx;
-  const SCHEMA='{"mandante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
+  const SCHEMA='{"mandante":{"nome":"","tecnico":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
   // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
   // esforço: a 1ª busca é abrangente e a forma já vem do ESPN/API de graça. O esforço só
   // adiciona buscas que APROFUNDAM/cruzam fontes — não destrava tópicos. A profundidade de
   // raciocínio vem do thinking budget da Fase 2, separada da coleta.
   const topics=hasFd?[
-    '"[Mandante] [Visitante] Copa 2026 lesões suspensões escalação provável xG estilo tático" — Sofascore, Transfermarkt, fbref (cubra lesões, escalação, xG e estilo numa busca)',
-    '"[Mandante] desfalques e [Visitante] vulnerabilidades defensivas Copa 2026 esquema tático" — Globo Esporte, Goal (aprofunda tática e desfalques)',
+    '"[Mandante] [Visitante] Copa 2026 técnico atual lesões suspensões escalação provável xG estilo tático" — Sofascore, Transfermarkt, fbref (cubra TÉCNICO ATUAL, lesões, escalação, xG e estilo numa busca)',
+    '"[Mandante] desfalques e [Visitante] vulnerabilidades defensivas Copa 2026 esquema tático treinador" — Globo Esporte, Goal (aprofunda técnico, tática e desfalques)',
     '"[Mandante] [Visitante] Copa 2026 fbref xG expected goals estatísticas avançadas" — fbref, Understat (aprofunda xG/estatística)'
   ]:[
-    '"[Mandante] [Visitante] Copa 2026 forma recente resultados lesões escalação provável" — ESPN, Sofascore, Transfermarkt (cubra forma, lesões e escalação)',
-    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas" — fbref, Sofascore (cubra xG e tática)',
+    '"[Mandante] [Visitante] Copa 2026 técnico atual forma recente resultados lesões escalação provável" — ESPN, Sofascore, Transfermarkt (cubra TÉCNICO ATUAL, forma, lesões e escalação)',
+    '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas treinador" — fbref, Sofascore (cubra técnico, xG e tática)',
     '"[Mandante] [Visitante] Copa 2026 classificação grupo estatísticas fbref" — fbref, ESPN (aprofunda dados/estatística)'
   ];
   const _maxUses=Math.max(1,Math.min(maxSearches??topics.length,topics.length));
   const _dir=topics.slice(0,_maxUses).map((s,i)=>`${'①②③④'[i]} ${s}`).join('\n');
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. Declare em "lacunas" só o que realmente não encontrar.';
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. GROUNDING (crítico): extraia TÉCNICO, ESCALAÇÃO e JOGADORES SOMENTE do que as buscas retornarem. Seu conhecimento próprio sobre técnicos/elencos é de 2024-2025 e está DESATUALIZADO para a Copa 2026 (times trocaram de treinador e de jogadores). Se não encontrar um dado nas buscas, deixe o campo vazio e registre em "lacunas" — NUNCA preencha de memória.';
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
@@ -4048,6 +4048,8 @@ PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados sã
 
 OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais. Se um dado estiver ausente (lacuna), declare-o na seção "lacunas" sem inventar.
 
+GROUNDING TEMPORAL (CRÍTICO — erro mais grave a evitar): seu conhecimento de treino sobre TÉCNICOS, ESCALAÇÕES e ELENCOS é de 2024-2025 e está DESATUALIZADO para a Copa 2026 — seleções trocaram de treinador e de jogadores. NUNCA afirme nome de técnico, escalação ou jogador específico a partir do seu conhecimento próprio. Use SOMENTE o que vier nos FATOS COLETADOS e no CONTEXTO DO TORNEIO. Se o técnico (campo "tecnico"), a escalação ou um jogador-chave NÃO estiverem nos dados coletados, escreva "a confirmar" no campo e registre em "lacunas" — não preencha de memória. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
+
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual
 2. Verifique se os times já estão classificados, eliminados ou precisam de resultado específico
@@ -4064,7 +4066,7 @@ METODOLOGIA:
    - "media": probabilidade ≥45% com dados parciais mas coerentes
    - "baixa": apenas se a sugestão tiver valor estratégico excepcional; justifique explicitamente
    Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
-6. ANÁLISE DE TÉCNICOS: use os dados coletados sobre os treinadores. Preencha tecnico_mandante e tecnico_visitante com nome, formação habitual, filosofia de jogo, ajustes na Copa 2026 e como o perfil tático afeta os mercados
+6. ANÁLISE DE TÉCNICOS: use APENAS o nome de técnico que vier nos FATOS COLETADOS (campo "tecnico" de cada time). Se vier, preencha tecnico_mandante/tecnico_visitante com nome + formação, filosofia, ajustes e impacto nos mercados. Se o campo "tecnico" estiver vazio nos dados, preencha "nome" com "a confirmar" e registre em "lacunas" — NÃO deduza o treinador de memória (ele pode ter mudado desde 2024-2025)
 7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.

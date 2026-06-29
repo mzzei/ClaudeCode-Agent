@@ -1381,6 +1381,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div class="sf-hint">Desligado (padrão · economia): no automático usa só dados gratuitos do ESPN — créditos da API são gastos <b>somente nas análises que você pede</b>. Ligado: ao abrir, a IA pesquisa classificação/contexto extra (consome créditos).</div>
     </div>
     <div class="sf">
+      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="dynsearch-toggle" onchange="setDynSearch(this.checked)" style="width:auto;margin:0;cursor:pointer">
+        Filtragem dinâmica na busca (experimental)
+      </label>
+      <div class="sf-hint">Roda a coleta (Fase 1) no <b>Sonnet</b> com <code>web_search_20260209</code>, que filtra as páginas antes de entrarem no contexto. <b>Reduz a contagem de tokens, mas tende a aumentar o custo em $</b> (Sonnet custa ~3,75× o Haiku). Se o seu acesso não suportar, volta sozinho à busca padrão. Padrão: desligado.</div>
+    </div>
+    <div class="sf">
       <label class="sf-lbl" for="worker-url-input">Worker URL (Cloudflare)</label>
       <input id="worker-url-input" type="text" placeholder="https://worldcup-proxy.gcerqueira2012.workers.dev" autocomplete="off" oninput="saveWorkerUrl(this.value)">
       <div class="sf-hint">Quando ativo, a API Key não precisa ficar no browser · chave guardada no Cloudflare</div>
@@ -1803,7 +1810,7 @@ function parseRateLimitHeaders(res){
   if(tl){rlState.tokLimit=tl;rlState.tokRemaining=tr;rlState.tokReset=ts;}
   if(rl){rlState.reqLimit=rl;rlState.reqRemaining=rr;}
 }
-function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();const aa=document.getElementById('auto-ai-toggle');if(aa)aa.checked=autoAiEnabled();const pe=document.getElementById('persona-input');if(pe)pe.value=getUserPersona();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
+function openSettings(){document.getElementById('sov').style.display='flex';const w=document.getElementById('worker-url-input');if(w)w.value=getWorkerUrl();const aa=document.getElementById('auto-ai-toggle');if(aa)aa.checked=autoAiEnabled();const ds=document.getElementById('dynsearch-toggle');if(ds)ds.checked=getDynSearch();const pe=document.getElementById('persona-input');if(pe)pe.value=getUserPersona();document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang));updateSettingsTokens();}
 function updateSettingsTokens(){
   const tot=tokenState.sessionIn+tokenState.sessionOut;
   const emptyEl=document.getElementById('sf-tok-empty');
@@ -1814,7 +1821,8 @@ function updateSettingsTokens(){
   emptyEl.style.display='none';costCard.style.display='';rowsEl.style.display='';
   const haikuP=MODEL_PRICE['claude-haiku-4-5-20251001'];
   const mainP=MODEL_PRICE[currentModel]||MODEL_PRICE['claude-sonnet-4-6'];
-  const p1Cost=(tokenState.sessionIn_p1*haikuP.i+tokenState.sessionOut_p1*haikuP.o)/1e6;
+  const p1P=getDynSearch()?(MODEL_PRICE['claude-sonnet-4-6']):haikuP; // filtragem dinâmica roda no Sonnet
+  const p1Cost=(tokenState.sessionIn_p1*p1P.i+tokenState.sessionOut_p1*p1P.o)/1e6;
   const p2In=tokenState.sessionIn-tokenState.sessionIn_p1,p2Out=tokenState.sessionOut-tokenState.sessionOut_p1;
   const cost=p1Cost+(p2In*mainP.i+p2Out*mainP.o)/1e6;
   document.getElementById('sf-tok-cost').textContent=_fmtCost(cost);
@@ -1872,7 +1880,8 @@ function updateDockTokens(){
   // Phase 1 always uses Haiku regardless of selected model; price each phase separately
   const haikuP=MODEL_PRICE['claude-haiku-4-5-20251001'];
   const mainP=MODEL_PRICE[currentModel]||MODEL_PRICE['claude-sonnet-4-6'];
-  const p1Cost=(tokenState.sessionIn_p1*haikuP.i+tokenState.sessionOut_p1*haikuP.o)/1e6;
+  const p1P=getDynSearch()?(MODEL_PRICE['claude-sonnet-4-6']):haikuP; // filtragem dinâmica roda no Sonnet
+  const p1Cost=(tokenState.sessionIn_p1*p1P.i+tokenState.sessionOut_p1*p1P.o)/1e6;
   const p2In=tokenState.sessionIn-tokenState.sessionIn_p1;
   const p2Out=tokenState.sessionOut-tokenState.sessionOut_p1;
   const cost=p1Cost+(p2In*mainP.i+p2Out*mainP.o)/1e6;
@@ -3491,6 +3500,10 @@ const KEY_STORE='copa2026_api_key';
 const AUTO_AI_STORE='copa2026_auto_ai';
 function autoAiEnabled(){try{return localStorage.getItem(AUTO_AI_STORE)==='1';}catch{return false;}}
 function setAutoAi(on){try{localStorage.setItem(AUTO_AI_STORE,on?'1':'0');}catch{}if(on){loadTournamentCtx(true);}}
+// Filtragem dinâmica (experimental, opt-in): Fase 1 no Sonnet + web_search_20260209.
+const DYN_SEARCH_STORE='copa2026_dynsearch';
+function getDynSearch(){try{return localStorage.getItem(DYN_SEARCH_STORE)==='1';}catch{return false;}}
+function setDynSearch(on){try{localStorage.setItem(DYN_SEARCH_STORE,on?'1':'0');}catch{}}
 let _keyDebounce=null;
 document.getElementById('api-key-input').addEventListener('input',function(){
   clearTimeout(_keyDebounce);
@@ -3954,10 +3967,22 @@ ${_dir}
 ${_coverNote}
 Extraia placares, classificação do grupo, xG e estilo diretamente das páginas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
-  let accIn=0,accOut=0; // acumula uso do Haiku por todas as iterações (busca + resposta)
-  for(let i=0;i<4;i++){
+  let accIn=0,accOut=0; // acumula uso por todas as iterações (busca + resposta)
+  // Filtragem dinâmica (opt-in): Sonnet + web_search_20260209 filtra as páginas antes de
+  // entrarem no contexto. Auto-cura: se o acesso não suportar (400), desliga e cai pro
+  // Haiku + web_search básico (caminho provado) sem quebrar a coleta.
+  let _useModel=getDynSearch()?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
+  let _useTool=getDynSearch()?'web_search_20260209':'web_search_20250305';
+  let _dynActive=getDynSearch();
+  for(let i=0;i<5;i++){
     if(signal.aborted)throw new Error('cancelled');
-    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:3000,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:_maxUses}]}),signal});
+    const mkBody=()=>JSON.stringify({model:_useModel,max_tokens:3000,system:SP,messages:msgs,tools:[{type:_useTool,name:'web_search',max_uses:_maxUses}]});
+    let res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
+    if(res.status===400&&_dynActive){
+      setDynSearch(false);_dynActive=false;_useModel='claude-haiku-4-5-20251001';_useTool='web_search_20250305';
+      try{toast('Filtragem dinâmica indisponível neste acesso — usando busca padrão.');}catch{}
+      res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
+    }
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
     const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
@@ -3971,6 +3996,8 @@ Extraia placares, classificação do grupo, xG e estilo diretamente das páginas
     if(data.stop_reason==='tool_use'){
       msgs.push({role:'assistant',content:data.content});
       msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
+    }else if(data.stop_reason==='pause_turn'){
+      msgs.push({role:'assistant',content:data.content}); // retoma a busca server-side (filtragem dinâmica)
     }else break;
   }
   return{rawFacts:null,inTokens:accIn,outTokens:accOut};

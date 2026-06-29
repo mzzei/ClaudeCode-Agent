@@ -3961,7 +3961,15 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   ];
   const _maxUses=Math.max(1,Math.min(maxSearches??topics.length,topics.length));
   const _dir=topics.slice(0,_maxUses).map((s,i)=>`${'①②③④'[i]} ${s}`).join('\n');
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+GROUNDING_RULE;
+  // Fontes hiperconfiáveis: TEXTO-GUIA no prompt (orienta o modelo a buscar/priorizar nelas).
+  // NÃO usar como allowed_domains — a allowlist por domínio já degradou a coleta e quebrou o
+  // formato estruturado 2x (ver worldcupagent-web-search-regression). Aqui é só dica, não filtro.
+  const _srcNote='FONTES HIPERCONFIÁVEIS (priorize estas; em conflito, vale a mais recente e oficial): '
+    +'Opta/The Analyst (theanalyst.com) e WhoScored para dados e ratings; FBref/StatsBomb e Understat para xG e estatística avançada; '
+    +'FotMob, Sofascore e os sites/federações oficiais para escalações e convocações confirmadas; '
+    +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
+    +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+_srcNote+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.

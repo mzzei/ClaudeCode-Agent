@@ -2173,16 +2173,21 @@ body.printing .a-tc{display:block !important}
 body.printing .print-tabname{display:block}
 body.printing .no-print{display:none !important}
 body.printing .a-card{overflow:visible}
-body.printing .tab-h{break-after:avoid;page-break-after:avoid}
+/* .tab-h SEM break-after:avoid: o heading pode ficar no fim de página sem criar
+   espaço vazio enorme (o browser empurrava heading+conteúdo inteiros para a próxima
+   página quando o 1º item leaf não cabia, gerando metade de página em branco). */
 body.printing .a-title{break-after:avoid;page-break-after:avoid}
-/* NÃO usar break-inside:avoid em .tab-s: a seção costuma ser MAIOR que uma página
-   (ex.: 7 tickets) e o motor de impressão então corta o conteúdo (come info) e
-   joga o bloco pra próxima página (pula páginas). O contêiner PODE quebrar entre os
-   filhos; só os itens-folha é que não devem ser partidos no meio. */
+body.printing .print-tabname{break-after:avoid;page-break-after:avoid}
+/* Itens-folha não são partidos no meio: */
 body.printing .ticket{break-inside:avoid;page-break-inside:avoid}
 body.printing .tcard{break-inside:avoid;page-break-inside:avoid}
 body.printing .stile{break-inside:avoid;page-break-inside:avoid}
 body.printing .frow,body.printing .tend-item,body.printing .prow,body.printing .ev-row,body.printing .duelo-row,body.printing .lrow,body.printing .urow,body.printing .irow,body.printing .ct-item{break-inside:avoid;page-break-inside:avoid}
+/* .lrow seguido de .llogic: mantém o texto explicativo na mesma página do valor */
+body.printing .lrow{break-after:avoid;page-break-after:avoid}
+body.printing .llogic{break-inside:avoid;page-break-inside:avoid}
+/* Controle de viúvas/órfãs: impede linha solta no fim/início de página */
+body.printing .tab-body,body.printing .ct-diag,body.printing .llogic,body.printing .ev-reason,body.printing .ticket-reason{orphans:2;widows:2}
 @media print{
   @page{margin:14mm}
   .no-print{display:none !important}
@@ -2192,13 +2197,16 @@ body.printing .frow,body.printing .tend-item,body.printing .prow,body.printing .
   .a-tabs{display:none !important}
   .a-tc{display:block !important}
   .print-tabname{display:block}
-  /* .tab-s NÃO leva break-inside:avoid — ver nota acima (seção > 1 página corta/pula). */
+  /* Itens-folha não são partidos no meio. .tab-h sem break-after (ver nota acima). */
   .ticket{break-inside:avoid;page-break-inside:avoid}
   .tcard{break-inside:avoid;page-break-inside:avoid}
   .stile{break-inside:avoid;page-break-inside:avoid}
   .frow,.tend-item,.prow,.ev-row,.duelo-row,.lrow,.urow,.irow,.ct-item{break-inside:avoid;page-break-inside:avoid}
-  .tab-h{break-after:avoid;page-break-after:avoid}
+  .lrow{break-after:avoid;page-break-after:avoid}
+  .llogic{break-inside:avoid;page-break-inside:avoid}
   .a-title{break-after:avoid;page-break-after:avoid}
+  .print-tabname{break-after:avoid;page-break-after:avoid}
+  .tab-body,.ct-diag,.llogic,.ev-reason,.ticket-reason{orphans:2;widows:2}
 }
 </style>
 </head>

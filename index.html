@@ -2175,10 +2175,14 @@ body.printing .no-print{display:none !important}
 body.printing .a-card{overflow:visible}
 body.printing .tab-h{break-after:avoid;page-break-after:avoid}
 body.printing .a-title{break-after:avoid;page-break-after:avoid}
-body.printing .tab-s{break-inside:avoid;page-break-inside:avoid}
+/* NÃO usar break-inside:avoid em .tab-s: a seção costuma ser MAIOR que uma página
+   (ex.: 7 tickets) e o motor de impressão então corta o conteúdo (come info) e
+   joga o bloco pra próxima página (pula páginas). O contêiner PODE quebrar entre os
+   filhos; só os itens-folha é que não devem ser partidos no meio. */
 body.printing .ticket{break-inside:avoid;page-break-inside:avoid}
 body.printing .tcard{break-inside:avoid;page-break-inside:avoid}
 body.printing .stile{break-inside:avoid;page-break-inside:avoid}
+body.printing .frow,body.printing .tend-item,body.printing .prow,body.printing .ev-row,body.printing .duelo-row,body.printing .lrow,body.printing .urow,body.printing .irow,body.printing .ct-item{break-inside:avoid;page-break-inside:avoid}
 @media print{
   @page{margin:14mm}
   .no-print{display:none !important}
@@ -2188,10 +2192,11 @@ body.printing .stile{break-inside:avoid;page-break-inside:avoid}
   .a-tabs{display:none !important}
   .a-tc{display:block !important}
   .print-tabname{display:block}
-  .tab-s{break-inside:avoid;page-break-inside:avoid}
+  /* .tab-s NÃO leva break-inside:avoid — ver nota acima (seção > 1 página corta/pula). */
   .ticket{break-inside:avoid;page-break-inside:avoid}
   .tcard{break-inside:avoid;page-break-inside:avoid}
   .stile{break-inside:avoid;page-break-inside:avoid}
+  .frow,.tend-item,.prow,.ev-row,.duelo-row,.lrow,.urow,.irow,.ct-item{break-inside:avoid;page-break-inside:avoid}
   .tab-h{break-after:avoid;page-break-after:avoid}
   .a-title{break-after:avoid;page-break-after:avoid}
 }

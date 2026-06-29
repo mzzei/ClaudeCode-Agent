@@ -3917,6 +3917,17 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sel-pop')&&!e.targe
 // ESPN não requer chave — carrega standings/agenda e notícias imediatamente
 if(!getAfKey()&&!getFdKey())setTimeout(()=>{loadEspnData(false);loadNews();},200);
 
+// Regra de grounding temporal compartilhada (Fase 1 coleta + Fase 2 análise). Escrita UMA vez:
+// princípio geral (qualquer fato volátil só dos dados) + verificação (dados vencem a memória) +
+// completude (extrair tudo; "a confirmar" é último recurso). Cobre toda a classe de erro, não
+// uma lista curta — impede técnico/escalação/ranking/clube/etc. desatualizados de memória.
+const GROUNDING_RULE=`GROUNDING TEMPORAL (regra dura — o erro mais grave a evitar):
+Seu conhecimento de treino reflete 2024-2025 e está DESATUALIZADO para a Copa 2026: entre temporadas, seleções trocam de técnico, de convocados, de titulares, e jogadores mudam de clube, se lesionam ou saem.
+• FATOS VOLÁTEIS — use SOMENTE o que vier dos dados coletados/buscas, NUNCA de memória: técnico atual; escalação, titulares e formação atual; elenco e convocados (quem está dentro ou fora da Copa); lesões e suspensões; clube atual de cada jogador; capitão; forma recente, resultados, classificação e fase; ranking FIFA; disponibilidade ou aposentadoria de jogadores. A regra vale para QUALQUER fato que possa ter mudado desde 2024-2025, mesmo que não esteja nesta lista.
+• CONHECIMENTO PRÓPRIO só é permitido para o que NÃO muda: leitura tática, estilos de jogo, padrões históricos e metodologia estatística (xG, Poisson). Nunca para nomes, escalações ou status atuais.
+• VERIFICAÇÃO (concepção de atualidade): antes de escrever qualquer nome ou fato volátil, confirme que ele aparece nos dados. Se sua memória divergir dos dados, os DADOS vencem. Se você "lembra" de algo que não está nos dados, NÃO afirme.
+• COMPLETUDE PRIMEIRO: extraia o MÁXIMO de cada busca/dado para preencher tudo de forma completa. "A confirmar" + registro em "lacunas" é ÚLTIMO RECURSO — só quando o dado realmente não aparece em nenhuma fonte. Não recorra a "a confirmar" por preguiça ou para encurtar.`;
+
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // Pre-fetch structured data: AF (paid) > FD (paid, no WC) > ESPN (free, automatic)
@@ -3950,7 +3961,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   ];
   const _maxUses=Math.max(1,Math.min(maxSearches??topics.length,topics.length));
   const _dir=topics.slice(0,_maxUses).map((s,i)=>`${'①②③④'[i]} ${s}`).join('\n');
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. GROUNDING (crítico): extraia TÉCNICO, ESCALAÇÃO e JOGADORES SOMENTE do que as buscas retornarem. Seu conhecimento próprio sobre técnicos/elencos é de 2024-2025 e está DESATUALIZADO para a Copa 2026 (times trocaram de treinador e de jogadores). Se não encontrar um dado nas buscas, deixe o campo vazio e registre em "lacunas" — NUNCA preencha de memória.';
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
@@ -4048,7 +4059,8 @@ PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados sã
 
 OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais. Se um dado estiver ausente (lacuna), declare-o na seção "lacunas" sem inventar.
 
-GROUNDING TEMPORAL (CRÍTICO — erro mais grave a evitar): seu conhecimento de treino sobre TÉCNICOS, ESCALAÇÕES e ELENCOS é de 2024-2025 e está DESATUALIZADO para a Copa 2026 — seleções trocaram de treinador e de jogadores. NUNCA afirme nome de técnico, escalação ou jogador específico a partir do seu conhecimento próprio. Use SOMENTE o que vier nos FATOS COLETADOS e no CONTEXTO DO TORNEIO. Se o técnico (campo "tecnico"), a escalação ou um jogador-chave NÃO estiverem nos dados coletados, escreva "a confirmar" no campo e registre em "lacunas" — não preencha de memória. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
+${GROUNDING_RULE}
+Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
 
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual

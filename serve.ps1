@@ -11,7 +11,7 @@ while ($listener.IsListening) {
     try {
         $bytes = [System.IO.File]::ReadAllBytes($file)
         $ext = [System.IO.Path]::GetExtension($file).ToLower()
-        $ctx.Response.ContentType = if ($ext -eq ".html") { "text/html; charset=utf-8" } elseif ($ext -eq ".js") { "application/javascript" } elseif ($ext -eq ".css") { "text/css" } else { "application/octet-stream" }
+        $ctx.Response.ContentType = if ($ext -eq ".html") { "text/html; charset=utf-8" } elseif ($ext -eq ".js") { "application/javascript" } elseif ($ext -eq ".css") { "text/css" } elseif ($ext -eq ".json") { "application/manifest+json" } elseif ($ext -eq ".png") { "image/png" } elseif ($ext -eq ".ico") { "image/x-icon" } else { "application/octet-stream" }
         $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
     } catch { $ctx.Response.StatusCode = 404 }
     $ctx.Response.Close()

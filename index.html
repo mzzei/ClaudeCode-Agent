@@ -547,6 +547,12 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
   /* Input dock */
   .i-dock{padding:.65rem .9rem calc(.6rem + env(safe-area-inset-bottom,0))}
   #match-input{font-size:16px} /* prevent iOS zoom */
+  /* Barra de ações: em tela estreita, seletores + botões numa linha e o contador
+     de tokens numa linha própria abaixo — evita a sobreposição dos elementos. */
+  .i-bar{flex-wrap:wrap;row-gap:8px}
+  .i-selectors{order:1}
+  .i-actions{order:2}
+  .i-tok-mini{order:3;flex:0 0 100%;padding-left:2px;margin-top:1px}
 
   /* Analysis card */
   .a-tc{padding:.75rem}
@@ -1227,7 +1233,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <span class="i-tok-s">tok ·</span>
           <span class="i-tok-c" id="i-tok-cost">$0.00</span>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+        <div class="i-actions" style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
           <button class="i-attach" onclick="document.getElementById('attach-input').click()" title="Anexar imagem, PDF ou texto (ou cole imagem com Ctrl+V)" aria-label="Anexar arquivo">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
@@ -2414,7 +2420,7 @@ function renderResults(d,opts){
   // ── Tab: Resumo ──
   const tabResumo=`
     ${d.contexto_fase||d.confianca_geral?`<div class="tab-s">
-      <div class="tab-h">1. Resumo Executivo</div>
+      <div class="tab-h">1. Resumo</div>
       <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||esc(d.confianca_geral)}</span>
       ${d.contexto_fase?`<p class="tab-body">${esc(d.contexto_fase)}</p>`:''}
     </div>`:''}

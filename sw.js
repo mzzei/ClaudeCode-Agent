@@ -1,7 +1,7 @@
 // Service worker do WorldCup Agent — cacheia SOMENTE o shell estático (mesma origem).
 // Nunca intercepta chamadas de API (Anthropic, football-data, ESPN, allorigins etc.):
 // para essas, o navegador segue o fluxo normal de rede, sem passar pelo SW.
-const CACHE_VERSION = 'wc-agent-v1';
+const CACHE_VERSION = 'wc-agent-v2';
 const SHELL_FILES = [
   './',
   './index.html',

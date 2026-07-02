@@ -1,7 +1,7 @@
 {
-  "name": "WorldCup Agent · Copa 2026",
-  "short_name": "WorldCup Agent",
-  "description": "Agente de análise tática e estatística da Copa do Mundo 2026.",
+  "name": "Meridian · Copa 2026",
+  "short_name": "Meridian",
+  "description": "Meridian — inteligência tática e estatística para a Copa do Mundo 2026.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

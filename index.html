@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WorldCup Agent · Copa 2026</title>
+<title>Meridian · Copa 2026</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#04130c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="WorldCup Agent">
+<meta name="apple-mobile-web-app-title" content="Meridian">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=2">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -179,6 +179,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .a-agent{display:flex;align-items:center;gap:8px}
 .a-ball{width:28px;height:28px;background:var(--terra-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .a-name{font-size:12px;font-weight:500;color:var(--deep)}
+/* Marca Meridian (estrela) — dimensionada por contexto */
+.brand-star{display:block;filter:drop-shadow(0 1px 3px rgba(40,217,142,.4))}
+.a-ball .brand-star{width:17px;height:17px}
+.rep-ball .brand-star{width:26px;height:26px}
+.wp-icon .brand-star{width:54px;height:54px;margin:0 auto}
 .a-pill{font-size:9px;font-weight:700;background:var(--terra);color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;letter-spacing:.05em}
 .a-hdr-r{display:flex;align-items:center;gap:5px}
 .a-ts{font-size:11px;color:var(--muted)}
@@ -635,8 +640,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 }
 
 /* ── Sidebar internals ── */
-.ls-name{font-family:var(--sans);font-style:normal;font-weight:800;font-size:15px;letter-spacing:.02em;color:var(--deep);line-height:1.15}
-.ls-name-agent{display:block;font-weight:800;font-size:15px;letter-spacing:.22em}
+.ls-name{font-family:var(--sans);font-style:normal;font-weight:800;font-size:17px;letter-spacing:.2em;color:var(--deep);line-height:1.05}
+.ls-name-agent{display:block;font-weight:600;font-size:7.5px;letter-spacing:.235em;margin-top:4px}
 .ls-tag{color:var(--dim)}
 .ls-new{background:linear-gradient(120deg,#d6f95a,#43e08f);color:#06251a;border:none;border-radius:14px;box-shadow:0 10px 26px rgba(67,224,143,.3),inset 0 1px 0 rgba(255,255,255,.55);font-weight:700;transition:transform .15s,box-shadow .15s}
 .ls-new:hover{background:linear-gradient(120deg,#d6f95a,#43e08f);transform:translateY(-1px);box-shadow:0 14px 32px rgba(67,224,143,.45),inset 0 1px 0 rgba(255,255,255,.55)}
@@ -1105,7 +1110,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
         </div>
       </div>
       <div>
-        <div class="ls-name">WORLDCUP<span class="ls-name-agent wc-lime">AGENT</span></div>
+        <div class="ls-name">MERIDIAN<span class="ls-name-agent wc-lime">SPORTS INTELLIGENCE</span></div>
       </div>
     </div>
 
@@ -1357,8 +1362,8 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 <div id="wov" class="wov">
   <div class="wpanel">
     <div class="wp-top">
-      <div class="wp-icon">🏆</div>
-      <div class="wp-title">Bem-vindo ao WorldCup Agent</div>
+      <div class="wp-icon"><svg class="brand-star" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mstar-wp" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d6f95a"/><stop offset=".5" stop-color="#8fe87a"/><stop offset="1" stop-color="#28d98e"/></linearGradient></defs><path d="M12 .6C12.6 7.5 16.5 11.4 23.4 12 16.5 12.6 12.6 16.5 12 23.4 11.4 16.5 7.5 12.6 .6 12 7.5 11.4 11.4 7.5 12 .6Z" fill="url(#mstar-wp)"/></svg></div>
+      <div class="wp-title">Bem-vindo ao Meridian</div>
     </div>
     <div class="wp-body">
       <p class="wp-text">A <b>chave API da Anthropic</b> é um código pessoal que libera o agente para usar inteligência artificial — sem ela, o agente não consegue analisar partidas nem responder perguntas.<br><br>Criar uma é gratuito e leva menos de 2 minutos: clique em <b>"Configurar agora"</b>, cole o código e pronto.</p>
@@ -1572,6 +1577,9 @@ const WORKER_URL_STORE='copa2026_worker_url';
 const tokenState  = {sessionIn:0,sessionOut:0,sessionIn_p1:0,sessionOut_p1:0,lastIn:0,lastOut:0,runs:0,lastCacheCreated:0,lastCacheRead:0,sessionCacheRead:0,sessionCacheSaved:0,lastCacheHitPct:0,lastCacheMissReason:null};
 const MODEL_PRICE = {'claude-haiku-4-5-20251001':{i:0.80,o:4.00,crs:0.72},'claude-sonnet-4-6':{i:3.00,o:15.00,crs:2.70},'claude-opus-4-8':{i:15.00,o:75.00,crs:13.50}};
 const MODEL_DOCK  = {'claude-haiku-4-5-20251001':'Haiku','claude-sonnet-4-6':'Sonnet','claude-opus-4-8':'Opus'};
+// Marca Meridian: estrela de 4 pontas (mesmo motivo do logo). SVG inline com gradiente
+// próprio — self-contained, funciona inclusive no relatório exportado (arquivo standalone).
+const BRAND_STAR  = '<svg class="brand-star" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mstar" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d6f95a"/><stop offset=".5" stop-color="#8fe87a"/><stop offset="1" stop-color="#28d98e"/></linearGradient></defs><path d="M12 .6C12.6 7.5 16.5 11.4 23.4 12 16.5 12.6 12.6 16.5 12 23.4 11.4 16.5 7.5 12.6 .6 12 7.5 11.4 11.4 7.5 12 .6Z" fill="url(#mstar)"/></svg>';
 const AGENT_PESQUISA_ID  = 'agent_018yogv9RUisgKsjXkaQj7AM';
 const AGENT_ANALISE_ID   = 'agent_01KEV4VR44NPKiY3FCXhHcid';
 const MEMORY_STORE_ID    = 'memstore_01QAkhiox2LUTMN9Y4Cf9hQQ';
@@ -2162,7 +2170,7 @@ function exportCards(cardEls,opts){
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relatório · WorldCup Agent · Copa 2026</title>
+<title>Relatório · Meridian · Copa 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -2175,8 +2183,9 @@ html,body{height:auto;overflow:auto;background:#04130c}
 .rep-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid rgba(160,240,190,.15);flex-wrap:wrap}
 .rep-brand{display:flex;gap:12px;align-items:center}
 .rep-ball{width:42px;height:42px;background:linear-gradient(150deg,rgba(40,217,142,.22),rgba(214,249,90,.12));border:1.5px solid rgba(40,217,142,.4);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 18px rgba(40,217,142,.2)}
-.rep-title{font-family:var(--sans);font-size:1.05rem;font-weight:800;letter-spacing:.01em;color:var(--deep);line-height:1.2}
-.rep-meta{font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.02em}
+.rep-title{font-family:var(--sans);font-size:1.15rem;font-weight:800;letter-spacing:.2em;color:var(--deep);line-height:1.05}
+.rep-title-sub{display:block;font-weight:600;font-size:7.5px;letter-spacing:.235em;margin-top:4px;background:linear-gradient(100deg,#d6f95a,#8fe87a 50%,#28d98e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
+.rep-meta{font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:.02em}
 .rep-print{background:var(--terra);color:#06251a;border:none;border-radius:10px;padding:.55rem 1.1rem;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:background .18s}
 .rep-print:hover{background:#a6f24a}
 .rep-disc{font-size:11px;color:var(--dim);text-align:center;margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid rgba(160,240,190,.1);line-height:1.6}
@@ -2232,16 +2241,16 @@ body.printing .tab-body,body.printing .ct-diag,body.printing .llogic,body.printi
 <div class="rep-wrap">
   <div class="rep-head">
     <div class="rep-brand">
-      <div class="rep-ball">🏆</div>
+      <div class="rep-ball">${BRAND_STAR}</div>
       <div>
-        <div class="rep-title">WORLDCUP<span style="color:var(--terra)">AGENT</span></div>
+        <div class="rep-title">MERIDIAN<span class="rep-title-sub">SPORTS INTELLIGENCE</span></div>
         <div class="rep-meta">Copa 2026 · ${dateStr} · ${count} análise${count!==1?'s':''}</div>
       </div>
     </div>
     <button class="rep-print no-print" onclick="doPrint()">↓ Salvar como PDF</button>
   </div>
   ${clone.innerHTML}
-  <div class="rep-disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira · WorldCup Agent</div>
+  <div class="rep-disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira · Meridian</div>
 </div>
 <script>
 function showTab(cardId,tab){
@@ -2524,8 +2533,8 @@ function renderResults(d,opts){
   el.innerHTML=`<div class="a-card" id="acard-${id}">
     <div class="a-hdr">
       <div class="a-agent">
-        <div class="a-ball">🏆</div>
-        <div><span class="a-name">WorldCup Agent</span></div>
+        <div class="a-ball">${BRAND_STAR}</div>
+        <div><span class="a-name">Meridian</span></div>
       </div>
       <div class="a-hdr-r">
         <span class="a-ts">${ts}</span>
@@ -4251,7 +4260,7 @@ async function runChat(){
 function analystSystemPrompt(){
   return `${t('agent_lang')}
 
-Você é o WorldCup Agent, uma IA analista de futebol especializada na Copa do Mundo 2026. Atue como um analista de verdade: interprete livremente o que o usuário pede e cubra um leque amplo de pedidos sobre futebol e a Copa — análises de partidas, táticas, escalações, formações, jogadores, históricos e confrontos diretos, prognósticos, comparações, cenários hipotéticos, regras, estatísticas, curiosidades e contexto do torneio.
+Você é o Meridian, uma IA analista de futebol especializada na Copa do Mundo 2026. Atue como um analista de verdade: interprete livremente o que o usuário pede e cubra um leque amplo de pedidos sobre futebol e a Copa — análises de partidas, táticas, escalações, formações, jogadores, históricos e confrontos diretos, prognósticos, comparações, cenários hipotéticos, regras, estatísticas, curiosidades e contexto do torneio.
 
 Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.
 
@@ -4273,7 +4282,7 @@ function showFallbackCard(query){
   const el=document.createElement('div');
   el.innerHTML=`<div class="a-card">
     <div class="a-hdr">
-      <div class="a-agent"><div class="a-ball">🏆</div><div><span class="a-name">WorldCup Agent</span></div></div>
+      <div class="a-agent"><div class="a-ball">${BRAND_STAR}</div><div><span class="a-name">Meridian</span></div></div>
       <div class="a-hdr-r"><span class="a-ts">${ts}</span></div>
     </div>
     <div class="a-subtitle">Análise em texto · modo simplificado</div>

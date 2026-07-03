@@ -1,4 +1,4 @@
-$root = "C:\Users\Gabriel\.claude\sessions\WorldCupAgent"
+$root = $PSScriptRoot
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:3456/")
 $listener.Start()

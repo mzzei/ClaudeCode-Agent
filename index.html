@@ -156,7 +156,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* User message bubble */
 .msg-user{margin-bottom:1.1rem;display:flex;flex-direction:column;align-items:flex-end}
-.user-bubble{background:var(--terra-pale);border:1px solid rgba(200,86,60,.2);border-radius:18px 18px 4px 18px;padding:.8rem 1rem;color:var(--deep);font-size:14px;line-height:1.6;word-break:break-word;max-width:88%}
+.user-bubble{background:var(--terra-pale);border:1px solid rgba(200,86,60,.2);border-radius:18px 18px 4px 18px;padding:.8rem 1rem;color:var(--deep);font-size:14px;line-height:1.6;word-break:break-word;white-space:pre-wrap;max-width:88%}
 .user-meta{display:flex;align-items:center;gap:7px;margin-top:.3rem}
 .ua-btn{font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:6px;display:flex;align-items:center;gap:3px;transition:color .15s;font-family:var(--sans)}
 .ua-btn:hover{color:var(--mid)}
@@ -2042,7 +2042,32 @@ function showUserBubble(text,atts){
   document.getElementById('conversation').appendChild(el);
   scrollChat();
 }
-function copyUserMsg(){navigator.clipboard.writeText(_lastQuery).catch(()=>{});}
+// Cópia robusta: a API async falha silenciosamente em alguns WebViews/mobile
+// (sem contexto seguro ou sem gesto) — sem fallback, o clipboard ficava com
+// conteúdo velho (ex.: um texto URL-encoded de antes). Fallback via execCommand
+// + feedback por toast garantem que o texto REAL seja copiado no PC e no mobile.
+async function copyToClipboard(text){
+  text=text==null?'':String(text);
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText&&window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      toast('Copiado');return true;
+    }
+    throw new Error('no async clipboard');
+  }catch(e){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text;ta.setAttribute('readonly','');
+      ta.style.position='fixed';ta.style.top='0';ta.style.left='0';ta.style.opacity='0';
+      document.body.appendChild(ta);
+      ta.focus();ta.select();ta.setSelectionRange(0,text.length);
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast(ok?'Copiado':'Não foi possível copiar');return ok;
+    }catch(e2){toast('Não foi possível copiar');return false;}
+  }
+}
+function copyUserMsg(){copyToClipboard(_lastQuery);}
 
 // ─── Anexos (imagens) ───────────────────────────────────────────────────────
 // Mídia em base64 nunca entra no _chatThread (evita bloat de memória e re-cobrança
@@ -2355,7 +2380,7 @@ function initTabPill(cardEl){
 }
 function copyAnalysis(id){
   const c=document.getElementById('acard-'+id);
-  navigator.clipboard.writeText(c?c.innerText:'').catch(()=>{});
+  copyToClipboard(c?c.innerText:'');
 }
 
 // ─── Right sidebar ────────────────────────────────────────────────────────
@@ -3688,14 +3713,15 @@ loadChatContext();
 })();
 
 // Carrega o histórico persistido (localStorage) e popula a lista de Análises Recentes
-// Textarea: Enter=enviar (Shift+Enter=nova linha), auto-resize, colapso no reset
+// Textarea: Enter=nova linha (paragrafar); enviar só pelo botão ou Ctrl/Cmd+Enter.
 function taReset(ta){ta.value='';ta.style.height='';ta.rows=1;}
 (function(){
   const ta=document.getElementById('match-input');
   function taGrow(){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,220)+'px';}
   ta.addEventListener('input',function(){taGrow();if(!_running)setRunBtn(false);});
   ta.addEventListener('keydown',function(e){
-    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!_running)toggleRun();}
+    // Enter paragrafa (comportamento padrão do textarea). Envia só com Ctrl/Cmd+Enter.
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!_running)toggleRun();}
   });
   // Colar imagem direto (Ctrl+V de print de escalação/formação)
   ta.addEventListener('paste',function(e){
@@ -4061,18 +4087,18 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     fdCtx=formatEspnContext(standings,scoreboard);
   }
   const hasFd=!!fdCtx;
-  const SCHEMA='{"mandante":{"nome":"","tecnico":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
+  const SCHEMA='{"mandante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
   // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
   // esforço: a 1ª busca é abrangente e a forma já vem do ESPN/API de graça. O esforço só
   // adiciona buscas que APROFUNDAM/cruzam fontes — não destrava tópicos. A profundidade de
   // raciocínio vem do thinking budget da Fase 2, separada da coleta.
   const topics=hasFd?[
-    '"[Mandante] [Visitante] Copa 2026 técnico atual lesões suspensões escalação provável xG estilo tático" — Sofascore, Transfermarkt, fbref (cubra TÉCNICO ATUAL, lesões, escalação, xG e estilo numa busca)',
+    '"[Mandante] [Visitante] Copa 2026 técnico atual ranking FIFA atual lesões suspensões escalação provável xG estilo tático" — Sofascore, Transfermarkt, fbref (cubra TÉCNICO ATUAL, RANKING FIFA ATUAL, lesões, escalação, xG e estilo numa busca)',
     '"[Mandante] desfalques e [Visitante] vulnerabilidades defensivas Copa 2026 esquema tático treinador" — Globo Esporte, Goal (aprofunda técnico, tática e desfalques)',
     '"[Mandante] [Visitante] Copa 2026 fbref xG expected goals estatísticas avançadas" — fbref, Understat (aprofunda xG/estatística)'
   ]:[
-    '"[Mandante] [Visitante] Copa 2026 técnico atual forma recente resultados lesões escalação provável" — ESPN, Sofascore, Transfermarkt (cubra TÉCNICO ATUAL, forma, lesões e escalação)',
+    '"[Mandante] [Visitante] Copa 2026 técnico atual ranking FIFA atual forma recente resultados lesões escalação provável" — ESPN, Sofascore, Transfermarkt (cubra TÉCNICO ATUAL, RANKING FIFA ATUAL, forma, lesões e escalação)',
     '"[Mandante] [Visitante] Copa 2026 xG estilo tático vulnerabilidades defensivas treinador" — fbref, Sofascore (cubra técnico, xG e tática)',
     '"[Mandante] [Visitante] Copa 2026 classificação grupo estatísticas fbref" — fbref, ESPN (aprofunda dados/estatística)'
   ];
@@ -4086,7 +4112,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'FotMob, Sofascore e os sites/federações oficiais para escalações e convocações confirmadas; '
     +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'+_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
@@ -4182,7 +4208,9 @@ Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aprov
 
 PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados são confirmados — NÃO faça pesquisas. Use exatamente os dados fornecidos em DADOS PRÉ-COLETADOS.
 
-OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais. Se um dado estiver ausente (lacuna), declare-o na seção "lacunas" sem inventar.
+OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais.
+
+LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em "lacunas" um dado que (a) esteja realmente ausente dos dados fornecidos E (b) afete MATERIALMENTE a conclusão da análise. NÃO liste como lacuna: ranking FIFA (vem nos dados; se não vier, é público e estável — informe assim mesmo), estatísticas individuais de reservas, histórico pessoal de goleiro, ou possíveis cartões acumulados — esses são secundários e não devem virar lacuna. Antes de declarar qualquer lacuna, tente derivar/estimar a partir dos dados já disponíveis (ex.: forma, xG, resultados). Prefira uma análise completa: lacuna é exceção, não hábito.
 
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
@@ -4291,11 +4319,19 @@ async function runChat(){
       const lastContent=atts.length?buildUserContent(effectiveQuery,atts):effectiveQuery;
       reqMessages=trimmedThread.slice(0,-1).concat([{role:'user',content:lastContent}]);
     }
-    const _chatBody={model:currentModel,max_tokens:(atts.length||liveData)?4096:2048,
+    // O esforço selecionado agora VALE no chat: aplica raciocínio (thinking) proporcional,
+    // dando profundidade a perguntas de acompanhamento. Só em modelos que aceitam
+    // budget_tokens (Opus/Fable usam outro esquema e dariam 400). max_tokens sobe para
+    // acomodar o budget (cobra-se o uso real, não o teto).
+    const _chatEffort=EFFORT_LEVELS[currentEffort]||{budget:0};
+    const _chatThink=_chatEffort.budget>0 && !/opus-4-8|opus-4-7|fable-5/.test(currentModel);
+    const _chatBase=(atts.length||liveData)?4096:2048;
+    const _chatBody={model:currentModel,max_tokens:_chatBase+(_chatThink?_chatEffort.budget:0),
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
       messages:reqMessages,stream:true,
       // web_search como ÚLTIMO recurso (extrema necessidade): lesões/notícias que a ESPN não cobre.
       tools:[{type:'web_search_20250305',name:'web_search',max_uses:1}]};
+    if(_chatThink){_chatBody.thinking={type:'enabled',budget_tokens:_chatEffort.budget};_chatBody.temperature=1;}
     if(getWorkerUrl())_chatBody.diagnostics={previous_message_id:_lastChatId};
     const res=await fetch(getApiBase()+'/v1/messages',{
       method:'POST',
@@ -4435,6 +4471,28 @@ function setRunBtn(running){
   else b.textContent=(_attachments.length||_chatThread.length>0)?t('btn_send'):t('btn_analyze');
 }
 
+// Condensa a análise estruturada num texto curto para servir de MEMÓRIA em follow-ups
+// de chat (grounding sem re-gastar tokens de coleta). Mantém os fatos-chave, não os
+// fundamentos longos de cada ticket.
+function _analysisSummaryForThread(d){
+  if(!d||typeof d!=='object')return 'Análise estruturada gerada nesta conversa.';
+  const L=[],tm=d.mandante||{},tv=d.visitante||{};
+  L.push(`[ANÁLISE ESTRUTURADA JÁ ENTREGUE NESTA CONVERSA — ${d.partida||'partida'}${d.fase?' · '+d.fase:''}${d.data_hora?' · '+d.data_hora:''}${d.sede?' · '+d.sede:''}]`);
+  if(tm.nome||tv.nome){
+    L.push(`${tm.nome||'Mandante'}: ranking FIFA ${tm.ranking_fifa||'?'}; forma ${tm.forma_recente||'?'}; xG ${tm.xg_marcado??'?'}/${tm.xg_sofrido??'?'}; escalação ${tm.escalacao||'?'}; desfalques ${(tm.desfalques||[]).join(', ')||'nenhum'}.`);
+    L.push(`${tv.nome||'Visitante'}: ranking FIFA ${tv.ranking_fifa||'?'}; forma ${tv.forma_recente||'?'}; xG ${tv.xg_marcado??'?'}/${tv.xg_sofrido??'?'}; escalação ${tv.escalacao||'?'}; desfalques ${(tv.desfalques||[]).join(', ')||'nenhum'}.`);
+  }
+  const tcm=d.tecnico_mandante||{},tcv=d.tecnico_visitante||{};
+  if(tcm.nome||tcv.nome)L.push(`Técnicos: ${tcm.nome||'?'} (${tcm.formacao||'?'}, ${tcm.filosofia||''}) x ${tcv.nome||'?'} (${tcv.formacao||'?'}, ${tcv.filosofia||''}).`);
+  if(d.lambda)L.push(`Lambdas (gols esperados): ${tm.nome||'mandante'} ${d.lambda.home_mid??'?'}, ${tv.nome||'visitante'} ${d.lambda.away_mid??'?'}.`);
+  if(Array.isArray(d.eventos_provaveis)&&d.eventos_provaveis.length)L.push('Eventos prováveis: '+d.eventos_provaveis.slice(0,6).map(e=>`${e.evento} ${Math.round((e.probabilidade||0)*100)}%`).join('; ')+'.');
+  if(Array.isArray(d.sugestoes_ticket)&&d.sugestoes_ticket.length)L.push('Tickets: '+d.sugestoes_ticket.slice(0,6).map(x=>`${x.descricao} (${Math.round((x.probabilidade||0)*100)}%, ${x.confianca||''})`).join('; ')+'.');
+  if(Array.isArray(d.fatores_decisivos)&&d.fatores_decisivos.length)L.push('Fatores decisivos: '+d.fatores_decisivos.slice(0,5).join('; ')+'.');
+  if(d.confronto_tatico&&d.confronto_tatico.conclusao)L.push('Síntese tática: '+d.confronto_tatico.conclusao);
+  if(Array.isArray(d.lacunas)&&d.lacunas.length)L.push('Lacunas conhecidas: '+d.lacunas.slice(0,4).join('; ')+'.');
+  L.push('(Base factual desta partida — use como memória para perguntas de acompanhamento; não repita a coleta se a resposta já estiver aqui.)');
+  return L.join('\n');
+}
 async function runAnalysis(){
   if(_running)return;
   const apiKey=document.getElementById('api-key-input').value.trim();
@@ -4560,6 +4618,11 @@ async function runAnalysis(){
     }
     if(!parsed)throw new Error('O modelo não retornou uma análise estruturada. Tente descrever a partida com "PARTIDA: [Time A] x [Time B]" ou use um dos jogos sugeridos.');
     renderResults(parsed);
+    // Memória: registra a análise estruturada no fio do chat para que perguntas de
+    // acompanhamento ("e se a Bósnia abrir o placar?") sejam fundamentadas pela análise
+    // já feita — e não apenas por uma nova consulta rasa à ESPN. Resumo condensado
+    // (não o JSON inteiro) para manter o custo dos follow-ups baixo.
+    try{_chatThread.push({role:'user',content:_pendingQuery||query});_chatThread.push({role:'assistant',content:_analysisSummaryForThread(parsed)});}catch(_){}
     ks.textContent='Guardada apenas nesta aba · apagada ao fechar';ks.style.color='var(--muted)';
   }catch(e){
     stopThinking(false);

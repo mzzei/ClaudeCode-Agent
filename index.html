@@ -3707,19 +3707,26 @@ function setPerfMode(on){
 // backdrop-filter escala com a ÁREA renderizada (ele reamostra o fundo inteiro do painel
 // a cada frame) — então uma janela pequena pode passar no teste e, ao maximizar/entrar em
 // tela cheia, os painéis ficam bem maiores e o mesmo dispositivo já não aguenta mais.
+// Detecta tanto FPS médio baixo quanto ENGASGOS pontuais (stutter): um travamento a
+// cada 1-2s pode não derrubar a média (ex.: 58fps médio ainda "parece" ok no cálculo),
+// mas é exatamente o que o olho humano percebe como "não fluido". Por isso mede também
+// o maior intervalo entre frames e quantos frames excederam um salto perceptível.
 function _measurePerfAndApply(){
   if(getPerfModePref()!==null)return; // usuário já escolheu explicitamente: nunca remede
   if(document.body.classList.contains('wc-lite'))return; // já está no modo leve, nada a fazer
-  let frames=0,start=null;
+  let frames=0,start=null,last=null,maxDelta=0,jankFrames=0;
   function tick(ts){
-    if(start===null)start=ts;
+    if(start===null){start=ts;last=ts;}
+    const delta=ts-last;last=ts;
+    if(delta>maxDelta)maxDelta=delta;
+    if(delta>80)jankFrames++; // >80ms entre frames = engasgo visível (equivalente a <12,5fps naquele instante)
     frames++;
-    if(ts-start<1200){requestAnimationFrame(tick);return;}
+    if(ts-start<2000){requestAnimationFrame(tick);return;}
     const fps=frames/((ts-start)/1000);
-    if(fps<45){
+    if(fps<45||maxDelta>150||jankFrames>=3){
       applyPerfMode(true);
       const hint=document.getElementById('perf-mode-hint');
-      if(hint)hint.innerHTML='Ativado automaticamente: este dispositivo renderizou abaixo de 45fps (a área da tela usada pelo app aumentou, ex.: tela cheia). Desmarque para forçar os efeitos visuais completos.';
+      if(hint)hint.innerHTML=`Ativado automaticamente: detectamos baixo desempenho neste dispositivo (${fps.toFixed(0)}fps médio, maior engasgo de ${Math.round(maxDelta)}ms). Desmarque para forçar os efeitos visuais completos.`;
     }
   }
   requestAnimationFrame(tick);
@@ -3734,6 +3741,9 @@ function _measurePerfAndApply(){
   const _reMeasure=()=>{clearTimeout(_rz);_rz=setTimeout(_measurePerfAndApply,600);};
   window.addEventListener('resize',_reMeasure);
   document.addEventListener('fullscreenchange',_reMeasure);
+  // Remede periodicamente em segundo plano (a cada 25s): pega degradação que só aparece
+  // durante uso real (scroll, digitação, animações concorrentes), não só no load/resize.
+  setInterval(_measurePerfAndApply,25000);
 })();
 
 // ─── Data API key listeners ───────────────────────────────────────────────

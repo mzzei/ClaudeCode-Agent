@@ -34,7 +34,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .app{display:grid;grid-template-columns:236px 1fr 292px;height:100vh;overflow:hidden;position:relative;z-index:1}
 
 /* ── Left sidebar ── */
-.l-sb{background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.l-sb{background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
 .ls-brand{display:flex;gap:10px;align-items:center;padding:1.25rem 1.1rem .9rem}
 .ls-ball{width:36px;height:36px;background:var(--terra-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .ls-name{font-family:var(--serif);font-size:.95rem;line-height:1.2;font-weight:500;font-style:italic;color:var(--deep)}
@@ -349,7 +349,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .i-disc{font-size:10px;color:var(--muted);text-align:center;margin-top:.5rem}
 
 /* ── Right sidebar ── */
-.r-sb{background:var(--cream);border-left:1px solid var(--border);overflow-y:auto;padding:.9rem}
+/* O painel externo carrega o "vidro" (backdrop-filter) e NÃO rola; o scroll fica no
+   .rs-scroll interno, sem filtro — assim o scroll é compositado (rápido) e não força o
+   navegador a reamostrar o backdrop-filter a cada frame. Mesmo padrão de .main/.chat. */
+.r-sb{background:var(--cream);border-left:1px solid var(--border);overflow:hidden;padding:0;display:flex;flex-direction:column}
+.rs-scroll{flex:1;min-height:0;overflow-y:auto;padding:.9rem;overscroll-behavior:contain}
 .rs-block{background:var(--white);border:1px solid var(--border);border-radius:13px;padding:.9rem;margin-bottom:.75rem}
 .rs-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
 
@@ -658,8 +662,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
   background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
   border:1px solid rgba(160,240,190,.12)!important;border-left:none;
   backdrop-filter:blur(11px);-webkit-backdrop-filter:blur(11px);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 18px 50px rgba(0,0,0,.35);
-  padding:.85rem
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 18px 50px rgba(0,0,0,.35)
 }
 
 /* ── Modo desempenho ──
@@ -1086,13 +1089,13 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
 .sb-backdrop.open{background:rgba(2,12,7,.55)}
 
 /* ── Scrollbars ── */
-.chat::-webkit-scrollbar,.r-sb::-webkit-scrollbar,.lib-matches::-webkit-scrollbar,
+.chat::-webkit-scrollbar,.rs-scroll::-webkit-scrollbar,.lib-matches::-webkit-scrollbar,
 .ls-hist::-webkit-scrollbar,.spanel::-webkit-scrollbar{width:6px}
-.chat::-webkit-scrollbar-track,.r-sb::-webkit-scrollbar-track,.lib-matches::-webkit-scrollbar-track,
+.chat::-webkit-scrollbar-track,.rs-scroll::-webkit-scrollbar-track,.lib-matches::-webkit-scrollbar-track,
 .ls-hist::-webkit-scrollbar-track,.spanel::-webkit-scrollbar-track{background:transparent}
-.chat::-webkit-scrollbar-thumb,.r-sb::-webkit-scrollbar-thumb,.lib-matches::-webkit-scrollbar-thumb,
+.chat::-webkit-scrollbar-thumb,.rs-scroll::-webkit-scrollbar-thumb,.lib-matches::-webkit-scrollbar-thumb,
 .ls-hist::-webkit-scrollbar-thumb,.spanel::-webkit-scrollbar-thumb{background:rgba(120,240,170,.18);border-radius:3px}
-.chat::-webkit-scrollbar-thumb:hover,.r-sb::-webkit-scrollbar-thumb:hover,.ls-hist::-webkit-scrollbar-thumb:hover{background:rgba(120,240,170,.32)}
+.chat::-webkit-scrollbar-thumb:hover,.rs-scroll::-webkit-scrollbar-thumb:hover,.ls-hist::-webkit-scrollbar-thumb:hover{background:rgba(120,240,170,.32)}
 
 /* ── Tab content inner bg ── */
 .a-tc{padding:1.1rem}
@@ -1354,6 +1357,7 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
 
   <!-- ── RIGHT SIDEBAR ── -->
   <aside class="r-sb">
+   <div class="rs-scroll">
     <!-- Featured (empty state) -->
     <div id="rs-featured">
       <div class="rs-block" id="rs-copa-stats" style="display:none">
@@ -1402,6 +1406,7 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
       </div>
     </div>
 
+   </div>
   </aside>
 
 </div>

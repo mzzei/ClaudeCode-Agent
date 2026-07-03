@@ -2605,6 +2605,8 @@ CONSCIÊNCIA TEMPORAL:
 FONTES CONFIÁVEIS (use apenas estas — nunca blogs sem credencial estatística):
 ESPN, BBC Sport, The Guardian Sport, FIFA.com oficial, UEFA.com, FBref.com, Sofascore, Opta/StatsBomb, Transfermarkt, SofaScore, WhoScored, Goal.com (apenas para confirmação de escalações). Prefira sempre a fonte com maior rigor estatístico (FBref/Opta > ESPN > Goal). Cite a fonte nos campos de fundamento.
 
+${SOURCE_RULE}
+
 SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
 
 ① "[Mandante] Copa do Mundo 2026 resultados estatísticas"
@@ -3503,12 +3505,15 @@ function renderLibrary(){
     return;
   }
   const today=new Date();today.setHours(0,0,0,0);
-  let filtered=jogos;
-  if(_libFilter==='hoje')filtered=jogos.filter(j=>dateLabelFromISO(j.data_iso)==='hoje');
-  else if(_libFilter==='amanha')filtered=jogos.filter(j=>dateLabelFromISO(j.data_iso)==='amanhã');
-  else if(_libFilter==='semana'){const lim=new Date(today.getTime()+7*864e5);filtered=jogos.filter(j=>{if(!j.data_iso)return false;const d=new Date(j.data_iso+'T12:00:00');return d>=today&&d<lim;});}
-  else if(_libFilter==='grupos')filtered=jogos.filter(j=>(j.fase||'').toLowerCase().includes('grupo'));
-  else if(_libFilter==='mata')filtered=jogos.filter(j=>!(j.fase||'').toLowerCase().includes('grupo'));
+  // Base: nunca exibir jogos já disputados (data anterior a hoje). Mantém 'jogos'
+  // intacto (=== _schedule) para que jogos.indexOf(j)→fillMatch continue correto.
+  const notPast=j=>{if(!j.data_iso)return true;return new Date(j.data_iso+'T12:00:00')>=today;};
+  let filtered=jogos.filter(notPast);
+  if(_libFilter==='hoje')filtered=filtered.filter(j=>dateLabelFromISO(j.data_iso)==='hoje');
+  else if(_libFilter==='amanha')filtered=filtered.filter(j=>dateLabelFromISO(j.data_iso)==='amanhã');
+  else if(_libFilter==='semana'){const lim=new Date(today.getTime()+7*864e5);filtered=filtered.filter(j=>{if(!j.data_iso)return false;const d=new Date(j.data_iso+'T12:00:00');return d<lim;});}
+  else if(_libFilter==='grupos')filtered=filtered.filter(j=>(j.fase||'').toLowerCase().includes('grupo'));
+  else if(_libFilter==='mata')filtered=filtered.filter(j=>!(j.fase||'').toLowerCase().includes('grupo'));
   if(!filtered.length){libMatches.innerHTML='<div class="lib-empty">Nenhuma partida neste filtro.</div>';return;}
   const grp={};filtered.forEach(j=>{const k=j.data_iso||'outros';if(!grp[k])grp[k]=[];grp[k].push(j);});
   let html='';Object.keys(grp).sort().forEach(dateKey=>{
@@ -3968,6 +3973,16 @@ Seu conhecimento de treino reflete 2024-2025 e está DESATUALIZADO para a Copa 2
 • VERIFICAÇÃO (concepção de atualidade): antes de escrever qualquer nome ou fato volátil, confirme que ele aparece nos dados. Se sua memória divergir dos dados, os DADOS vencem. Se você "lembra" de algo que não está nos dados, NÃO afirme.
 • COMPLETUDE PRIMEIRO: extraia o MÁXIMO de cada busca/dado para preencher tudo de forma completa. "A confirmar" + registro em "lacunas" é ÚLTIMO RECURSO — só quando o dado realmente não aparece em nenhuma fonte. Não recorra a "a confirmar" por preguiça ou para encurtar.`;
 
+// Regra de fontes: nada de casas de apostas como fonte de fato/citação. Prompt-only
+// (não usar allowed_domains/blocklist — não existe blocklist no web_search e a
+// allowlist já quebrou o pipeline 2x). Odds seguem permitidas como INSUMO analítico,
+// mas atribuídas genericamente — sem nome de bookmaker.
+const SOURCE_RULE=`FONTES E CITAÇÃO (regra obrigatória):
+• Fatos e estatísticas devem vir de JORNALISMO ESPORTIVO e PROVEDORES ESTATÍSTICOS: FBref, Opta/StatsBomb, Sofascore, WhoScored, ESPN, BBC Sport, The Guardian, Transfermarkt, FotMob, sites oficiais (FIFA/UEFA/federações) e imprensa esportiva de referência (Lance, Globo Esporte, Marca, L'Équipe, Gazzetta).
+• NUNCA cite, como fonte no campo "fundamento", casas de apostas, agregadores de odds ou sites de "dicas/tips de apostas" (ex.: bet365, betano, betfair, legalbet, blogs de apostas, "sites de apostas") — mesmo que apareçam na busca. Eles NÃO são fonte jornalística.
+• Odds de mercado podem ser usadas como INSUMO analítico (probabilidade implícita), mas atribua sempre de forma genérica — "odds de mercado / probabilidade implícita" — NUNCA nomeando uma casa de apostas.
+• Se um dado só existir em fonte de apostas, cite o TIPO do dado ("odds implícitas de mercado") ou omita a fonte — nunca dê credibilidade nominal a uma casa de apostas. Prefira sempre confirmar a estatística num provedor estatístico/jornalístico.`;
+
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // Pre-fetch structured data: AF (paid) > FD (paid, no WC) > ESPN (free, automatic)
@@ -4009,7 +4024,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'FotMob, Sofascore e os sites/federações oficiais para escalações e convocações confirmadas; '
     +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+_srcNote+'\n'+GROUNDING_RULE;
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões.\n'+_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
@@ -4109,6 +4124,8 @@ OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensag
 
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
+
+${SOURCE_RULE}
 
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual

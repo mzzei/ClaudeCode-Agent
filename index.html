@@ -3703,11 +3703,13 @@ function setPerfMode(on){
   const hint=document.getElementById('perf-mode-hint');
   if(hint)hint.innerHTML='Desliga o desfoque de fundo (blur/vidro fosco) e as animações decorativas — deixa a interface mais leve para computadores que engasgam. Ativado manualmente.';
 }
-(function initPerfMode(){
-  const pref=getPerfModePref();
-  if(pref==='on'||pref==='off'){applyPerfMode(pref==='on');return;} // escolha explícita do usuário: respeita e não remede
-  // Sem preferência salva: mede o FPS real do dispositivo por ~1,2s logo após o load
-  // e decide sozinho (sem persistir — cada sessão remede, robusto a mudanças de máquina/aba).
+// Amostra o FPS real por ~1,2s e liga o modo leve se ficar abaixo do limiar. O custo do
+// backdrop-filter escala com a ÁREA renderizada (ele reamostra o fundo inteiro do painel
+// a cada frame) — então uma janela pequena pode passar no teste e, ao maximizar/entrar em
+// tela cheia, os painéis ficam bem maiores e o mesmo dispositivo já não aguenta mais.
+function _measurePerfAndApply(){
+  if(getPerfModePref()!==null)return; // usuário já escolheu explicitamente: nunca remede
+  if(document.body.classList.contains('wc-lite'))return; // já está no modo leve, nada a fazer
   let frames=0,start=null;
   function tick(ts){
     if(start===null)start=ts;
@@ -3717,10 +3719,21 @@ function setPerfMode(on){
     if(fps<45){
       applyPerfMode(true);
       const hint=document.getElementById('perf-mode-hint');
-      if(hint)hint.innerHTML='Ativado automaticamente: este dispositivo renderizou abaixo de 45fps ao carregar a página. Desmarque para forçar os efeitos visuais completos.';
+      if(hint)hint.innerHTML='Ativado automaticamente: este dispositivo renderizou abaixo de 45fps (a área da tela usada pelo app aumentou, ex.: tela cheia). Desmarque para forçar os efeitos visuais completos.';
     }
   }
-  setTimeout(()=>requestAnimationFrame(tick),800);
+  requestAnimationFrame(tick);
+}
+(function initPerfMode(){
+  const pref=getPerfModePref();
+  if(pref==='on'||pref==='off'){applyPerfMode(pref==='on');return;} // escolha explícita do usuário: respeita e não remede
+  setTimeout(_measurePerfAndApply,800);
+  // Remede ao redimensionar/maximizar/entrar em tela cheia (debounced): a janela pode
+  // crescer bastante depois do load inicial, mudando o custo real de compositing.
+  let _rz=null;
+  const _reMeasure=()=>{clearTimeout(_rz);_rz=setTimeout(_measurePerfAndApply,600);};
+  window.addEventListener('resize',_reMeasure);
+  document.addEventListener('fullscreenchange',_reMeasure);
 })();
 
 // ─── Data API key listeners ───────────────────────────────────────────────

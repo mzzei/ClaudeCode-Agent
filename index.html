@@ -3733,9 +3733,32 @@ function _measurePerfAndApply(){
   }
   requestAnimationFrame(tick);
 }
+// Detecção instantânea e definitiva: pergunta ao WebGL qual "GPU" o navegador está
+// de fato usando para compositar a página. Quando a aceleração de hardware está
+// desligada/quebrada (driver incompatível, política do Windows etc.), o navegador cai
+// pra um renderizador por software — string do tipo "Microsoft Basic Render Driver",
+// "SwiftShader", "llvmpipe" ou "Software Rasterizer" no lugar do nome da GPU real
+// (ex.: "NVIDIA GeForce RTX 2060"). Isso elimina a ambiguidade da amostragem de FPS:
+// não precisa medir nada, o navegador já entrega a resposta.
+function _isSoftwareRenderer(){
+  try{
+    const c=document.createElement('canvas');
+    const gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+    if(!gl)return false;
+    const dbg=gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer=(dbg?gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER))||'';
+    return /swiftshader|llvmpipe|basic render|software rasterizer|software renderer|\bwarp\b/i.test(renderer);
+  }catch(e){return false;}
+}
 (function initPerfMode(){
   const pref=getPerfModePref();
   if(pref==='on'||pref==='off'){applyPerfMode(pref==='on');return;} // escolha explícita do usuário: respeita e não remede
+  if(_isSoftwareRenderer()){
+    applyPerfMode(true);
+    const hint=document.getElementById('perf-mode-hint');
+    if(hint)hint.innerHTML='Ativado automaticamente: este navegador está renderizando por software (sem aceleração de GPU) — o desfoque de fundo fica muito pesado nesse modo. Desmarque para forçar os efeitos visuais completos (não recomendado nesse caso).';
+    return; // já resolvido, não precisa da amostragem de FPS
+  }
   setTimeout(_measurePerfAndApply,800);
   // Remede ao redimensionar/maximizar/entrar em tela cheia (debounced): a janela pode
   // crescer bastante depois do load inicial, mudando o custo real de compositing.

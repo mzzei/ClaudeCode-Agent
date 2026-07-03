@@ -414,6 +414,16 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .sf{margin-bottom:1.1rem}
 .sf-lbl{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);margin-bottom:.4rem}
 .sf-hint{font-size:11px;color:var(--muted);margin-top:.35rem}
+/* Seção retrátil (details/summary) dentro de Configurações */
+.sf-adv{margin:0 0 1.1rem;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.sf-adv>summary{list-style:none;cursor:pointer;user-select:none;display:flex;align-items:center;gap:9px;padding:.72rem .85rem;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mid);font-weight:600;transition:background .15s}
+.sf-adv>summary::-webkit-details-marker{display:none}
+.sf-adv>summary:hover{background:rgba(255,255,255,.03)}
+.sf-adv>summary::before{content:'';width:0;height:0;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .2s ease;flex-shrink:0;opacity:.6}
+.sf-adv[open]>summary::before{transform:rotate(90deg)}
+.sf-adv-body{padding:.15rem .85rem .55rem}
+.sf-adv-body>.sf{margin-bottom:.9rem}
+.sf-adv-body>.sf:last-child{margin-bottom:.15rem}
 .ds-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .ds-name{font-size:12px;font-weight:500;color:var(--deep)}
 .tok-sf-empty{font-size:12px;color:var(--dim);text-align:center;padding:10px 0}
@@ -1446,64 +1456,74 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
       <textarea id="persona-input" rows="3" placeholder="Ex.: Me chame de 'chefe'. Seja informal, bem-humorado e use jargão de boleiro. Vá direto ao ponto." oninput="savePersona(this.value)"></textarea>
       <div class="sf-hint">Define <b>como o agente fala com você</b> — nome, tom, humor, formato. Não altera a precisão das análises, os dados nem a estrutura das respostas; só o jeito de se dirigir a você. Guardado neste navegador.</div>
     </div>
-    <div class="sf">
-      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="auto-ai-toggle" onchange="setAutoAi(this.checked)" style="width:auto;margin:0;cursor:pointer">
-        Enriquecer dados via IA automaticamente
-      </label>
-      <div class="sf-hint">Desligado (padrão · economia): no automático usa só dados gratuitos do ESPN — créditos da API são gastos <b>somente nas análises que você pede</b>. Ligado: ao abrir, a IA pesquisa classificação/contexto extra (consome créditos).</div>
-    </div>
-    <div class="sf">
-      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="dynsearch-toggle" onchange="setDynSearch(this.checked)" style="width:auto;margin:0;cursor:pointer">
-        Filtragem dinâmica na busca (experimental)
-      </label>
-      <div class="sf-hint">Roda a coleta (Fase 1) no <b>Sonnet</b> com <code>web_search_20260209</code>, que filtra as páginas antes de entrarem no contexto. <b>Reduz a contagem de tokens, mas tende a aumentar o custo em $</b> (Sonnet custa ~3,75× o Haiku). Se o seu acesso não suportar, volta sozinho à busca padrão. Padrão: desligado.</div>
-    </div>
-    <div class="sf">
-      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="perf-mode-toggle" onchange="setPerfMode(this.checked)" style="width:auto;margin:0;cursor:pointer">
-        Modo desempenho (menos efeitos visuais)
-      </label>
-      <div class="sf-hint" id="perf-mode-hint">Desliga o desfoque de fundo (blur/vidro fosco) e as animações decorativas — deixa a interface mais leve para computadores que engasgam. O app já detecta automaticamente quando o dispositivo está renderizando abaixo de 45fps e liga isso sozinho; use este botão para forçar manualmente.</div>
-    </div>
+    <details class="sf-adv">
+      <summary>Configurações avançadas</summary>
+      <div class="sf-adv-body">
+        <div class="sf">
+          <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="auto-ai-toggle" onchange="setAutoAi(this.checked)" style="width:auto;margin:0;cursor:pointer">
+            Enriquecer dados via IA automaticamente
+          </label>
+          <div class="sf-hint">Desligado (padrão · economia): no automático usa só dados gratuitos do ESPN — créditos da API são gastos <b>somente nas análises que você pede</b>. Ligado: ao abrir, a IA pesquisa classificação/contexto extra (consome créditos).</div>
+        </div>
+        <div class="sf">
+          <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="dynsearch-toggle" onchange="setDynSearch(this.checked)" style="width:auto;margin:0;cursor:pointer">
+            Filtragem dinâmica na busca (experimental)
+          </label>
+          <div class="sf-hint">Roda a coleta (Fase 1) no <b>Sonnet</b> com <code>web_search_20260209</code>, que filtra as páginas antes de entrarem no contexto. <b>Reduz a contagem de tokens, mas tende a aumentar o custo em $</b> (Sonnet custa ~3,75× o Haiku). Se o seu acesso não suportar, volta sozinho à busca padrão. Padrão: desligado.</div>
+        </div>
+        <div class="sf">
+          <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="perf-mode-toggle" onchange="setPerfMode(this.checked)" style="width:auto;margin:0;cursor:pointer">
+            Modo desempenho (menos efeitos visuais)
+          </label>
+          <div class="sf-hint" id="perf-mode-hint">Desliga o desfoque de fundo (blur/vidro fosco) e as animações decorativas — deixa a interface mais leve para computadores que engasgam. O app já detecta automaticamente quando o dispositivo está renderizando abaixo de 45fps e liga isso sozinho; use este botão para forçar manualmente.</div>
+        </div>
+      </div>
+    </details>
     <div class="sf">
       <label class="sf-lbl" for="worker-url-input">Worker URL (Cloudflare)</label>
       <input id="worker-url-input" type="text" placeholder="https://worldcup-proxy.gcerqueira2012.workers.dev" autocomplete="off" oninput="saveWorkerUrl(this.value)">
       <div class="sf-hint">Quando ativo, a API Key não precisa ficar no browser · chave guardada no Cloudflare</div>
     </div>
-    <div class="sf">
-      <label class="sf-lbl" id="sf-sources-lbl">Fontes de Dados</label>
+    <details class="sf-adv">
+      <summary>Informações avançadas (não interessantes)</summary>
+      <div class="sf-adv-body">
+        <div class="sf">
+          <label class="sf-lbl" id="sf-sources-lbl">Fontes de Dados</label>
 
-      <div class="ds-row">
-        <span class="ds-name">ESPN</span>
-        <span class="ds-status" id="espn-status">carregando…</span>
-      </div>
+          <div class="ds-row">
+            <span class="ds-name">ESPN</span>
+            <span class="ds-status" id="espn-status">carregando…</span>
+          </div>
 
-      <div class="ds-row">
-        <span class="ds-name">API-Football</span>
-        <span class="ds-status" id="af-status"></span>
-      </div>
-      <input id="af-key-input" type="password" placeholder="Chave API-Football" autocomplete="off">
+          <div class="ds-row">
+            <span class="ds-name">API-Football</span>
+            <span class="ds-status" id="af-status"></span>
+          </div>
+          <input id="af-key-input" type="password" placeholder="Chave API-Football" autocomplete="off">
 
-      <div class="ds-row">
-        <span class="ds-name">football-data.org</span>
-        <span class="ds-status" id="fd-status"></span>
-      </div>
-      <input id="fd-key-input" type="password" placeholder="Chave football-data.org" autocomplete="off">
+          <div class="ds-row">
+            <span class="ds-name">football-data.org</span>
+            <span class="ds-status" id="fd-status"></span>
+          </div>
+          <input id="fd-key-input" type="password" placeholder="Chave football-data.org" autocomplete="off">
 
-      <div class="ds-row">
-        <span class="ds-name">StatsBomb</span>
-        <span class="ds-status" id="sb-status"></span>
-      </div>
-      <input id="sb-key-input" type="password" placeholder="Chave StatsBomb" autocomplete="off">
+          <div class="ds-row">
+            <span class="ds-name">StatsBomb</span>
+            <span class="ds-status" id="sb-status"></span>
+          </div>
+          <input id="sb-key-input" type="password" placeholder="Chave StatsBomb" autocomplete="off">
 
-      <div class="ds-row">
-        <span class="ds-name">Opta / Stats Perform</span>
-        <span class="ds-status" id="op-status"></span>
+          <div class="ds-row">
+            <span class="ds-name">Opta / Stats Perform</span>
+            <span class="ds-status" id="op-status"></span>
+          </div>
+          <input id="op-key-input" type="password" placeholder="Chave Opta (Stats Perform)" autocomplete="off">
+        </div>
       </div>
-      <input id="op-key-input" type="password" placeholder="Chave Opta (Stats Perform)" autocomplete="off">
-    </div>
+    </details>
     <div class="sf" id="sf-lang-section">
       <label class="sf-lbl" id="sf-lang-lbl">Idioma</label>
       <div class="lang-row">

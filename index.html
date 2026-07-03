@@ -2690,7 +2690,7 @@ CONSCIÊNCIA TEMPORAL:
 FONTES CONFIÁVEIS (use apenas estas — nunca blogs sem credencial estatística):
 ESPN, BBC Sport, The Guardian Sport, FIFA.com oficial, UEFA.com, FBref.com, Sofascore, Opta/StatsBomb, Transfermarkt, SofaScore, WhoScored, Goal.com (apenas para confirmação de escalações). Prefira sempre a fonte com maior rigor estatístico (FBref/Opta > ESPN > Goal). Cite a fonte nos campos de fundamento.
 
-${SOURCE_RULE}${contextBlock()}
+${SOURCE_RULE}
 
 SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
 
@@ -4215,7 +4215,7 @@ LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em 
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
 
-${SOURCE_RULE}${contextBlock()}
+${SOURCE_RULE}
 
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual
@@ -4549,7 +4549,7 @@ async function runAnalysis(){
     if(getWorkerUrl())baseBody.diagnostics={previous_message_id:_lastAnalysisId};
     if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search',max_uses:4}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
-    const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`}];
+    const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}${contextBlock()}`}];
     let _newAnalysisId=null;
 
     for(let iter=0;iter<10;iter++){
@@ -4606,7 +4606,7 @@ async function runAnalysis(){
       // falha de parse (chaves ausentes OU JSON malformado/truncado), não só a primeira.
       updateThinkingToks({status:'Reformulando resposta…',phase:2});
       const retryMessages=[
-        {role:'user',content:`DATA: ${currentDateFull()}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}`},
+        {role:'user',content:`DATA: ${currentDateFull()}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}${contextBlock()}`},
         {role:'assistant',content:finalText.slice(0,2000)},
         {role:'user',content:'Retorne APENAS o JSON estruturado da análise, começando com { e terminando com }, sem texto antes ou depois, sem blocos de código markdown.'}
       ];

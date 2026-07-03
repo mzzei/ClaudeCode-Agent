@@ -611,14 +611,16 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 @keyframes wc-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .wc-blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 .wc-blob{position:absolute;border-radius:50%}
-/* Blur reduzido (55-65px → 28-32px): o custo do filter:blur() escala ~quadraticamente
-   com o raio, e esses blobs ficam atrás de 3 painéis com backdrop-filter que precisam
-   reamostrar esse fundo ANIMADO a cada frame — em GPU integrada isso derrubava o FPS
-   bem abaixo do que uma GPU dedicada aguenta sem esforço (efeito "roda liso aqui, trava
-   noutro PC" mesmo com hardware geral superior). Efeito visual quase idêntico. */
-.wc-blob1{width:520px;height:520px;top:-120px;left:18%;background:radial-gradient(circle,rgba(40,217,142,.4),transparent 62%);filter:blur(28px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
-.wc-blob2{width:480px;height:480px;bottom:-160px;right:6%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(30px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
-.wc-blob3{width:420px;height:420px;top:32%;left:38%;background:radial-gradient(circle,rgba(232,196,106,.13),transparent 58%);filter:blur(32px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
+/* Blur em ponto intermediário (era 55-65px original; caiu pra 28-32px; agora 42-46px):
+   o blob em si é relativamente barato — é um bitmap borrado uma vez e só TRANSLADADO
+   pelo compositor (will-change:transform), sem precisar reprocessar o blur a cada frame.
+   O gargalo real de verdade são os 3 painéis com backdrop-filter, que reamostram esse
+   fundo A CADA FRAME sempre que algo muda na área deles (scroll, abrir/fechar painel) —
+   por isso restaurar o tamanho visual do blob aqui é seguro; o ponto sensível de
+   desempenho está nos painéis (ver .l-sb/.main/.r-sb) e no "Modo desempenho". */
+.wc-blob1{width:520px;height:520px;top:-120px;left:18%;background:radial-gradient(circle,rgba(40,217,142,.4),transparent 62%);filter:blur(44px);will-change:transform;animation:wc-blob1 22s ease-in-out infinite}
+.wc-blob2{width:480px;height:480px;bottom:-160px;right:6%;background:radial-gradient(circle,rgba(214,249,90,.22),transparent 60%);filter:blur(46px);will-change:transform;animation:wc-blob2 26s ease-in-out infinite}
+.wc-blob3{width:420px;height:420px;top:32%;left:38%;background:radial-gradient(circle,rgba(232,196,106,.13),transparent 58%);filter:blur(48px);will-change:transform;animation:wc-blob3 30s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.wc-blob1,.wc-blob2,.wc-blob3,.ls-emblem-aura{animation:none!important}}
 
 /* Gradient text utilities */

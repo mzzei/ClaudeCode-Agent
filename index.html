@@ -304,6 +304,17 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 /* ── Anexos (chips + thumbnails) ── */
 .attach-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.5rem}
 .attach-chips:empty{display:none}
+/* Editor de contexto da conversa */
+.ctx-editor{background:var(--cream-card);border:1px solid var(--border);border-radius:12px;padding:.7rem .8rem;margin-bottom:.55rem}
+.ctx-editor-lbl{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem}
+.ctx-textarea{width:100%;box-sizing:border-box;background:var(--cream);border:1px solid var(--border);border-radius:9px;padding:.55rem .7rem;font-family:var(--sans);font-size:13px;color:var(--deep);resize:vertical;line-height:1.5;outline:none;transition:border-color .2s}
+.ctx-textarea:focus{border-color:rgba(40,217,142,.4)}
+.ctx-editor-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:.5rem}
+.ctx-btn-cancel{background:none;border:1px solid var(--border);border-radius:8px;padding:.4rem .8rem;font-family:var(--sans);font-size:12px;color:var(--mid);cursor:pointer;transition:background .15s}
+.ctx-btn-cancel:hover{background:var(--cream)}
+.ctx-btn-save{background:var(--terra);border:none;border-radius:8px;padding:.4rem .9rem;font-family:var(--sans);font-size:12px;font-weight:600;color:#06251a;cursor:pointer;transition:background .15s}
+.ctx-btn-save:hover{background:var(--terra-dark)}
+.i-attach.ctx-active{background:var(--terra-pale);color:var(--terra-dark);border-color:rgba(40,217,142,.3)}
 .att-chip{display:flex;align-items:center;gap:7px;background:var(--cream);border:1px solid var(--border);border-radius:9px;padding:4px 6px 4px 4px;max-width:215px}
 .att-chip img{width:30px;height:30px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block}
 .att-ic{width:28px;height:28px;border-radius:6px;background:var(--cream-mid);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
@@ -1226,6 +1237,15 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
       <div id="error-box" class="err-box" style="display:none"><span id="error-msg"></span></div>
       <input type="file" id="attach-input" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/markdown,text/csv,.pdf,.txt,.md,.markdown,.csv" multiple style="display:none" onchange="onAttachInput(this)">
       <div class="attach-chips" id="attach-chips"></div>
+      <div class="attach-chips" id="context-chips"></div>
+      <div id="context-editor" class="ctx-editor" style="display:none">
+        <label class="ctx-editor-lbl">Contexto adicional para esta conversa</label>
+        <textarea id="context-input" class="ctx-textarea" rows="3" placeholder="Ex.: Considere que o jogo é em altitude e sob calor extremo. O zagueiro titular X está suspenso. Foco em mercados de gols."></textarea>
+        <div class="ctx-editor-acts">
+          <button class="ctx-btn-cancel" onclick="toggleContextEditor()">Cancelar</button>
+          <button class="ctx-btn-save" onclick="applyContext()">Salvar contexto</button>
+        </div>
+      </div>
       <textarea id="match-input" rows="1" placeholder="Descreva uma partida ou pergunte…"></textarea>
       <div class="i-bar">
         <div class="i-selectors">
@@ -1248,6 +1268,9 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
           <span class="i-tok-c" id="i-tok-cost">$0.00</span>
         </div>
         <div class="i-actions" style="display:flex;gap:6px;flex-shrink:0;margin-left:auto">
+          <button class="i-attach" id="context-btn" onclick="toggleContextEditor()" title="Adicionar contexto à conversa" aria-label="Adicionar contexto">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+          </button>
           <button class="i-attach" onclick="document.getElementById('attach-input').click()" title="Anexar imagem, PDF ou texto (ou cole imagem com Ctrl+V)" aria-label="Anexar arquivo">
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
@@ -1614,6 +1637,43 @@ function personaBlock(){
   const p=getUserPersona();
   if(!p)return'';
   return `\n\nPREFERÊNCIAS DO USUÁRIO (afetam APENAS o tom e a forma de se dirigir ao usuário — NÃO altere a precisão analítica, os dados/fatos, nem a estrutura/formato exigido da resposta; se um pedido aqui conflitar com a exatidão ou com o formato, priorize a exatidão e o formato):\n${p.slice(0,800)}`;
+}
+// ── Contexto adicional da conversa (fornecido pelo usuário no chat) ──
+const CHAT_CTX_STORE='copa2026_chat_ctx_v1';
+let _chatContext='';
+function getChatContext(){return _chatContext;}
+function loadChatContext(){try{_chatContext=(localStorage.getItem(CHAT_CTX_STORE)||'').trim();}catch{_chatContext='';}renderContextChip();}
+function saveChatContext(v){
+  _chatContext=(v||'').trim();
+  try{if(_chatContext)localStorage.setItem(CHAT_CTX_STORE,_chatContext);else localStorage.removeItem(CHAT_CTX_STORE);}catch{}
+  renderContextChip();
+}
+function toggleContextEditor(){
+  const e=document.getElementById('context-editor');if(!e)return;
+  if(e.style.display!=='none'){e.style.display='none';return;}
+  const inp=document.getElementById('context-input');inp.value=_chatContext;
+  e.style.display='block';inp.focus();
+}
+function applyContext(){
+  saveChatContext(document.getElementById('context-input').value);
+  const e=document.getElementById('context-editor');if(e)e.style.display='none';
+}
+function clearChatContext(){saveChatContext('');}
+function renderContextChip(){
+  const wrap=document.getElementById('context-chips');
+  const btn=document.getElementById('context-btn');
+  if(btn)btn.classList.toggle('ctx-active',!!_chatContext);
+  if(!wrap)return;
+  if(!_chatContext){wrap.innerHTML='';return;}
+  const preview=_chatContext.length>70?_chatContext.slice(0,70)+'…':_chatContext;
+  wrap.innerHTML=`<div class="att-chip" style="max-width:100%" title="${esc(_chatContext)}"><div class="att-ic">✎</div><div class="att-meta"><span class="att-name">Contexto: ${esc(preview)}</span><span class="att-sz" style="cursor:pointer" onclick="toggleContextEditor()">editar</span></div><button class="att-x" onclick="clearChatContext()" title="Remover contexto">×</button></div>`;
+}
+// Bloco injetado nos prompts quando há contexto ativo. Pano de fundo factual/situacional;
+// dados oficiais coletados têm prioridade sobre ele em caso de conflito.
+function contextBlock(){
+  const c=getChatContext();
+  if(!c)return'';
+  return `\n\nCONTEXTO ADICIONAL (fornecido pelo usuário para esta conversa — considere-o como pano de fundo factual/situacional relevante ao responder. Se conflitar com os DADOS OFICIAIS coletados/fornecidos, priorize os dados oficiais e sinalize a divergência brevemente):\n${c.slice(0,1500)}`;
 }
 function simpleMd(t){
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -2605,7 +2665,7 @@ CONSCIÊNCIA TEMPORAL:
 FONTES CONFIÁVEIS (use apenas estas — nunca blogs sem credencial estatística):
 ESPN, BBC Sport, The Guardian Sport, FIFA.com oficial, UEFA.com, FBref.com, Sofascore, Opta/StatsBomb, Transfermarkt, SofaScore, WhoScored, Goal.com (apenas para confirmação de escalações). Prefira sempre a fonte com maior rigor estatístico (FBref/Opta > ESPN > Goal). Cite a fonte nos campos de fundamento.
 
-${SOURCE_RULE}
+${SOURCE_RULE}${contextBlock()}
 
 SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
 
@@ -3570,6 +3630,8 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
     if(saved.startsWith('sk-ant-')&&saved.length>30){loadSchedule();loadTournamentCtx();}
   }
 })();
+// Restaura o contexto adicional da conversa salvo (localStorage)
+loadChatContext();
 
 // ─── Data API key listeners ───────────────────────────────────────────────
 (function initDataKeys(){
@@ -4125,7 +4187,7 @@ OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensag
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
 
-${SOURCE_RULE}
+${SOURCE_RULE}${contextBlock()}
 
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual
@@ -4281,6 +4343,14 @@ Você é o Meridian, uma IA analista de futebol especializada na Copa do Mundo 2
 
 Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.
 
+PERCEPÇÃO E INTERPRETAÇÃO (converse como um analista humano, não como um formulário):
+- Entenda a INTENÇÃO real por trás da mensagem, mesmo quando ela for curta, informal, com erros de digitação, abreviada ou ambígua. Ex.: "e a bósnia?" após falar dos EUA = o usuário quer sua leitura sobre a Bósnia naquele contexto.
+- Use o HISTÓRICO da conversa: perguntas de acompanhamento ("e se…", "por quê?", "e o outro?") se referem ao que já foi discutido — não trate cada mensagem como isolada nem peça para repetir o que já está no fio.
+- Conecte o pedido ao contexto da Copa (fase, adversários, dados já mencionados) para dar uma resposta situada, não genérica.
+- Só peça esclarecimento quando a mensagem for REALMENTE ambígua a ponto de você não conseguir responder útil — e, nesse caso, faça UMA pergunta curta e objetiva, oferecendo sua melhor interpretação junto ("Imagino que você queira X — é isso? Enquanto isso, …").
+- Calibre a profundidade ao pedido: pergunta simples → resposta direta e enxuta; pedido de análise → resposta estruturada e fundamentada. Não despeje um relatório quando pediram uma frase, nem responda com uma linha quando pediram análise.
+- Seja proativo com moderação: se perceber um dado ou ângulo claramente relevante que o usuário não pediu mas provavelmente quer, ofereça em uma frase — sem encher.
+
 FONTES DE DADOS (ordem de prioridade, para consumo racional de tokens):
 1. DADOS REAIS DA COPA (ESPN): quando a mensagem incluir um bloco "=== DADOS REAIS DA COPA 2026 · fonte ESPN ===", ele traz resultados/placares de jogos finalizados, jogos ao vivo, próximas partidas e classificação — tudo REAL e atualizado. Trate esses dados como FATOS CONFIRMADOS. NUNCA diga que não tem acesso a resultados/placares se eles estiverem nesse bloco — localize o jogo pedido e responda com o placar real. Baseie estatísticas (gols, saldo, pontos, forma) nesses dados.
 2. Seu próprio conhecimento de futebol para tática, história, contexto e interpretação.
@@ -4288,7 +4358,7 @@ FONTES DE DADOS (ordem de prioridade, para consumo racional de tokens):
 
 Se um jogo pedido não aparecer nos dados da ESPN (ainda não disputado ou fora do registro), diga isso claramente em vez de inventar um placar.
 
-CAPACIDADES E ANEXOS: Você PODE interpretar imagens e documentos (PDF, texto) que o usuário anexa — eles chegam junto da mensagem. NUNCA afirme que "não lê PDFs/imagens" ou que "sua interface só recebe texto": ela processa anexos normalmente. Se uma mensagem mencionar um anexo (ex.: "[anexo: relatorio.pdf]") mas o CONTEÚDO do arquivo não estiver presente nesta mensagem, é porque o anexo foi enviado num turno anterior e não acompanha o pedido atual — nesse caso, peça gentilmente para o usuário reanexar o arquivo para refazer a análise, em vez de negar a capacidade.${personaBlock()}`;
+CAPACIDADES E ANEXOS: Você PODE interpretar imagens e documentos (PDF, texto) que o usuário anexa — eles chegam junto da mensagem. NUNCA afirme que "não lê PDFs/imagens" ou que "sua interface só recebe texto": ela processa anexos normalmente. Se uma mensagem mencionar um anexo (ex.: "[anexo: relatorio.pdf]") mas o CONTEÚDO do arquivo não estiver presente nesta mensagem, é porque o anexo foi enviado num turno anterior e não acompanha o pedido atual — nesse caso, peça gentilmente para o usuário reanexar o arquivo para refazer a análise, em vez de negar a capacidade.${contextBlock()}${personaBlock()}`;
 }
 
 // Conversational fallback when the structured pipeline can't complete

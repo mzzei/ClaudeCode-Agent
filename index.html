@@ -660,6 +660,19 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
   padding:.85rem
 }
 
+/* ── Modo desempenho ──
+   backdrop-filter é caro independente de blur radius (reamostra o fundo a cada frame);
+   em máquinas onde a aceleração de hardware do navegador está desligada/limitada, mesmo
+   uma GPU dedicada forte não ajuda (tudo cai pra rasterização por CPU). Este modo remove
+   o custo de compositing por completo: sem backdrop-filter, sem blobs animados/borrados.
+   Ativado automaticamente se o FPS medido no dispositivo for baixo, ou manualmente em
+   Configurações. */
+body.wc-lite .l-sb,body.wc-lite .main,body.wc-lite .r-sb,body.wc-lite .m-nav{
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+}
+body.wc-lite .wc-blob1,body.wc-lite .wc-blob2,body.wc-lite .wc-blob3{display:none!important}
+body.wc-lite .ls-emblem-aura{animation:none!important}
+
 /* ── Sidebar internals ── */
 .ls-name{font-family:var(--sans);font-style:normal;font-weight:800;font-size:17px;letter-spacing:.2em;color:var(--deep);line-height:1.05}
 .ls-name-agent{display:block;font-weight:600;font-size:7.5px;letter-spacing:.235em;margin-top:4px}
@@ -1439,6 +1452,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
         Filtragem dinâmica na busca (experimental)
       </label>
       <div class="sf-hint">Roda a coleta (Fase 1) no <b>Sonnet</b> com <code>web_search_20260209</code>, que filtra as páginas antes de entrarem no contexto. <b>Reduz a contagem de tokens, mas tende a aumentar o custo em $</b> (Sonnet custa ~3,75× o Haiku). Se o seu acesso não suportar, volta sozinho à busca padrão. Padrão: desligado.</div>
+    </div>
+    <div class="sf">
+      <label class="sf-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="perf-mode-toggle" onchange="setPerfMode(this.checked)" style="width:auto;margin:0;cursor:pointer">
+        Modo desempenho (menos efeitos visuais)
+      </label>
+      <div class="sf-hint" id="perf-mode-hint">Desliga o desfoque de fundo (blur/vidro fosco) e as animações decorativas — deixa a interface mais leve para computadores que engasgam. O app já detecta automaticamente quando o dispositivo está renderizando abaixo de 45fps e liga isso sozinho; use este botão para forçar manualmente.</div>
     </div>
     <div class="sf">
       <label class="sf-lbl" for="worker-url-input">Worker URL (Cloudflare)</label>
@@ -3667,6 +3687,41 @@ document.getElementById('api-key-input').addEventListener('blur',function(){
 })();
 // Restaura o contexto adicional da conversa salvo (localStorage)
 loadChatContext();
+
+// ── Modo desempenho: desliga backdrop-filter/blobs animados (custo de compositing
+// caro) quando o dispositivo não aguenta, mesmo com GPU dedicada — se a aceleração
+// de hardware do navegador estiver limitada, tudo cai pra rasterização por CPU. ──
+const PERF_MODE_STORE='copa2026_perf_mode'; // 'on'|'off' — só existe se o usuário escolheu manualmente
+function applyPerfMode(on){
+  document.body.classList.toggle('wc-lite',!!on);
+  const cb=document.getElementById('perf-mode-toggle');if(cb)cb.checked=!!on;
+}
+function getPerfModePref(){try{return localStorage.getItem(PERF_MODE_STORE);}catch{return null;}}
+function setPerfMode(on){
+  try{localStorage.setItem(PERF_MODE_STORE,on?'on':'off');}catch{}
+  applyPerfMode(on);
+  const hint=document.getElementById('perf-mode-hint');
+  if(hint)hint.innerHTML='Desliga o desfoque de fundo (blur/vidro fosco) e as animações decorativas — deixa a interface mais leve para computadores que engasgam. Ativado manualmente.';
+}
+(function initPerfMode(){
+  const pref=getPerfModePref();
+  if(pref==='on'||pref==='off'){applyPerfMode(pref==='on');return;} // escolha explícita do usuário: respeita e não remede
+  // Sem preferência salva: mede o FPS real do dispositivo por ~1,2s logo após o load
+  // e decide sozinho (sem persistir — cada sessão remede, robusto a mudanças de máquina/aba).
+  let frames=0,start=null;
+  function tick(ts){
+    if(start===null)start=ts;
+    frames++;
+    if(ts-start<1200){requestAnimationFrame(tick);return;}
+    const fps=frames/((ts-start)/1000);
+    if(fps<45){
+      applyPerfMode(true);
+      const hint=document.getElementById('perf-mode-hint');
+      if(hint)hint.innerHTML='Ativado automaticamente: este dispositivo renderizou abaixo de 45fps ao carregar a página. Desmarque para forçar os efeitos visuais completos.';
+    }
+  }
+  setTimeout(()=>requestAnimationFrame(tick),800);
+})();
 
 // ─── Data API key listeners ───────────────────────────────────────────────
 (function initDataKeys(){

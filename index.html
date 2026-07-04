@@ -2078,6 +2078,21 @@ function scrollChat(){const c=document.getElementById('chat');setTimeout(()=>{c.
 
 function fmt(n){return n>=1000?(n/1000).toFixed(1)+'k':String(n);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// O schema pede array de strings em campos como "lacunas", mas o modelo às vezes
+// generaliza o padrão de outros arrays do schema (que SÃO objetos, ex. eventos_provaveis)
+// e devolve {campo:"...", motivo:"..."} em vez de string — String(objeto) vira
+// "[object Object]" na tela. Isso extrai um texto legível de qualquer formato.
+function textFrom(v){
+  if(typeof v==='string')return v;
+  if(v==null)return '';
+  if(typeof v==='object'){
+    const known=v.lacuna||v.descricao||v.texto||v.campo||v.fator||v.motivo;
+    if(known)return String(known);
+    const strs=Object.values(v).filter(x=>typeof x==='string'&&x.trim());
+    if(strs.length)return strs.join(' — ');
+  }
+  return String(v);
+}
 
 let _lastQuery='';
 function showUserBubble(text,atts){
@@ -2556,8 +2571,8 @@ function ctSideSection(s,hn,an,atkN,defN){
   return `<div class="tab-s"><div class="tab-h">Ataque ${atkN} × Defesa ${defN}</div>`+
     ctVanTag(s.vantagem,hn,an)+
     (s.diagnostico?`<p class="ct-diag">${esc(s.diagnostico)}</p>`:'')+
-    (s.pontos_exploracao?.length?`<div class="ct-group"><div class="ct-glbl">Pontos de exploração</div>${s.pontos_exploracao.map(p=>`<div class="ct-item ct-atk">${esc(p)}</div>`).join('')}</div>`:'')+
-    (s.bloqueios?.length?`<div class="ct-group"><div class="ct-glbl">Bloqueios previstos</div>${s.bloqueios.map(b=>`<div class="ct-item ct-def">${esc(b)}</div>`).join('')}</div>`:'')+
+    (s.pontos_exploracao?.length?`<div class="ct-group"><div class="ct-glbl">Pontos de exploração</div>${s.pontos_exploracao.map(p=>`<div class="ct-item ct-atk">${esc(textFrom(p))}</div>`).join('')}</div>`:'')+
+    (s.bloqueios?.length?`<div class="ct-group"><div class="ct-glbl">Bloqueios previstos</div>${s.bloqueios.map(b=>`<div class="ct-item ct-def">${esc(textFrom(b))}</div>`).join('')}</div>`:'')+
     '</div>';
 }
 
@@ -2589,11 +2604,11 @@ function renderResults(d,opts){
     </div>`:''}
     ${d.fatores_decisivos?.length?`<div class="tab-s">
       <div class="tab-h">2. Fatores Decisivos</div>
-      ${d.fatores_decisivos.map((f,i)=>`<div class="frow"><span class="fnum">${i+1}</span><span>${esc(f)}</span></div>`).join('')}
+      ${d.fatores_decisivos.map((f,i)=>`<div class="frow"><span class="fnum">${i+1}</span><span>${esc(textFrom(f))}</span></div>`).join('')}
     </div>`:''}
     ${d.tendencias?.length?`<div class="tab-s">
       <div class="tab-h">3. Tendências Recentes</div>
-      ${d.tendencias.map(t=>`<div class="tend-item"><span class="tend-dot"></span><span>${esc(t)}</span></div>`).join('')}
+      ${d.tendencias.map(t=>`<div class="tend-item"><span class="tend-dot"></span><span>${esc(textFrom(t))}</span></div>`).join('')}
     </div>`:''}
     ${d.sugestoes_ticket?.length?`<div class="tab-s">
       <div class="tab-h">4. Sugestões de Ticket</div>
@@ -2665,7 +2680,7 @@ function renderResults(d,opts){
     </div>`:''}
     <div class="tab-s">
       <div class="tab-h">Lacunas de Dados</div>
-      ${d.lacunas?.length?d.lacunas.map(g=>`<div class="gitem">· ${esc(g)}</div>`).join(''):'<span style="font-size:12px;color:var(--muted)">Nenhuma lacuna crítica declarada</span>'}
+      ${d.lacunas?.length?d.lacunas.map(g=>`<div class="gitem">· ${esc(textFrom(g))}</div>`).join(''):'<span style="font-size:12px;color:var(--muted)">Nenhuma lacuna crítica declarada</span>'}
     </div>
     <div class="disc">Análise estatística baseada em modelo de Poisson e dados reais · não é recomendação financeira</div>`;
 
@@ -2787,6 +2802,8 @@ METODOLOGIA:
    Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
 6. ANÁLISE DE TÉCNICOS: pesquise o treinador de cada equipe. Identifique formação habitual, filosofia de pressão/posse/transição, ajustes realizados na Copa 2026 e como o perfil tático do técnico afeta os mercados (ex: técnico defensivo → under, alta linha → espaços nas costas)
 7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
+
+FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
@@ -4373,6 +4390,8 @@ METODOLOGIA:
    Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
 6. ANÁLISE DE TÉCNICOS: use APENAS o nome de técnico que vier nos FATOS COLETADOS (campo "tecnico" de cada time). Se vier, preencha tecnico_mandante/tecnico_visitante com nome + formação, filosofia, ajustes e impacto nos mercados. Se o campo "tecnico" estiver vazio nos dados, preencha "nome" com "a confirmar" e registre em "lacunas" — NÃO deduza o treinador de memória (ele pode ter mudado desde 2024-2025)
 7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
+
+FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 

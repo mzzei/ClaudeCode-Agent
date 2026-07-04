@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "WorldCupAgent",
-      "runtimeExecutable": "pwsh",
-      "runtimeArgs": ["-NoProfile", "-File", "C:\\Users\\Gabriel\\.claude\\sessions\\WorldCupAgent\\serve.ps1"],
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\serve.ps1"],
       "port": 3456
     }
   ]

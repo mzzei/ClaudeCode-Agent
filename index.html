@@ -2796,6 +2796,7 @@ REGRAS DE PESQUISA:
 • Máximo 6 buscas por análise.
 • NÃO pesquise: data, hora, sede, fase — já constam na mensagem.
 • NÃO pesquise ranking FIFA geral — use apenas se aparecer como dado colateral.
+• TÉCNICO ATUAL e ESCALAÇÃO/ONZE PROVÁVEL são informação pública e encontrável — as buscas ③ e ⑤ existem justamente para obtê-los. Não os deixe vazios nem os declare como lacuna sem ter efetivamente buscado; se a 1ª tentativa não trouxe, refine ("[Seleção] técnico atual 2026", "[Seleção] escalação provável"). Preencha SEMPRE a partir dos resultados da busca — nunca de memória.
 
 ${GROUNDING_RULE}
 Os resultados das SUAS PRÓPRIAS BUSCAS acima são a única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
@@ -4278,7 +4279,9 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'FotMob, Sofascore e os sites/federações oficiais para escalações e convocações confirmadas; '
     +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
-  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'+_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
+  const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
+    +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
+    +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
 CLASSIFICAÇÃO, RESULTADOS E FORMA RECENTE JÁ VÊM VIA API abaixo — não pesquise isso.
@@ -4376,7 +4379,7 @@ PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados sã
 
 OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais.
 
-LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em "lacunas" um dado que (a) esteja realmente ausente dos dados fornecidos E (b) afete MATERIALMENTE a conclusão da análise. NÃO liste como lacuna: ranking FIFA (vem nos dados; se não vier, é público e estável — informe assim mesmo), estatísticas individuais de reservas, histórico pessoal de goleiro, ou possíveis cartões acumulados — esses são secundários e não devem virar lacuna. Antes de declarar qualquer lacuna, tente derivar/estimar a partir dos dados já disponíveis (ex.: forma, xG, resultados). Prefira uma análise completa: lacuna é exceção, não hábito.
+LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em "lacunas" um dado que (a) esteja realmente ausente dos dados fornecidos E (b) afete MATERIALMENTE a conclusão da análise. Reserve "lacunas" para dados que NENHUMA fonte publica (ex.: um xG específico que não existe para aquela partida). NÃO liste como lacuna informação que é PÚBLICA e encontrável — técnico atual, escalação/onze provável, ranking FIFA: se algum desses não veio nos dados, é LIMITE DE COLETA (a busca não trouxe), não um fato inexistente; mencione no máximo uma vez, de forma sucinta e sem especular o valor. Também não vire lacuna: estatísticas individuais de reservas, histórico pessoal de goleiro, ou possíveis cartões acumulados. Antes de declarar qualquer lacuna, tente derivar/estimar a partir dos dados já disponíveis (ex.: forma, xG, resultados). Prefira uma análise completa: lacuna é exceção, não hábito.
 
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
@@ -4399,7 +4402,7 @@ METODOLOGIA:
    - "media": probabilidade ≥45% com dados parciais mas coerentes
    - "baixa": apenas se a sugestão tiver valor estratégico excepcional; justifique explicitamente
    Não descarte tickets de alta confiança por serem "óbvios" — um ticket preciso e bem fundamentado tem mais valor que um arriscado
-6. ANÁLISE DE TÉCNICOS: use APENAS o nome de técnico que vier nos FATOS COLETADOS (campo "tecnico" de cada time). Se vier, preencha tecnico_mandante/tecnico_visitante com nome + formação, filosofia, ajustes e impacto nos mercados. Se o campo "tecnico" estiver vazio nos dados, preencha "nome" com "a confirmar" e registre em "lacunas" — NÃO deduza o treinador de memória (ele pode ter mudado desde 2024-2025)
+6. ANÁLISE DE TÉCNICOS: use APENAS o nome de técnico que vier nos FATOS COLETADOS (campo "tecnico" de cada time). Se vier, preencha tecnico_mandante/tecnico_visitante com nome + formação, filosofia, ajustes e impacto nos mercados. Se o campo "tecnico" vier vazio nos dados: técnico e escalação de seleções são informação PÚBLICA — um campo vazio significa que a COLETA foi insuficiente, NÃO que o técnico seja desconhecido. Preencha "nome" com "a confirmar", registre no máximo UMA lacuna sucinta ("técnico a confirmar na coleta") e NÃO especule quem seria nem deduza de memória (pode ter mudado desde 2024-2025). NÃO transforme essa ausência num tema recorrente da análise (não repita em incerteza/eventos/fundamentos como se fosse um fator relevante) — trate como limite pontual de dados.
 7. CONFRONTO TÁTICO: compare o estilo ofensivo de cada time com as vulnerabilidades defensivas do adversário. Para atq_mand_def_vis: como o ataque do mandante explora (ou não) a defesa do visitante. Para atq_vis_def_mand: como o ataque do visitante explora (ou não) a defesa do mandante. Inclua pontos_exploracao (onde o ataque penetra) e bloqueios (onde a defesa neutraliza). Identifique duelos_chave individuais e conclua com síntese tática do equilíbrio geral.
 
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
@@ -4647,17 +4650,17 @@ function _analysisSummaryForThread(d){
   const L=[],tm=d.mandante||{},tv=d.visitante||{};
   L.push(`[ANÁLISE ESTRUTURADA JÁ ENTREGUE NESTA CONVERSA — ${d.partida||'partida'}${d.fase?' · '+d.fase:''}${d.data_hora?' · '+d.data_hora:''}${d.sede?' · '+d.sede:''}]`);
   if(tm.nome||tv.nome){
-    L.push(`${tm.nome||'Mandante'}: ranking FIFA ${tm.ranking_fifa||'?'}; forma ${tm.forma_recente||'?'}; xG ${tm.xg_marcado??'?'}/${tm.xg_sofrido??'?'}; escalação ${tm.escalacao||'?'}; desfalques ${(tm.desfalques||[]).join(', ')||'nenhum'}.`);
-    L.push(`${tv.nome||'Visitante'}: ranking FIFA ${tv.ranking_fifa||'?'}; forma ${tv.forma_recente||'?'}; xG ${tv.xg_marcado??'?'}/${tv.xg_sofrido??'?'}; escalação ${tv.escalacao||'?'}; desfalques ${(tv.desfalques||[]).join(', ')||'nenhum'}.`);
+    L.push(`${tm.nome||'Mandante'}: ranking FIFA ${tm.ranking_fifa||'?'}; forma ${tm.forma_recente||'?'}; xG ${tm.xg_marcado??'?'}/${tm.xg_sofrido??'?'}; escalação ${tm.escalacao||'?'}; desfalques ${(tm.desfalques||[]).map(textFrom).filter(Boolean).join(', ')||'nenhum'}.`);
+    L.push(`${tv.nome||'Visitante'}: ranking FIFA ${tv.ranking_fifa||'?'}; forma ${tv.forma_recente||'?'}; xG ${tv.xg_marcado??'?'}/${tv.xg_sofrido??'?'}; escalação ${tv.escalacao||'?'}; desfalques ${(tv.desfalques||[]).map(textFrom).filter(Boolean).join(', ')||'nenhum'}.`);
   }
   const tcm=d.tecnico_mandante||{},tcv=d.tecnico_visitante||{};
   if(tcm.nome||tcv.nome)L.push(`Técnicos: ${tcm.nome||'?'} (${tcm.formacao||'?'}, ${tcm.filosofia||''}) x ${tcv.nome||'?'} (${tcv.formacao||'?'}, ${tcv.filosofia||''}).`);
   if(d.lambda)L.push(`Lambdas (gols esperados): ${tm.nome||'mandante'} ${d.lambda.home_mid??'?'}, ${tv.nome||'visitante'} ${d.lambda.away_mid??'?'}.`);
   if(Array.isArray(d.eventos_provaveis)&&d.eventos_provaveis.length)L.push('Eventos prováveis: '+d.eventos_provaveis.slice(0,6).map(e=>`${e.evento} ${Math.round((e.probabilidade||0)*100)}%`).join('; ')+'.');
   if(Array.isArray(d.sugestoes_ticket)&&d.sugestoes_ticket.length)L.push('Tickets: '+d.sugestoes_ticket.slice(0,6).map(x=>`${x.descricao} (${Math.round((x.probabilidade||0)*100)}%, ${x.confianca||''})`).join('; ')+'.');
-  if(Array.isArray(d.fatores_decisivos)&&d.fatores_decisivos.length)L.push('Fatores decisivos: '+d.fatores_decisivos.slice(0,5).join('; ')+'.');
+  if(Array.isArray(d.fatores_decisivos)&&d.fatores_decisivos.length)L.push('Fatores decisivos: '+d.fatores_decisivos.slice(0,5).map(textFrom).filter(Boolean).join('; ')+'.');
   if(d.confronto_tatico&&d.confronto_tatico.conclusao)L.push('Síntese tática: '+d.confronto_tatico.conclusao);
-  if(Array.isArray(d.lacunas)&&d.lacunas.length)L.push('Lacunas conhecidas: '+d.lacunas.slice(0,4).join('; ')+'.');
+  if(Array.isArray(d.lacunas)&&d.lacunas.length)L.push('Lacunas conhecidas: '+d.lacunas.slice(0,4).map(textFrom).filter(Boolean).join('; ')+'.');
   L.push('(Base factual desta partida — use como memória para perguntas de acompanhamento; não repita a coleta se a resposta já estiver aqui.)');
   return L.join('\n');
 }

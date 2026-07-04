@@ -215,7 +215,11 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .pname{font-size:14px;font-weight:500}.ppct{font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
 .prange{font-size:11px;color:var(--muted);margin-top:3px}
 .btrack{height:5px;background:var(--cream-mid);border-radius:3px;overflow:hidden;margin-top:4px}
-.bfill{height:100%;border-radius:3px;transition:width .9s cubic-bezier(.22,.61,.36,1)}
+/* transform:scaleX em vez de width: animar width força recálculo de layout + repintura
+   a cada frame; várias barras (tickets/eventos) animando ao mesmo tempo quando uma análise
+   renderiza travava o scroll bem nesse momento. transform é só compositing (GPU), sem custo
+   de layout — mesmo efeito visual (cresce da esquerda, origin:left). */
+.bfill{height:100%;width:100%;border-radius:3px;transform-origin:left;transition:transform .9s cubic-bezier(.22,.61,.36,1);will-change:transform}
 .s3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .stile{background:var(--cream-card);border:1px solid var(--border);border-radius:12px;padding:.8rem .6rem;text-align:center}
 .slbl{font-size:11px;color:var(--mid);margin-bottom:4px}.sval{font-size:1.4rem;font-weight:500;font-variant-numeric:tabular-nums}
@@ -223,7 +227,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .ev-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
 .ev-nome{font-size:13px;font-weight:500}.ev-pct{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--terra)}
 .ev-bar-track{height:3px;background:var(--cream-mid);border-radius:2px;overflow:hidden;margin-bottom:4px}
-.ev-bar-fill{height:100%;border-radius:2px;background:var(--terra);transition:width .9s cubic-bezier(.22,.61,.36,1)}
+.ev-bar-fill{height:100%;width:100%;border-radius:2px;background:var(--terra);transform-origin:left;transition:transform .9s cubic-bezier(.22,.61,.36,1);will-change:transform}
 .ev-reason{font-size:11px;color:var(--muted);line-height:1.5}
 .ticket{background:var(--cream);border:1px solid rgba(120,65,50,.2);border-radius:13px;padding:.9rem 1rem;margin-bottom:8px}
 .ticket:last-child{margin-bottom:0}
@@ -800,7 +804,7 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
 .ppct{color:var(--deep);font-size:1.45rem;font-weight:800}
 .prange{color:var(--dim)}
 .btrack{background:rgba(255,255,255,.07);border-radius:5px;height:7px!important}
-.bfill{background:linear-gradient(90deg,#28d98e,#a6f24a);box-shadow:0 0 16px rgba(120,240,120,.6);transition:width 1.1s cubic-bezier(.22,.61,.36,1)!important}
+.bfill{background:linear-gradient(90deg,#28d98e,#a6f24a);box-shadow:0 0 16px rgba(120,240,120,.6);transition:transform 1.1s cubic-bezier(.22,.61,.36,1)!important}
 
 /* ── Stat tiles ── */
 .s3{gap:10px}
@@ -2619,7 +2623,7 @@ function renderResults(d,opts){
   const tabTatica=`
     <div class="tab-s">
       <div class="tab-h">1. Probabilidades · Resultado</div>
-      ${[{lbl:hn,v:prob.home,lo:pL.home,hi:pH.home},{lbl:'Empate',v:prob.draw,lo:pL.draw,hi:pH.draw},{lbl:an,v:prob.away,lo:pL.away,hi:pH.away}].map(b=>`<div class="prow"><div class="pmeta"><span class="pname">${b.lbl}</span><span class="ppct">${pct(b.v)}</span></div><div class="btrack"><div class="bfill" data-w="${Math.round(b.v*100)}" style="width:0%"></div></div><div class="prange">faixa ${pct(b.lo)}–${pct(b.hi)}</div></div>`).join('')}
+      ${[{lbl:hn,v:prob.home,lo:pL.home,hi:pH.home},{lbl:'Empate',v:prob.draw,lo:pL.draw,hi:pH.draw},{lbl:an,v:prob.away,lo:pL.away,hi:pH.away}].map(b=>`<div class="prow"><div class="pmeta"><span class="pname">${b.lbl}</span><span class="ppct">${pct(b.v)}</span></div><div class="btrack"><div class="bfill" data-w="${Math.round(b.v*100)}" style="transform:scaleX(0)"></div></div><div class="prange">faixa ${pct(b.lo)}–${pct(b.hi)}</div></div>`).join('')}
     </div>
     <div class="tab-s">
       <div class="tab-h">2. Mercados de Gols</div>
@@ -2639,7 +2643,7 @@ function renderResults(d,opts){
     </div>`:''}
     ${d.eventos_provaveis?.length?`<div class="tab-s">
       <div class="tab-h">4. Eventos Prováveis</div>
-      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="width:0%"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
+      ${d.eventos_provaveis.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="transform:scaleX(0)"></div></div><div class="ev-reason">${esc(e.fundamento||'')}</div></div>`).join('')}
     </div>`:''}
     ${(d.tecnico_mandante?.nome||d.tecnico_visitante?.nome)?`<div class="tab-s">
       <div class="tab-h">5. Perfil dos Técnicos</div>
@@ -2722,7 +2726,7 @@ function renderResults(d,opts){
   // Animate bars from 0→value and init tab pill
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
-      cardEl.querySelectorAll('.bfill[data-w],.ev-bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%');
+      cardEl.querySelectorAll('.bfill[data-w],.ev-bar-fill[data-w]').forEach(b=>b.style.transform=`scaleX(${b.dataset.w/100})`);
       initTabPill(cardEl);
     });
   });

@@ -2792,7 +2792,9 @@ REGRAS DE PESQUISA:
 • Máximo 6 buscas por análise.
 • NÃO pesquise: data, hora, sede, fase — já constam na mensagem.
 • NÃO pesquise ranking FIFA geral — use apenas se aparecer como dado colateral.
-• Dados não encontrados → declare em "lacunas". Nunca invente valores.
+
+${GROUNDING_RULE}
+Os resultados das SUAS PRÓPRIAS BUSCAS acima são a única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
 
 METODOLOGIA:
 1. Use os dados coletados na sequência acima para montar o perfil de cada time
@@ -4218,7 +4220,8 @@ Seu conhecimento de treino reflete 2024-2025 e está DESATUALIZADO para a Copa 2
 • FATOS VOLÁTEIS — use SOMENTE o que vier dos dados coletados/buscas, NUNCA de memória: técnico atual; escalação, titulares e formação atual; elenco e convocados (quem está dentro ou fora da Copa); lesões e suspensões; clube atual de cada jogador; capitão; forma recente, resultados, classificação e fase; ranking FIFA; disponibilidade ou aposentadoria de jogadores. A regra vale para QUALQUER fato que possa ter mudado desde 2024-2025, mesmo que não esteja nesta lista.
 • CONHECIMENTO PRÓPRIO só é permitido para o que NÃO muda: leitura tática, estilos de jogo, padrões históricos e metodologia estatística (xG, Poisson). Nunca para nomes, escalações ou status atuais.
 • VERIFICAÇÃO (concepção de atualidade): antes de escrever qualquer nome ou fato volátil, confirme que ele aparece nos dados. Se sua memória divergir dos dados, os DADOS vencem. Se você "lembra" de algo que não está nos dados, NÃO afirme.
-• COMPLETUDE PRIMEIRO: extraia o MÁXIMO de cada busca/dado para preencher tudo de forma completa. "A confirmar" + registro em "lacunas" é ÚLTIMO RECURSO — só quando o dado realmente não aparece em nenhuma fonte. Não recorra a "a confirmar" por preguiça ou para encurtar.`;
+• COMPLETUDE PRIMEIRO: extraia o MÁXIMO de cada busca/dado para preencher tudo de forma completa. "A confirmar" + registro em "lacunas" é ÚLTIMO RECURSO — só quando o dado realmente não aparece em nenhuma fonte. Não recorra a "a confirmar" por preguiça ou para encurtar.
+• NARRATIVA DE INCERTEZA (erro sutil, mesma família do erro acima): ao descrever o impacto de uma lacuna (campos "incerteza", "lacunas" ou qualquer texto livre), NUNCA especule qual poderia ser o valor real do fato volátil ausente (ex.: "um técnico diferente do histórico X poderia mudar a formação para Y" — isso INVENTA um "histórico X" como se fosse referência confiável e propõe um valor alternativo do nada). Diga apenas que o dado não foi confirmado nos FATOS COLETADOS e como essa ausência reduz a precisão/confiança da análise — sem sugerir nomes, esquemas ou valores específicos que não vieram dos dados.`;
 
 // Regra de fontes: nada de casas de apostas como fonte de fato/citação. Prompt-only
 // (não usar allowed_domains/blocklist — não existe blocklist no web_search e a

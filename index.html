@@ -1747,7 +1747,7 @@ function simpleMd(t){
 function showAgentBubble(html){
   const el=document.createElement('div');
   el.className='msg-agent-chat';
-  el.innerHTML=`<div class="a-ball" style="flex-shrink:0;margin-top:2px">🏆</div><div class="agent-bubble">${html}</div>`;
+  el.innerHTML=`<div class="a-ball" style="flex-shrink:0;margin-top:2px">${BRAND_STAR}</div><div class="agent-bubble">${html}</div>`;
   document.getElementById('conversation').appendChild(el);
   scrollChat();
   return el.querySelector('.agent-bubble');
@@ -2086,14 +2086,18 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 // generaliza o padrão de outros arrays do schema (que SÃO objetos, ex. eventos_provaveis)
 // e devolve {campo:"...", motivo:"..."} em vez de string — String(objeto) vira
 // "[object Object]" na tela. Isso extrai um texto legível de qualquer formato.
+// Recursivo: cobre objeto aninhado dentro de objeto e arrays dentro do item. Fallback
+// final é JSON.stringify (não String) — nunca deve devolver o literal "[object Object]".
 function textFrom(v){
   if(typeof v==='string')return v;
   if(v==null)return '';
+  if(Array.isArray(v))return v.map(textFrom).filter(Boolean).join(' — ');
   if(typeof v==='object'){
-    const known=v.lacuna||v.descricao||v.texto||v.campo||v.fator||v.motivo;
-    if(known)return String(known);
-    const strs=Object.values(v).filter(x=>typeof x==='string'&&x.trim());
-    if(strs.length)return strs.join(' — ');
+    const known=v.lacuna||v.descricao||v.texto||v.campo||v.fator||v.motivo||v.detalhe||v.observacao||v.nota||v.resumo||v.mensagem||v.item;
+    if(known)return textFrom(known);
+    const parts=Object.values(v).map(textFrom).filter(Boolean);
+    if(parts.length)return parts.join(' — ');
+    try{return JSON.stringify(v);}catch{return String(v);}
   }
   return String(v);
 }

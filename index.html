@@ -2772,6 +2772,8 @@ ESPN, BBC Sport, The Guardian Sport, FIFA.com oficial, UEFA.com, FBref.com, Sofa
 
 ${SOURCE_RULE}
 
+${TICKET_RULES}
+
 SEQUÊNCIA DE PESQUISA — execute nesta ordem antes de qualquer cálculo (nomes de seleções em português):
 
 ① "[Mandante] Copa do Mundo 2026 resultados estatísticas"
@@ -4287,6 +4289,18 @@ const SOURCE_RULE=`FONTES E CITAÇÃO (regra obrigatória):
 • Odds de mercado podem ser usadas como INSUMO analítico (probabilidade implícita), mas atribua sempre de forma genérica — "odds de mercado / probabilidade implícita" — NUNCA nomeando uma casa de apostas.
 • Se um dado só existir em fonte de apostas, cite o TIPO do dado ("odds implícitas de mercado") ou omita a fonte — nunca dê credibilidade nominal a uma casa de apostas. Prefira sempre confirmar a estatística num provedor estatístico/jornalístico.`;
 
+// Disciplina de tickets — nasceu de uma resposta real com alucinações graves
+// (estatística impossível "13 jogos no torneio", odd inventada "6.50", gíria "perna",
+// mercados-lixo de tiro de meta, prorrogação assumida como padrão). Vale nos 3 prompts.
+const TICKET_RULES=`DISCIPLINA DE TICKETS E APOSTAS (regra obrigatória — evita alucinação e jargão):
+• TERMINOLOGIA: NÃO use a gíria "perna" para uma seleção do bilhete — escreva "seleção", "mercado" ou "aposta". Explique qualquer jargão na 1ª ocorrência (ex.: "same game parlay / criar aposta = várias apostas do mesmo jogo combinadas num bilhete só").
+• NUNCA invente uma odd/cotação numérica (ex.: "odd 6.50", "odd geral X.XX") — você NÃO tem dados de odds. Fale sempre em PROBABILIDADE estimada pelo seu modelo (em %), nunca num número de cotação. Não apresente a resposta como um bilhete de casa de apostas com cotação fechada.
+• ESTATÍSTICAS DE JOGADOR (jogos, gols, assistências, minutos, defesas, finalizações), disponibilidade, lesão e forma: use SOMENTE o que vier dos DADOS COLETADOS/BUSCA. NUNCA de memória (pode ter mudado desde 2024-2025). Se não veio nos dados, diga que não foi confirmado — não invente número nem escale um jogador de memória.
+• SANITY-CHECK obrigatório antes de afirmar QUALQUER número: numa Copa do Mundo uma seleção joga NO MÁXIMO 7 partidas (3 na fase de grupos + até 4 no mata-mata) e o artilheiro do torneio raramente passa de ~6-8 gols NO TOTAL. Números como "13 jogos no torneio" ou "8 gols" para um jogador num único Mundial são IMPOSSÍVEIS — se chegar a um valor assim, é alucinação: descarte e não afirme.
+• NÃO ASSUMA PRORROGAÇÃO como padrão para inflar mercados de acúmulo (chutes, defesas, desarmes). Mata-mata quase sempre termina em 90'. Prorrogação é cenário possível, não a base do cálculo.
+• QUALIDADE DOS MERCADOS: priorize mercados com fundamento estatístico real (resultado, total de gols, ambas marcam, jogador finaliza/marca, handicap). NÃO encha o bilhete com mercados obscuros e de baixo valor (tiro de meta/goal kicks, laterais, escanteios triviais) só para aumentar o número de seleções — sem fundamento sólido, não inclua.
+• COERÊNCIA: não misture contagens contraditórias (ex.: "4 jogos" para um time e "3 jogos" para o outro) sem explicar o formato da Copa 2026 — 48 seleções: fase de grupos de 3 jogos + 16-avos/oitavas/quartas/etc. no mata-mata.`;
+
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // Pre-fetch structured data com FALLBACK em cascata: AF (paga) → FD (paga) → ESPN (grátis).
@@ -4333,12 +4347,14 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // NÃO usar como allowed_domains — a allowlist por domínio já degradou a coleta e quebrou o
   // formato estruturado 2x (ver worldcupagent-web-search-regression). Aqui é só dica, não filtro.
   const _srcNote='FONTES HIPERCONFIÁVEIS (priorize estas; em conflito, vale a mais recente e oficial): '
+    +'SOFASCORE e FOTMOB são as PRINCIPAIS — deles extraia o máximo de métricas por jogo: rating dos jogadores, finalizações e finalizações no gol (por time e por jogador), grandes chances criadas/perdidas, posse de bola, precisão de passe, escanteios, desarmes, xG por partida, forma recente e escalações prováveis/confirmadas; '
     +'Opta/The Analyst (theanalyst.com) e WhoScored para dados e ratings; FBref/StatsBomb e Understat para xG e estatística avançada; '
-    +'FotMob, Sofascore e os sites/federações oficiais para escalações e convocações confirmadas; '
+    +'sites/federações oficiais para convocações confirmadas; '
     +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
   const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
+    +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — em "jogadores_chave", inclua para cada jogador citado os números REAIS da Copa 2026 que a busca retornar (jogos disputados, gols, assistências, finalizações/finalizações no gol por jogo, rating médio). Esses números fundamentam mercados de jogador; SÓ use valores vindos da busca, nunca de memória, e descarte qualquer valor implausível (uma seleção joga no máx. 7 jogos num Mundial).\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
@@ -4443,6 +4459,8 @@ ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
 
 ${SOURCE_RULE}
+
+${TICKET_RULES}
 
 CONSCIÊNCIA TEMPORAL:
 1. Use o CONTEXTO DO TORNEIO fornecido para identificar a fase atual
@@ -4622,6 +4640,10 @@ FONTES DE DADOS (ordem de prioridade, para consumo racional de tokens):
 3. web_search (busca na internet): use APENAS em extrema necessidade — quando o usuário pedir algo factual e recente que os DADOS DA ESPN e seu conhecimento não cobrem (ex.: lesão de última hora, notícia específica). Evite buscar na web o que já está nos dados da ESPN.
 
 Se um jogo pedido não aparecer nos dados da ESPN (ainda não disputado ou fora do registro), diga isso claramente em vez de inventar um placar.
+
+${GROUNDING_RULE}
+
+${TICKET_RULES}
 
 CAPACIDADES E ANEXOS: Você PODE interpretar imagens e documentos (PDF, texto) que o usuário anexa — eles chegam junto da mensagem. NUNCA afirme que "não lê PDFs/imagens" ou que "sua interface só recebe texto": ela processa anexos normalmente. Se uma mensagem mencionar um anexo (ex.: "[anexo: relatorio.pdf]") mas o CONTEÚDO do arquivo não estiver presente nesta mensagem, é porque o anexo foi enviado num turno anterior e não acompanha o pedido atual — nesse caso, peça gentilmente para o usuário reanexar o arquivo para refazer a análise, em vez de negar a capacidade.${contextBlock()}${personaBlock()}`;
 }

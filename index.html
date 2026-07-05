@@ -3127,6 +3127,55 @@ async function getAfFixtures(){
   const to=new Date(Date.now()+21*864e5).toISOString().slice(0,10);
   return fetchAf(`/fixtures?league=${AF_WC_LEAGUE}&season=2026&from=${from}&to=${to}`,'copa2026_af_fixtures_v1',AF_FIX_TTL);
 }
+// ── Enriquecimento determinístico via API-Football: técnico atual (sempre disponível)
+// e escalação CONFIRMADA (só perto do jogo). Tudo defensivo — fetchAf devolve null em
+// qualquer erro (CORS, rede, shape inesperado), então nunca quebra o pipeline; se falhar,
+// a coleta cai no web_search como antes. Técnico muda raramente → cache de 24h. ──
+const AF_COACH_TTL = 24*60*60*1000;
+async function getAfCoach(teamId){
+  const d=await fetchAf(`/coachs?team=${teamId}`,`copa2026_af_coach_${teamId}`,AF_COACH_TTL);
+  if(!d?.response?.length)return null;
+  // Técnico atual = quem tem carreira neste time com end===null; senão, o 1º da lista.
+  const cur=d.response.find(c=>Array.isArray(c.career)&&c.career.some(k=>k.team?.id===teamId&&!k.end));
+  return (cur||d.response[0])?.name||null;
+}
+async function getAfLineups(fixtureId){
+  const d=await fetchAf(`/fixtures/lineups?fixture=${fixtureId}`,`copa2026_af_lineup_${fixtureId}`,AF_FIX_TTL);
+  if(!d?.response?.length)return null;
+  return d.response.map(t=>({
+    team:t.team?.name||'', coach:t.coach?.name||'', formation:t.formation||'',
+    xi:(t.startXI||[]).map(e=>`${e.player?.number??''} ${e.player?.name||''}`.trim()).filter(Boolean)
+  })).filter(t=>t.team&&t.xi.length);
+}
+// Resolve os IDs de AF (times + fixture) da partida analisada, casando os nomes dos
+// times contra as fixtures já carregadas (normalizado sem acento/caixa). Retorna null
+// se não achar (ex.: pergunta livre com nomes fora do calendário) → sem enriquecimento.
+function _afMatchIds(query,fData){
+  if(!fData?.response?.length||!query)return null;
+  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const q=norm(query);
+  for(const f of fData.response){
+    const h=norm(f.teams?.home?.name),a=norm(f.teams?.away?.name);
+    if(h&&a&&q.includes(h)&&q.includes(a))
+      return {homeId:f.teams.home.id,awayId:f.teams.away.id,fixtureId:f.fixture?.id,home:f.teams.home.name,away:f.teams.away.name};
+  }
+  return null;
+}
+async function afEnrichCoachLineup(query,fData){
+  try{
+    const ids=_afMatchIds(query,fData);
+    if(!ids)return '';
+    const[ch,ca,lu]=await Promise.all([
+      ids.homeId?getAfCoach(ids.homeId):null,
+      ids.awayId?getAfCoach(ids.awayId):null,
+      ids.fixtureId?getAfLineups(ids.fixtureId):null
+    ]);
+    const ex=[];
+    if(ch||ca){ex.push('=== TÉCNICOS ATUAIS (API-Football · confirmado, use direto) ===');if(ch)ex.push(`${ids.home}: ${ch}`);if(ca)ex.push(`${ids.away}: ${ca}`);}
+    if(lu&&lu.length){ex.push('\n=== ESCALAÇÕES CONFIRMADAS (API-Football) ===');lu.forEach(t=>ex.push(`${t.team}${t.formation?' ('+t.formation+')':''}${t.coach?' — téc. '+t.coach:''}: ${t.xi.join(', ')}`));}
+    return ex.length?'\n\n'+ex.join('\n'):'';
+  }catch{return '';}
+}
 function formatAfContext(sData,fData){
   const lines=[];
   if(sData?.response?.[0]?.league?.standings){
@@ -4245,6 +4294,9 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   if(getAfKey()){
     const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
     fdCtx=formatAfContext(standings,fixtures);
+    // Técnico atual e escalação confirmada direto da API-Football (determinístico) —
+    // some do web_search a necessidade de "adivinhar" esses fatos. Defensivo: '' se falhar.
+    if(fdCtx)fdCtx+=await afEnrichCoachLineup(query,fixtures);
   }else if(getFdKey()){
     const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
     fdCtx=formatFdContext(standings,matches);

@@ -3221,7 +3221,7 @@ async function loadAfData(){
   const key=getAfKey();if(!key){updateAfStatus('','não configurado');return;}
   updateAfStatus('','verificando…');
   const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
-  if(!standings&&!fixtures){updateAfStatus('err',_afLastError||'sem resposta');return;}
+  if(!standings&&!fixtures){updateAfStatus('err',(_afLastError||'sem resposta')+' — usando ESPN');loadEspnData(false);return;}
   const ctx={fase_atual:'',standings:{},results:[]};
   if(standings?.response?.[0]?.league?.standings){
     standings.response[0].league.standings.forEach(group=>{
@@ -4289,19 +4289,25 @@ const SOURCE_RULE=`FONTES E CITAÇÃO (regra obrigatória):
 
 // ─── Phase 1: fact gathering (Haiku + web_search) ────────────────────────
 async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
-  // Pre-fetch structured data: AF (paid) > FD (paid, no WC) > ESPN (free, automatic)
+  // Pre-fetch structured data com FALLBACK em cascata: AF (paga) → FD (paga) → ESPN (grátis).
+  // CADA fonte só é tentada se a anterior não retornou nada. Antes era if/else-if/else, então
+  // uma chave AF/FD que FALHA (ex.: CORS, quota) deixava fdCtx vazio e NUNCA caía na ESPN —
+  // o usuário com chave quebrada ficava com dados PIORES do que sem chave. Agora a ESPN é
+  // sempre a rede de segurança final (grátis, sem chave).
   let fdCtx='';
   if(getAfKey()){
     const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
     fdCtx=formatAfContext(standings,fixtures);
-    // Técnico atual e escalação confirmada direto da API-Football (determinístico) —
-    // some do web_search a necessidade de "adivinhar" esses fatos. Defensivo: '' se falhar.
+    // Técnico atual e escalação confirmada direto da API-Football (determinístico).
     if(fdCtx)fdCtx+=await afEnrichCoachLineup(query,fixtures);
-  }else if(getFdKey()){
+  }
+  if(!fdCtx&&getFdKey()){
     const[standings,matches]=await Promise.all([getFdStandings(),getFdMatches()]);
     fdCtx=formatFdContext(standings,matches);
-  }else{
-    // ESPN: free, no key required
+  }
+  if(!fdCtx){
+    // ESPN: grátis, sem chave — base garantida (classificação, resultados, forma recente).
+    // Técnico/escalação NÃO vêm da ESPN → ficam por conta do web_search (Sofascore etc.).
     const[standings,scoreboard]=await Promise.all([getEspnStandings(),getEspnScoreboard()]);
     fdCtx=formatEspnContext(standings,scoreboard);
   }

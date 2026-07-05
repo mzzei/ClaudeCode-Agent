@@ -1489,7 +1489,7 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
     <div class="sf">
       <label class="sf-lbl" for="worker-url-input">Worker URL (Cloudflare)</label>
       <input id="worker-url-input" type="text" placeholder="https://worldcup-proxy.gcerqueira2012.workers.dev" autocomplete="off" oninput="saveWorkerUrl(this.value)">
-      <div class="sf-hint">Quando ativo, a API Key não precisa ficar no browser · chave guardada no Cloudflare</div>
+      <div class="sf-hint">Proxy grátis (Cloudflare) para Anthropic <b>e API-Football</b>: a chave não precisa ficar no browser e resolve o bloqueio (CORS) que impede a API-Football de funcionar direto. Código e passo a passo em <code>worker/</code> no repositório.</div>
     </div>
     <details class="sf-adv">
       <summary>Informações avançadas (não interessantes)</summary>
@@ -3106,8 +3106,14 @@ let _afLastError='';
 function getAfKey(){try{return localStorage.getItem(AF_KEY_STORE)||'';}catch{return'';}}
 function updateAfStatus(state,msg){const el=document.getElementById('af-status');if(!el)return;el.className='ds-status'+(state==='ok'?' ok':state==='err'?' err':'');el.textContent=msg||'';}
 function _afUrl(path,key){
-  // Pass key as URL param (avoids CORS preflight from file:// origin)
   const sep=path.includes('?')?'&':'?';
+  // 1º: Worker próprio do usuário (resolve CORS de verdade + pode injetar a chave server-side).
+  //     Rota {worker}/af/<path>. Enviamos a chave na query como fallback — o Worker prioriza
+  //     a AF_KEY do ambiente dele se existir. É o caminho recomendado (a AF direta é bloqueada
+  //     por CORS no navegador). Ver worker/README.md.
+  const w=getWorkerUrl();
+  if(w)return `${w.replace(/\/+$/,'')}/af${path}${sep}x-apisports-key=${encodeURIComponent(key||'')}`;
+  // 2º: sem Worker — chave na URL (evita preflight); corsproxy só como último recurso em file://.
   const direct=`${AF_BASE}${path}${sep}x-apisports-key=${encodeURIComponent(key)}`;
   return _fdNeedProxy?`https://corsproxy.io/?url=${encodeURIComponent(direct)}`:direct;
 }

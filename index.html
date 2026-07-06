@@ -3191,11 +3191,23 @@ function _afUrl(path,key){
   const direct=`${AF_BASE}${path}${sep}x-apisports-key=${encodeURIComponent(key)}`;
   return _fdNeedProxy?`https://corsproxy.io/?url=${encodeURIComponent(direct)}`:direct;
 }
+// Serializa TODAS as chamadas de rede à AF com um espaçamento mínimo entre elas. O plano
+// Free tem um limite baixo de requisições POR MINUTO, e o app dispara várias chamadas em
+// paralelo (standings+fixtures, depois técnico×2+escalação) — sem isso, um único carregamento
+// já estourava o limite ("Too many requests"). Cada chamada real espera sua vez na fila.
+let _afQueue=Promise.resolve();
+const AF_MIN_GAP_MS=1100; // ritmo conservador para o limite por minuto do plano Free
+function _afThrottled(fn){
+  const run=()=>new Promise(res=>setTimeout(()=>res(fn()),AF_MIN_GAP_MS));
+  const next=_afQueue.then(run,run);
+  _afQueue=next.catch(()=>{});
+  return next;
+}
 async function fetchAf(path,cacheKey,ttl=AF_TTL){
   try{const c=JSON.parse(localStorage.getItem(cacheKey)||'null');if(c&&(Date.now()-c.ts)<ttl)return c.data;}catch{}
   const key=getAfKey();if(!key)return null;
   try{
-    const res=await fetch(_afUrl(path,key)); // no custom headers — simple GET, no preflight
+    const res=await _afThrottled(()=>fetch(_afUrl(path,key))); // no custom headers — simple GET, no preflight
     if(!res.ok){_afLastError=`Erro ${res.status}`;return null;}
     const data=await res.json();
     if(data.errors&&Object.keys(data.errors).length){_afLastError=String(Object.values(data.errors)[0]);return null;}

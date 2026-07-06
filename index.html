@@ -2800,7 +2800,8 @@ function appendLiveDataPanel(d){
   wrap.className='live-data no-print';
   wrap.innerHTML=`<details class="live-details"><summary class="live-summary">⚡ Dados ao vivo · escalações, estatísticas, H2H (API-Sports)</summary>
     <div class="live-body">
-      <div class="live-hint">Lista TODOS os jogos da Copa 2026 (não só o desta análise) — use as abas/toolbar pra achar a partida e clique nela pra abrir escalações (técnico + onze), estatísticas, eventos e confrontos diretos.${dateHint}</div>
+      <div class="live-hint">Lista TODOS os jogos da Copa 2026 (não só o desta análise) — use as abas/toolbar pra achar a partida e clique nela pra abrir escalações (técnico + onze), estatísticas, eventos e confrontos diretos.${dateHint}
+        <br><b>Nota:</b> planos gratuitos da API-Football não têm acesso à temporada 2026 — se aparecer vazio/erro aqui, é essa limitação do plano, não um problema do app. A análise continua completa mesmo assim (via ESPN + busca na web).</div>
       <div class="live-widget" data-slot="games"></div>
       <div class="live-widget" data-slot="standings"></div>
     </div></details>`;

@@ -2790,12 +2790,17 @@ function _matchDateISO(d){
 function appendLiveDataPanel(d){
   const key=getAfKey(); if(!key)return; // sem chave API-Sports não há widgets
   const dateISO=_matchDateISO(d);
-  const gamesAttrs=`data-type="games" data-league="1" data-season="2026"${dateISO?` data-date="${dateISO}"`:''} data-target-game="modal" data-show-toolbar="true"`;
+  // SEM filtro de data no widget: um parsing de data levemente errado (fuso, formato)
+  // faz o filtro bater em ZERO jogos — lista vazia, sem erro visível, parecendo "quebrado".
+  // Mais robusto: mostrar TODOS os jogos da Copa (o widget já tem abas todos/ao vivo/
+  // encerrados/agendados) e deixar o usuário navegar até o jogo certo.
+  const gamesAttrs=`data-type="games" data-league="1" data-season="2026" data-target-game="modal" data-show-toolbar="true"`;
+  const dateHint=dateISO?` Esta partida é por volta de ${dateISO.split('-').reverse().join('/')} — use as abas/navegação do widget pra chegar nela.`:'';
   const wrap=document.createElement('div');
   wrap.className='live-data no-print';
   wrap.innerHTML=`<details class="live-details"><summary class="live-summary">⚡ Dados ao vivo · escalações, estatísticas, H2H (API-Sports)</summary>
     <div class="live-body">
-      <div class="live-hint">Clique num jogo para abrir escalações (técnico + onze), estatísticas, eventos e confrontos diretos — dados oficiais, ao vivo.</div>
+      <div class="live-hint">Lista TODOS os jogos da Copa 2026 (não só o desta análise) — use as abas/toolbar pra achar a partida e clique nela pra abrir escalações (técnico + onze), estatísticas, eventos e confrontos diretos.${dateHint}</div>
       <div class="live-widget" data-slot="games"></div>
       <div class="live-widget" data-slot="standings"></div>
     </div></details>`;

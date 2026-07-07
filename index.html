@@ -175,17 +175,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 
 /* ── Analysis card ── */
 .a-card{background:var(--white);border:1px solid var(--border);border-radius:16px;margin-bottom:1.5rem;overflow:hidden}
-/* Painel "Dados ao vivo" (widgets API-Sports) — irmão do card, colapsável */
-.live-data{margin:-.6rem 0 1.5rem}
-.live-details{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-.live-summary{list-style:none;cursor:pointer;padding:.7rem 1rem;font-size:12.5px;font-weight:500;color:var(--terra);display:flex;align-items:center;gap:6px;user-select:none}
-.live-summary::-webkit-details-marker{display:none}
-.live-summary:hover{background:var(--cream)}
-.live-details[open] .live-summary{border-bottom:1px solid var(--border)}
-.live-body{padding:.8rem}
-.live-hint{font-size:11.5px;color:var(--muted);margin-bottom:.7rem;line-height:1.5}
-.live-widget{margin-bottom:.8rem;min-height:40px}
-.live-widget:last-child{margin-bottom:0}
 .a-hdr{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1.1rem .4rem}
 .a-agent{display:flex;align-items:center;gap:8px}
 .a-ball{width:28px;height:28px;background:var(--terra-pale);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
@@ -2738,7 +2727,6 @@ function renderResults(d,opts){
   const hid=opts.hid||('h'+Date.now().toString(36)+id);
   cardEl.dataset.hid=hid;
   document.getElementById('conversation').appendChild(cardEl);
-  appendLiveDataPanel(d); // "Dados ao vivo" (widgets oficiais API-Sports) — irmão do card, não entra no export
   // Animate bars from 0→value and init tab pill
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
@@ -2751,69 +2739,6 @@ function renderResults(d,opts){
   if(opts.save!==false)saveAnalysis(hid,d);
   else renderRecentAnalyses();
   scrollChat();
-}
-
-// ─── Dados ao vivo (widgets oficiais API-Sports) ─────────────────────────
-// Os <api-sports-widget> renderizam a própria UI (escalações c/ técnico, estatísticas,
-// H2H, classificação) direto da fonte — funcionam no NAVEGADOR, contornando o CORS que
-// bloqueia a API crua. Carregamento preguiçoso: o script de terceiros só entra quando o
-// usuário abre o painel. A chave (data-key) é a mesma da API-Football (getAfKey).
-let _apiSportsReady=false;
-function ensureApiSportsWidgets(key){
-  if(_apiSportsReady)return;
-  _apiSportsReady=true;
-  const holder=document.createElement('div');
-  holder.id='apisports-config-holder';
-  holder.style.cssText='position:absolute;width:0;height:0;overflow:hidden';
-  const cfg=document.createElement('api-sports-widget');
-  cfg.setAttribute('data-type','config');
-  cfg.setAttribute('data-key',key);
-  cfg.setAttribute('data-sport','football');
-  cfg.setAttribute('data-theme','dark');
-  cfg.setAttribute('data-show-logos','true');
-  cfg.setAttribute('data-show-errors','true');
-  holder.appendChild(cfg);
-  document.body.appendChild(holder);
-  const s=document.createElement('script');
-  s.type='module';
-  s.src='https://widgets.api-sports.io/3.1.0/widgets.js';
-  document.body.appendChild(s);
-}
-// Extrai YYYY-MM-DD de d.data_hora ("07/07/2026 às 13:00", "05/07", ISO) p/ filtrar o dia.
-function _matchDateISO(d){
-  const s=(d&&d.data_hora)||''; let m;
-  if((m=s.match(/(\d{4})-(\d{2})-(\d{2})/)))return `${m[1]}-${m[2]}-${m[3]}`;
-  if((m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)))return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  if((m=s.match(/(\d{1,2})\/(\d{1,2})(?!\/)/)))return `2026-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  return '';
-}
-function appendLiveDataPanel(d){
-  const key=getAfKey(); if(!key)return; // sem chave API-Sports não há widgets
-  const dateISO=_matchDateISO(d);
-  // SEM filtro de data no widget: um parsing de data levemente errado (fuso, formato)
-  // faz o filtro bater em ZERO jogos — lista vazia, sem erro visível, parecendo "quebrado".
-  // Mais robusto: mostrar TODOS os jogos da Copa (o widget já tem abas todos/ao vivo/
-  // encerrados/agendados) e deixar o usuário navegar até o jogo certo.
-  const gamesAttrs=`data-type="games" data-league="1" data-season="2026" data-target-game="modal" data-show-toolbar="true"`;
-  const dateHint=dateISO?` Esta partida é por volta de ${dateISO.split('-').reverse().join('/')} — use as abas/navegação do widget pra chegar nela.`:'';
-  const wrap=document.createElement('div');
-  wrap.className='live-data no-print';
-  wrap.innerHTML=`<details class="live-details"><summary class="live-summary">⚡ Dados ao vivo · escalações, estatísticas, H2H (API-Sports)</summary>
-    <div class="live-body">
-      <div class="live-hint">Lista TODOS os jogos da Copa 2026 (não só o desta análise) — use as abas/toolbar pra achar a partida e clique nela pra abrir escalações (técnico + onze), estatísticas, eventos e confrontos diretos.${dateHint}
-        <br><b>Nota:</b> planos gratuitos da API-Football não têm acesso à temporada 2026 — se aparecer vazio/erro aqui, é essa limitação do plano, não um problema do app. A análise continua completa mesmo assim (via ESPN + busca na web).</div>
-      <div class="live-widget" data-slot="games"></div>
-      <div class="live-widget" data-slot="standings"></div>
-    </div></details>`;
-  document.getElementById('conversation').appendChild(wrap);
-  const det=wrap.querySelector('details');
-  det.addEventListener('toggle',()=>{
-    if(!det.open||det.dataset.loaded)return;
-    det.dataset.loaded='1';
-    ensureApiSportsWidgets(key);
-    wrap.querySelector('[data-slot="games"]').innerHTML=`<api-sports-widget ${gamesAttrs}></api-sports-widget>`;
-    wrap.querySelector('[data-slot="standings"]').innerHTML=`<api-sports-widget data-type="standings" data-league="1" data-season="2026"></api-sports-widget>`;
-  });
 }
 
 // ─── Temporal helpers ────────────────────────────────────────────────────

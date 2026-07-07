@@ -2820,6 +2820,8 @@ FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "
 
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
+VALIDAÇÃO CRUZADA DE CONFIANÇA: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) estejam CONSISTENTES entre 2+ fontes independentes das suas buscas; fato de fonte única sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre em "incerteza". Aplique o mesmo critério à "confianca" de cada ticket.
+
 LINGUAGEM E ESCRITA:
 - Estilo direto e analítico — mantenha sempre
 - Quando usar termo técnico (xG, lambda, Poisson, BTTS etc.), adicione entre parênteses uma explicação curta na primeira ocorrência: ex. "xG (gols esperados com base nas chances criadas)"
@@ -3346,6 +3348,40 @@ function formatEspnContext(sData,sbData){
   }
   return lines.join('\n');
 }
+// ─── TheSportsDB (grátis · CORS aberto · Copa 2026 = liga 4429) ───────────
+// 2ª fonte ESTRUTURADA e independente da ESPN: placares confirmados, rodada e
+// próximos jogos. Validado ao vivo (07/2026): cobre a temporada 2026 completa e
+// responde com Access-Control-Allow-Origin:* — chamada direta do navegador, sem
+// passar pelo Worker. Uso: validação cruzada de resultados + fallback da ESPN.
+const TSDB_BASE='https://www.thesportsdb.com/api/v1/json/123';
+const TSDB_TTL=15*60*1000;
+async function fetchTsdb(path,cacheKey){
+  try{const raw=localStorage.getItem(cacheKey);if(raw){const c=JSON.parse(raw);if(c&&Date.now()-c.t<TSDB_TTL)return c.d;}}catch{}
+  try{
+    const ctl=new AbortController();const tid=setTimeout(()=>ctl.abort(),8000);
+    const res=await fetch(TSDB_BASE+path,{signal:ctl.signal});clearTimeout(tid);
+    if(!res.ok)return null;
+    const d=await res.json();
+    try{localStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),d}));}catch{}
+    return d;
+  }catch{return null;}
+}
+function _tsdbLine(e){
+  const sc=(e.intHomeScore!=null&&e.intAwayScore!=null)?`${e.intHomeScore}x${e.intAwayScore}`:'—';
+  const rd=e.intRound?` (rodada ${e.intRound})`:'';
+  return `${e.dateEvent||''} · ${e.strHomeTeam} ${sc} ${e.strAwayTeam}${rd}`;
+}
+async function getTsdbContext(){
+  const[past,next]=await Promise.all([
+    fetchTsdb('/eventspastleague.php?id=4429','copa2026_tsdb_past_v1'),
+    fetchTsdb('/eventsnextleague.php?id=4429','copa2026_tsdb_next_v1')
+  ]);
+  const L=[];
+  if(past?.events?.length){L.push('=== RESULTADOS CONFIRMADOS (TheSportsDB · fonte estruturada independente — use para VALIDAÇÃO CRUZADA de placares/datas) ===');past.events.slice(0,15).forEach(e=>L.push(_tsdbLine(e)));}
+  if(next?.events?.length){L.push('=== PRÓXIMOS JOGOS (TheSportsDB) ===');next.events.slice(0,10).forEach(e=>L.push(_tsdbLine(e)));}
+  return L.join('\n');
+}
+
 function espnScoreboardToSchedule(sbData){
   if(!sbData?.events?.length)return[];
   return sbData.events.map(e=>{
@@ -4343,6 +4379,10 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     const[standings,scoreboard]=await Promise.all([getEspnStandings(),getEspnScoreboard()]);
     fdCtx=formatEspnContext(standings,scoreboard);
   }
+  // Camada extra: TheSportsDB (grátis, CORS aberto) — 2ª fonte estruturada INDEPENDENTE.
+  // Sempre anexada quando responde: dá à Fase 2 material real p/ validação cruzada de
+  // placares/datas, e vira a rede de segurança final se ESPN/AF/FD falharem juntas.
+  try{const _tsdb=await getTsdbContext();if(_tsdb)fdCtx=fdCtx?fdCtx+'\n\n'+_tsdb:_tsdb;}catch{}
   const hasFd=!!fdCtx;
   const SCHEMA='{"mandante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
@@ -4373,6 +4413,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
     +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — em "jogadores_chave", inclua para cada jogador citado os números REAIS da Copa 2026 que a busca retornar (jogos disputados, gols, assistências, finalizações/finalizações no gol por jogo, rating médio). Esses números fundamentam mercados de jogador; SÓ use valores vindos da busca, nunca de memória, e descarte qualquer valor implausível (uma seleção joga no máx. 7 jogos num Mundial).\n'
+    +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
     ?`Você é um agente de pesquisa da Copa do Mundo 2026. Data: ${currentDateFull()}.
@@ -4397,13 +4438,20 @@ Extraia placares, classificação do grupo, xG e estilo diretamente das páginas
   let _useModel=getDynSearch()?'claude-sonnet-4-6':'claude-haiku-4-5-20251001';
   let _useTool=getDynSearch()?'web_search_20260209':'web_search_20250305';
   let _dynActive=getDynSearch();
+  // Structured outputs na coleta: JSON garantido pela API (testado ao vivo com
+  // Haiku 4.5 e Sonnet 4.6 + web_search). Auto-cura: 400 → desliga e repete.
+  let _soP1=true;
   for(let i=0;i<5;i++){
     if(signal.aborted)throw new Error('cancelled');
-    const mkBody=()=>JSON.stringify({model:_useModel,max_tokens:3000,system:SP,messages:msgs,tools:[{type:_useTool,name:'web_search',max_uses:_maxUses}]});
+    const mkBody=()=>JSON.stringify({model:_useModel,max_tokens:3000,system:SP,messages:msgs,tools:[{type:_useTool,name:'web_search',max_uses:_maxUses}],...(_soP1?{output_config:{format:{type:'json_schema',schema:FACTS_SCHEMA}}}:{})});
     let res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
     if(res.status===400&&_dynActive){
       setDynSearch(false);_dynActive=false;_useModel='claude-haiku-4-5-20251001';_useTool='web_search_20250305';
       try{toast('Filtragem dinâmica indisponível neste acesso — usando busca padrão.');}catch{}
+      res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
+    }
+    if(res.status===400&&_soP1){
+      _soP1=false; // structured outputs não suportado neste acesso/combinação → caminho provado
       res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
     }
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
@@ -4463,6 +4511,29 @@ function buildEnrichedQuery(query,rawFacts,ctx){
   if(ctx){parts.push('\nCONTEXTO DO TORNEIO (standings e resultados recentes):');parts.push(ctx);}
   return parts.join('\n');
 }
+// ─── Structured Outputs (output_config.format · json_schema) — FASE 1 ────
+// Garante JSON 100% válido direto da API na COLETA. Testado AO VIVO via Worker
+// (07/2026): Haiku 4.5 e Sonnet 4.6, com thinking budget_tokens, web_search e
+// stream — todos aceitam. NÃO confundir com output_config.effort (que causou
+// 400 no passado); aqui é o campo "format", validado. Restrições do recurso:
+// additionalProperties:false obrigatório; sem min/max; anuláveis via anyOf.
+const _soStr={type:'string'};
+const _soNum={type:'number'};
+const _soStrArr={type:'array',items:{type:'string'}};
+const _soNullable=t=>({anyOf:[{type:t},{type:'null'}]});
+function _soObj(props){return{type:'object',properties:props,required:Object.keys(props),additionalProperties:false};}
+// Fase 1 (coleta): espelho do SCHEMA textual do gatherFacts.
+const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,jogadores_chave:_soStrArr,estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
+const FACTS_SCHEMA=_soObj({mandante:_soTeamP1(),visitante:_soTeamP1(),contexto_fase:_soStr,grupo_classificacao:_soStr,lacunas:_soStrArr});
+// Fase 2 (análise): structured outputs NÃO é usado. Testado ao vivo (07/2026):
+// o schema completo da análise (19 campos, confronto_tatico aninhado etc.) excede
+// o limite de gramática compilada da API — erro "The compiled grammar is too large"
+// em Haiku, Sonnet e Opus, mesmo sem enums/anyOf. Bisect: só 15 dos 19 campos
+// de topo cabem. Podar campos não é opção: com additionalProperties:false o modelo
+// ficaria PROIBIDO de emitir as seções podadas (a UI perderia painéis inteiros).
+// A Fase 2 segue com o caminho provado: prompt-contrato + parseAnalysisJson/repairJson
+// + retry sem thinking. NÃO reintroduzir output_config na Fase 2 sem reteste ao vivo.
+
 function getSystemPromptPhase2(){return `${t('agent_lang')}
 
 Você é o Agente de Análise da Copa do Mundo 2026. Objetivo: maximizar o aproveitamento nos tickets de aposta com análises precisas baseadas em fatos reais e modelos estatísticos.
@@ -4502,6 +4573,8 @@ METODOLOGIA:
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
+
+VALIDAÇÃO CRUZADA DE CONFIANÇA: os dados fornecidos vêm de fontes INDEPENDENTES (bloco da API/ESPN, bloco TheSportsDB e fatos da pesquisa web). Pondere a corroboração entre elas: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) sejam CONSISTENTES entre 2+ fontes; um fato presente em UMA única fonte sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre o conflito em "incerteza" (fator + impacto). Aplique o mesmo critério à "confianca" de cada sugestão de ticket: "alta" só com fundamento corroborado por 2+ fontes.
 
 LINGUAGEM E ESCRITA:
 - Estilo direto e analítico — mantenha sempre
@@ -4818,6 +4891,11 @@ async function runAnalysis(){
     if(getWorkerUrl())baseBody.diagnostics={previous_message_id:_lastAnalysisId};
     if(!useEnriched)baseBody.tools=[{type:'web_search_20250305',name:'web_search',max_uses:4}];
     if(effort.budget>0){baseBody.thinking={type:'enabled',budget_tokens:effort.budget};baseBody.temperature=1;}
+    // NOTA (07/2026): structured outputs (output_config.format) foi testado ao vivo
+    // para a Fase 2 e o schema completo da análise EXCEDE o limite de gramática da
+    // API ("compiled grammar is too large") em todos os modelos. Fase 2 permanece
+    // no caminho provado (contrato no prompt + parseAnalysisJson + retry). O recurso
+    // está ATIVO na Fase 1 (FACTS_SCHEMA, menor). Ver comentário em FACTS_SCHEMA.
     const messages=[{role:'user',content:`DATA: ${currentDateFull()}${memCtx}\n\nAnalise esta partida/contexto da Copa do Mundo 2026 e retorne APENAS o JSON estruturado: ${finalQuery}${contextBlock()}`}];
     let _newAnalysisId=null;
 

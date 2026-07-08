@@ -4363,6 +4363,9 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // o usuário com chave quebrada ficava com dados PIORES do que sem chave. Agora a ESPN é
   // sempre a rede de segurança final (grátis, sem chave).
   let fdCtx='';
+  // TheSportsDB (fonte independente da cascata) dispara JÁ e roda em paralelo com AF/FD/ESPN;
+  // só é aguardada no fim, então seu timeout (até 8s se não responder) não soma ao tempo total.
+  const _tsdbPromise=getTsdbContext().catch(()=>'');
   if(getAfKey()){
     const[standings,fixtures]=await Promise.all([getAfStandings(),getAfFixtures()]);
     fdCtx=formatAfContext(standings,fixtures);
@@ -4382,7 +4385,8 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // Camada extra: TheSportsDB (grátis, CORS aberto) — 2ª fonte estruturada INDEPENDENTE.
   // Sempre anexada quando responde: dá à Fase 2 material real p/ validação cruzada de
   // placares/datas, e vira a rede de segurança final se ESPN/AF/FD falharem juntas.
-  try{const _tsdb=await getTsdbContext();if(_tsdb)fdCtx=fdCtx?fdCtx+'\n\n'+_tsdb:_tsdb;}catch{}
+  // (disparada lá em cima, em paralelo com a cascata — aqui só colhe o resultado.)
+  try{const _tsdb=await _tsdbPromise;if(_tsdb)fdCtx=fdCtx?fdCtx+'\n\n'+_tsdb:_tsdb;}catch{}
   const hasFd=!!fdCtx;
   const SCHEMA='{"mandante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).

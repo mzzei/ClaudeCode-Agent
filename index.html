@@ -4389,7 +4389,12 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // (disparada lá em cima, em paralelo com a cascata — aqui só colhe o resultado.)
   try{const _tsdb=await _tsdbPromise;if(_tsdb)fdCtx=fdCtx?fdCtx+'\n\n'+_tsdb:_tsdb;}catch{}
   const hasFd=!!fdCtx;
-  const SCHEMA='{"mandante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"visitante":{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":[],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]},"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
+  // jogadores_chave é uma LISTA DE OBJETOS estruturados (um por jogador citado) com o
+  // conjunto fundamental de stats da competição — assim os mercados de jogador ficam cobertos
+  // já na coleta e o portão de completude consegue checar campo a campo depois.
+  const _pStat='{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}';
+  const _teamTpl='{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":['+_pStat+'],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]}';
+  const SCHEMA='{"mandante":'+_teamTpl+',"visitante":'+_teamTpl+',"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
   // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
   // esforço: a 1ª busca é abrangente e a forma já vem do ESPN/API de graça. O esforço só
@@ -4417,7 +4422,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
   const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
-    +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — em "jogadores_chave", inclua para cada jogador citado os números REAIS da Copa 2026 que a busca retornar. Trate como CONJUNTO FUNDAMENTAL OBRIGATÓRIO (fundamentam os mercados de jogador mais comuns), e busque ativamente cada um: jogos disputados, minutos, gols, assistências, finalizações e finalizações no gol por jogo, CARTÕES amarelos e vermelhos acumulados na competição (e se o jogador está a 1 amarelo da suspensão), FALTAS cometidas por jogo, e rating médio. Esses são dados PÚBLICOS e quase sempre encontráveis — deixá-los vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. SÓ use valores vindos da busca, nunca de memória, e descarte qualquer valor implausível (uma seleção joga no máx. 7 jogos num Mundial).\n'
+    +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — "jogadores_chave" é uma LISTA DE OBJETOS: um objeto por jogador citado (mire nos 3-5 titulares mais decisivos de cada seleção). Cada objeto tem o CONJUNTO FUNDAMENTAL OBRIGATÓRIO de campos, preenchidos com números REAIS da Copa 2026 vindos da busca: "nome", "posicao", "jogos", "minutos", "gols", "assistencias", "finalizacoes_por_jogo", "finalizacoes_no_gol_por_jogo", "grandes_chances_ou_passes_decisivos_por_jogo", "cartoes_amarelos", "cartoes_vermelhos", "a_um_amarelo_da_suspensao" (true/false), "faltas_cometidas_por_jogo", "faltas_sofridas_por_jogo", "desarmes_por_jogo", "cobra_penaltis_ou_faltas" (ex.: "pênaltis e faltas"/"faltas"/"não"), "rating_medio", e "observacao" (texto livre p/ o que não couber acima — p/ goleiros use aqui: defesas/jogo, clean sheets, gols sofridos; e sequências/lesões relevantes). Esses dados fundamentam os mercados de jogador e são PÚBLICOS e quase sempre encontráveis — deixar os campos-chave (gols, finalizacoes_no_gol_por_jogo, cartoes_amarelos, rating_medio) vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. Use null (não invente) só quando a busca realmente não trouxer aquele número; SÓ use valores da busca, nunca de memória, e descarte implausíveis (máx. 7 jogos num Mundial).\n'
     +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
   const SP=hasFd
@@ -4520,6 +4525,64 @@ function buildEnrichedQuery(query,rawFacts,ctx){
   if(ctx){parts.push('\nCONTEXTO DO TORNEIO (standings e resultados recentes):');parts.push(ctx);}
   return parts.join('\n');
 }
+
+// ─── Portão de completude por jogador (garantia por CÓDIGO, não por prompt) ───
+// Depois da coleta, checa se os titulares citados têm os stats-chave preenchidos.
+// Se faltar, dispara UMA busca-alvo (Haiku + web_search) só para os campos vazios e
+// funde o resultado no rawFacts. Custo ZERO quando a coleta já veio completa (só
+// inspeciona o JSON em memória — nenhuma chamada de API).
+const _PLAYER_CRITICAL=['gols','finalizacoes_no_gol_por_jogo','cartoes_amarelos','rating_medio'];
+const _PLAYER_FIELDS=['posicao','jogos','minutos','gols','assistencias','finalizacoes_por_jogo','finalizacoes_no_gol_por_jogo','grandes_chances_ou_passes_decisivos_por_jogo','cartoes_amarelos','cartoes_vermelhos','a_um_amarelo_da_suspensao','faltas_cometidas_por_jogo','faltas_sofridas_por_jogo','desarmes_por_jogo','cobra_penaltis_ou_faltas','rating_medio','observacao'];
+function _pgEmpty(v){return v===null||v===undefined||v==='';}
+function _pgNorm(s){return String(s||'').trim().toLowerCase();}
+function _mergePlayerPatch(rawFacts,patchArr){
+  const byName={};patchArr.forEach(p=>{if(p&&p.nome)byName[_pgNorm(p.nome)]=p;});
+  [rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
+    (Array.isArray(tm.jogadores_chave)?tm.jogadores_chave:[]).forEach(p=>{
+      if(!p||typeof p!=='object')return;
+      const src=byName[_pgNorm(p.nome)];if(!src)return;
+      _PLAYER_FIELDS.forEach(f=>{if(_pgEmpty(p[f])&&!_pgEmpty(src[f]))p[f]=src[f];});
+    });
+  });
+}
+async function fillPlayerGaps(rawFacts,apiKey,signal,onUpdate){
+  try{
+    if(!rawFacts)return{inTokens:0,outTokens:0};
+    const gaps=[];
+    [rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
+      (Array.isArray(tm.jogadores_chave)?tm.jogadores_chave:[]).forEach(p=>{
+        if(!p||typeof p!=='object'||!p.nome)return;
+        const missing=_PLAYER_CRITICAL.filter(f=>_pgEmpty(p[f]));
+        if(missing.length)gaps.push({nome:p.nome,faltando:missing});
+      });
+    });
+    if(!gaps.length)return{inTokens:0,outTokens:0}; // completo → custo zero, sem chamada
+    onUpdate&&onUpdate({status:'Completando stats faltantes…',phase:1});
+    const list=gaps.map(g=>`- ${g.nome}: faltam ${g.faltando.join(', ')}`).join('\n');
+    const SP='Você preenche stats FALTANTES de jogadores na Copa do Mundo 2026 buscando na web (Sofascore/FotMob/FBref). Retorne APENAS JSON válido: {"jogadores":[{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}]}. Preencha ao menos os campos pedidos como faltantes de cada jogador. Use null quando a busca não trouxer o número; NUNCA invente de memória; descarte implausíveis (máx 7 jogos num Mundial).';
+    const msgs=[{role:'user',content:`DATA: ${currentDateFull()}. Busque e preencha os stats faltantes destes jogadores na Copa 2026:\n${list}`}];
+    let accIn=0,accOut=0;
+    for(let i=0;i<3;i++){
+      if(signal.aborted)break;
+      const body=JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1500,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:2}]});
+      const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body,signal});
+      if(!res.ok)break;
+      const data=await res.json();const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
+      if(data.stop_reason==='end_turn'){
+        const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        const m=txt.match(/\{[\s\S]*\}/);let patch=null;try{if(m)patch=JSON.parse(m[0]);}catch{}
+        if(patch&&Array.isArray(patch.jogadores))_mergePlayerPatch(rawFacts,patch.jogadores);
+        break;
+      }
+      if(data.stop_reason==='tool_use'){
+        msgs.push({role:'assistant',content:data.content});
+        msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
+      }else if(data.stop_reason==='pause_turn'){msgs.push({role:'assistant',content:data.content});}
+      else break;
+    }
+    return{inTokens:accIn,outTokens:accOut};
+  }catch(e){if(e&&(e.name==='AbortError'||e.message==='cancelled'))throw e;return{inTokens:0,outTokens:0};}
+}
 // ─── Structured Outputs (output_config.format · json_schema) — FASE 1 ────
 // Garante JSON 100% válido direto da API na COLETA. Testado AO VIVO via Worker
 // (07/2026): Haiku 4.5 e Sonnet 4.6, com thinking budget_tokens, web_search e
@@ -4531,7 +4594,10 @@ const _soStrArr={type:'array',items:{type:'string'}};
 const _soNullable=t=>({anyOf:[{type:t},{type:'null'}]});
 function _soObj(props){return{type:'object',properties:props,required:Object.keys(props),additionalProperties:false};}
 // Fase 1 (coleta): espelho do SCHEMA textual do gatherFacts.
-const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,jogadores_chave:_soStrArr,estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
+// jogadores_chave agora é uma lista de objetos estruturados (15 stats fundamentais + nome/posição/observação).
+const _soN=()=>_soNullable('number');
+const _soPlayer=()=>_soObj({nome:_soStr,posicao:_soStr,jogos:_soN(),minutos:_soN(),gols:_soN(),assistencias:_soN(),finalizacoes_por_jogo:_soN(),finalizacoes_no_gol_por_jogo:_soN(),grandes_chances_ou_passes_decisivos_por_jogo:_soN(),cartoes_amarelos:_soN(),cartoes_vermelhos:_soN(),a_um_amarelo_da_suspensao:_soNullable('boolean'),faltas_cometidas_por_jogo:_soN(),faltas_sofridas_por_jogo:_soN(),desarmes_por_jogo:_soN(),cobra_penaltis_ou_faltas:_soStr,rating_medio:_soN(),observacao:_soStr});
+const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,jogadores_chave:{type:'array',items:_soPlayer()},estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
 const FACTS_SCHEMA=_soObj({mandante:_soTeamP1(),visitante:_soTeamP1(),contexto_fase:_soStr,grupo_classificacao:_soStr,lacunas:_soStrArr});
 // Fase 2 (análise): structured outputs NÃO é usado. Testado ao vivo (07/2026):
 // o schema completo da análise (19 campos, confronto_tatico aninhado etc.) excede
@@ -4887,6 +4953,15 @@ async function runAnalysis(){
     tokenState.sessionIn+=p1in;tokenState.sessionOut+=p1out;
     tokenState.sessionIn_p1+=p1in;tokenState.sessionOut_p1+=p1out;
     _thkP1Toks=p1in+p1out;
+
+    // Portão de completude: preenche stats-chave faltantes de titulares citados (custo
+    // zero se a coleta já veio completa; senão, UMA busca-alvo Haiku + web_search).
+    if(rawFacts){
+      const g=await fillPlayerGaps(rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
+      tokenState.sessionIn+=g.inTokens;tokenState.sessionOut+=g.outTokens;
+      tokenState.sessionIn_p1+=g.inTokens;tokenState.sessionOut_p1+=g.outTokens;
+      _thkP1Toks+=g.inTokens+g.outTokens;
+    }
 
     // ── Fase 2: modelo escolhido analisa (sem ferramentas se fatos OK) ────
     updateThinkingToks({status:'Raciocinando…',phase:2});

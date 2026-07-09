@@ -265,6 +265,13 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .pstat-susp{font-size:10px;font-weight:600;background:rgba(240,200,60,.16);color:#f0d060;border-radius:999px;padding:2px 8px}
 .pstat-note{font-size:11px;color:var(--mid);margin-top:.4rem;line-height:1.45}
 .pstat-src{font-size:10px;color:var(--muted);font-style:italic;margin-top:.5rem;text-align:center}
+/* Tabela genérica dos cards dinâmicos do chat */
+.gtbl-wrap{overflow-x:auto}
+.gtbl{width:100%;border-collapse:collapse;font-size:12px}
+.gtbl th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border)}
+.gtbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.gtbl tr:last-child td{border-bottom:none}
+.gtbl td:first-child{font-weight:500}
 .lrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
 .lrow:last-child{border-bottom:none}
 .llogic{font-size:11px;color:var(--muted);padding:3px 0 7px}.lhint{font-size:11px;color:var(--muted);margin-top:.6rem}
@@ -2603,9 +2610,90 @@ function _pstatCard(p){
   return `<div class="pstat"><div class="pstat-hd"><span class="pstat-nome">${esc(p.nome||'—')}</span>${p.posicao?`<span class="pstat-pos">${esc(p.posicao)}</span>`:''}${has(p.rating_medio)?`<span class="pstat-rating">${esc(p.rating_medio)}</span>`:''}</div>${cells.length?`<div class="pstat-grid">${cells.join('')}</div>`:''}${cardsRow}${pen}${obs}</div>`;
 }
 function _pstatTeam(nome,arr){
-  const players=(Array.isArray(arr)?arr:[]).filter(p=>p&&typeof p==='object'&&p.nome);
+  const hasVal=v=>v!==null&&v!==undefined&&v!=='';
+  // Só renderiza jogador que tenha ao menos UM stat além do nome/posição —
+  // evita cards vazios quando nem o portão conseguiu preencher nada.
+  const players=(Array.isArray(arr)?arr:[]).filter(p=>p&&typeof p==='object'&&p.nome
+    &&Object.keys(p).some(k=>k!=='nome'&&k!=='posicao'&&hasVal(p[k])));
   if(!players.length)return '';
   return `<div class="pstat-team"><div class="tname">${esc(nome)}</div>${players.map(_pstatCard).join('')}</div>`;
+}
+
+// ─── Card genérico com abas (design universal de resposta do chat) ─────────
+// O chat pede ao modelo um contrato JSON {card:{titulo,subtitulo,abas:[{titulo,
+// secoes:[{titulo,tipo,conteudo}]}]}} com títulos LIVRES (renomeados ao pedido).
+// Estes helpers parseiam com tolerância e renderizam reutilizando o CSS do .a-card.
+function chatCardFrom(text){
+  if(!text)return null;
+  const clean=text.replace(/```(?:json)?/gi,'');
+  const st=clean.indexOf('{');if(st<0)return null;
+  let obj=null;
+  const end=clean.lastIndexOf('}');
+  if(end>st){const cand=clean.slice(st,end+1);try{obj=JSON.parse(cand);}catch{try{obj=JSON.parse(repairJson(cand));}catch{}}}
+  if(!obj){try{obj=JSON.parse(repairJson(clean.slice(st)));}catch{}}
+  const c=obj&&obj.card?obj.card:(obj&&Array.isArray(obj.abas)?obj:null);
+  if(!c||!Array.isArray(c.abas))return null;
+  c.abas=c.abas.filter(a=>a&&(a.titulo||Array.isArray(a.secoes)));
+  return c.abas.length?c:null;
+}
+function _secHtml(s){
+  if(!s)return '';
+  const h=s.titulo?`<div class="tab-h">${esc(s.titulo)}</div>`:'';
+  const c=s.conteudo;
+  let body='';
+  if(s.tipo==='lista'&&Array.isArray(c)){
+    body=c.map(it=>`<div class="tend-item"><span class="tend-dot"></span><span>${esc(textFrom(it))}</span></div>`).join('');
+  }else if(s.tipo==='kv'&&Array.isArray(c)){
+    body=c.map(r=>`<div class="irow"><span class="ilbl">${esc(textFrom(r&&r.k))}</span><span class="ival">${esc(textFrom(r&&r.v))}</span></div>`).join('');
+  }else if(s.tipo==='tiles'&&Array.isArray(c)){
+    body=`<div class="s3">${c.map(t=>`<div class="stile"><div class="slbl">${esc(textFrom(t&&t.lbl))}</div><div class="sval">${esc(textFrom(t&&t.val))}</div></div>`).join('')}</div>`;
+  }else if(s.tipo==='tabela'&&c&&Array.isArray(c.linhas)){
+    const cols=Array.isArray(c.colunas)?c.colunas:[];
+    body=`<div class="gtbl-wrap"><table class="gtbl">${cols.length?`<thead><tr>${cols.map(x=>`<th>${esc(textFrom(x))}</th>`).join('')}</tr></thead>`:''}<tbody>${c.linhas.map(ln=>`<tr>${(Array.isArray(ln)?ln:[ln]).map(x=>`<td>${esc(textFrom(x))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }else{
+    // "texto" e qualquer tipo desconhecido caem em parágrafo (tolerância > rigidez)
+    body=`<p class="tab-body">${esc(textFrom(c))}</p>`;
+  }
+  return `<div class="tab-s">${h}${body}</div>`;
+}
+let _dynCount=0;
+function showDynTab(id,idx){
+  const card=document.getElementById('dyncard-'+id);if(!card)return;
+  card.querySelectorAll('.a-tc').forEach((t,i)=>t.style.display=i===idx?'block':'none');
+  card.querySelectorAll('.a-tab').forEach((b,i)=>b.classList.toggle('active',i===idx));
+}
+function renderChatCard(c){
+  _dynCount++;const id=_dynCount;
+  const ts=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const abas=c.abas.slice(0,6);
+  const el=document.createElement('div');
+  el.innerHTML=`<div class="a-card" id="dyncard-${id}">
+    <div class="a-hdr">
+      <div class="a-agent"><div class="a-ball">${BRAND_STAR}</div><div><span class="a-name">Meridian</span></div></div>
+      <div class="a-hdr-r"><span class="a-ts">${ts}</span></div>
+    </div>
+    ${c.subtitulo?`<div class="a-subtitle">${esc(c.subtitulo)}</div>`:''}
+    <div class="a-title">${esc(c.titulo||'Análise')}</div>
+    <div class="a-tabs">${abas.map((a,i)=>`<button class="a-tab${i===0?' active':''}" onclick="showDynTab(${id},${i})">${esc(a.titulo||('Seção '+(i+1)))}</button>`).join('')}</div>
+    ${abas.map((a,i)=>`<div class="a-tc"${i>0?' style="display:none"':''}>${(Array.isArray(a.secoes)?a.secoes:[]).map(_secHtml).join('')||'<p class="tab-body">—</p>'}</div>`).join('')}
+  </div>`;
+  const card=el.firstElementChild;
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('conversation').appendChild(card);
+  scrollChat();
+  return card;
+}
+// Versão achatada do card para a memória do fio (follow-ups baratos, sem JSON bruto)
+function cardToPlain(c){
+  const parts=[c.titulo||''];
+  (c.abas||[]).forEach(a=>{
+    parts.push('## '+(a.titulo||''));
+    (a.secoes||[]).forEach(s=>{
+      const v=typeof s.conteudo==='string'?s.conteudo:JSON.stringify(s.conteudo);
+      parts.push((s.titulo?s.titulo+': ':'')+(v||''));
+    });
+  });
+  return parts.join('\n').slice(0,4000);
 }
 function ctVanTag(v,hn,an){
   if(!v||v==='equilibrado')return `<span class="ct-van ct-van-e">Equilibrado</span>`;
@@ -3503,14 +3591,15 @@ async function loadEspnData(force){
 function fillMatch(i){
   const j=_schedule[i];if(!j)return;
   if(_currentView==='library')showView('chat');
-  const lines=[`PARTIDA: ${j.mandante} x ${j.visitante}`,`FASE: ${j.fase||'Copa do Mundo 2026'}`];
-  if(j.grupo)lines.push(`GRUPO: ${j.grupo}`);
+  // Prompt VISÍVEL curto e humano — as diretrizes de pesquisa (forma, lesões, escalação,
+  // xG, tickets) já vivem nos prompts do pipeline (Fase 1/Fase 2) e valem para toda
+  // análise; repeti-las aqui só poluía a caixa e sugeria que o pedido limitava a análise.
+  // O contexto do jogo (fase/data/sede) segue numa linha compacta: ancora a busca.
   const dLabel=j.data_iso?formatDateBR(j.data_iso):'';
-  if(dLabel&&j.hora_brt)lines.push(`DATA/HORA: ${dLabel} às ${j.hora_brt} BRT`);
-  else if(dLabel)lines.push(`DATA: ${dLabel}`);
-  if(j.sede)lines.push(`SEDE: ${j.sede}`);
-  lines.push('','Pesquise forma recente na Copa 2026, lesões/suspensões confirmadas, escalação provável e xG. Sugira 2-3 tickets com fundamento estatístico.');
-  const ta=document.getElementById('match-input');ta.value=lines.join('\n');ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,220)+'px';ta.focus();
+  const meta=[j.fase||'Copa do Mundo 2026',j.grupo?`Grupo ${j.grupo}`:'',dLabel?(j.hora_brt?`${dLabel} às ${j.hora_brt} BRT`:dLabel):'',j.sede||''].filter(Boolean).join(' · ');
+  const ta=document.getElementById('match-input');
+  ta.value=`Análise do jogo: ${j.mandante} × ${j.visitante}\n(${meta})`;
+  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,220)+'px';ta.focus();
 }
 // ─── Mobile sidebar ───────────────────────────────────────────────────────
 function toggleSidebar(){
@@ -4778,7 +4867,7 @@ async function runChat(){
     // acomodar o budget (cobra-se o uso real, não o teto).
     const _chatEffort=EFFORT_LEVELS[currentEffort]||{budget:0};
     const _chatThink=_chatEffort.budget>0 && !/opus-4-8|opus-4-7|fable-5/.test(currentModel);
-    const _chatBase=(atts.length||liveData)?4096:2048;
+    const _chatBase=(atts.length||liveData)?4096:3072; // cards JSON são mais verbosos que prosa
     const _chatBody={model:currentModel,max_tokens:_chatBase+(_chatThink?_chatEffort.budget:0),
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
       messages:reqMessages,stream:true,
@@ -4794,13 +4883,22 @@ async function runChat(){
     });
     parseRateLimitHeaders(res);if(!res.ok)throw new Error(`Erro ${res.status}`);
     let text='';const reader=res.body.getReader(),dec=new TextDecoder();
+    // Streaming bufferizado: se a resposta é o card JSON (começa com "{" ou ```json),
+    // NÃO pinga JSON cru na bolha — mostra um placeholder e renderiza o card no fim.
+    // Resposta em texto puro (exceção do contrato) continua streamando ao vivo.
+    let _isJson=null;
+    const _paint=()=>{
+      if(_isJson===null){const lead=text.replace(/^\s+/,'');if(!lead)return;_isJson=lead.startsWith('{')||/^```(?:json)?\s*\{/i.test(lead);
+        if(_isJson)bubble.innerHTML='<span class="ldot" style="display:inline-block;margin:2px 6px 2px 2px"></span><em style="font-size:12px;color:var(--muted)">montando análise…</em>';}
+      if(!_isJson){bubble.innerHTML=simpleMd(text);scrollChat();}
+    };
     while(true){
       const{done,value}=await reader.read();if(done)break;
       for(const line of dec.decode(value).split('\n')){
         if(!line.startsWith('data:'))continue;
         const d=line.slice(5).trim();if(d==='[DONE]')continue;
         try{const j=JSON.parse(d);
-          if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){text+=j.delta.text;bubble.innerHTML=simpleMd(text);scrollChat();}
+          if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){text+=j.delta.text;_paint();}
           if(j.type==='message_start'){
             if(j.message?.usage){
               tokenState.lastIn=j.message.usage.input_tokens||0;tokenState.sessionIn+=tokenState.lastIn;
@@ -4814,7 +4912,16 @@ async function runChat(){
         }catch{}
       }
     }
-    _chatThread.push({role:'assistant',content:text||'…'});
+    // Render final: card com abas quando o contrato veio; senão, texto normal.
+    const _card=chatCardFrom(text);
+    if(_card){
+      const row=bubble.closest('.msg-agent-chat');if(row)row.remove();else bubble.innerHTML='';
+      renderChatCard(_card);
+      _chatThread.push({role:'assistant',content:cardToPlain(_card)||'…'});
+    }else{
+      bubble.innerHTML=simpleMd(text||'…');
+      _chatThread.push({role:'assistant',content:text||'…'});
+    }
     stopThinking(true);setTimeout(()=>{updateTokenBar();updateDockTokens();},1300);
   }catch(e){
     stopThinking(false);
@@ -4830,7 +4937,15 @@ function analystSystemPrompt(){
 
 Você é o Meridian, uma IA analista de futebol especializada na Copa do Mundo 2026. Atue como um analista de verdade: interprete livremente o que o usuário pede e cubra um leque amplo de pedidos sobre futebol e a Copa — análises de partidas, táticas, escalações, formações, jogadores, históricos e confrontos diretos, prognósticos, comparações, cenários hipotéticos, regras, estatísticas, curiosidades e contexto do torneio.
 
-Não se prenda a um formato rígido: estruture a resposta da forma mais útil para o pedido (tópicos, comparações, parágrafos analíticos). Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.
+Seja preciso e fundamentado; quando não tiver certeza de um dado factual recente, deixe claro. Se a pergunta fugir totalmente de futebol/Copa do Mundo, redirecione gentilmente para o seu domínio.
+
+FORMATO DE RESPOSTA (design padrão — cards com abas):
+Para QUALQUER pedido substantivo (análise, comparação, avaliação de ticket, prognóstico, plano, lista de dados, cenário, explicação estruturada), responda APENAS com este JSON, sem texto antes/depois e sem bloco markdown:
+{"card":{"titulo":"","subtitulo":"","abas":[{"titulo":"","secoes":[{"titulo":"","tipo":"texto|lista|kv|tabela|tiles","conteudo":"…"}]}]}}
+- "abas": 2 a 4, com TÍTULOS LIVRES que você RENOMEIA para servir ao pedido (ex.: avaliação de ticket → "Veredito", "Seleção a Seleção", "Riscos", "Alternativas"; comparação de jogadores → "Panorama", "Números", "Contexto Tático", "Conclusão"). Nunca force os títulos de uma análise de partida se o pedido é outro.
+- "secoes": cada uma tem "tipo" e "conteudo": "texto" (string corrida), "lista" (array de strings), "kv" (array de {"k","v"} para pares rótulo→valor), "tabela" ({"colunas":[…],"linhas":[[…]]}) e "tiles" (array de {"lbl","val"} para 2-3 destaques numéricos). Use o tipo que melhor apresenta o dado — números comparáveis pedem "tabela" ou "kv", não prosa.
+- EXCEÇÃO (única): saudações, confirmações e respostas triviais de uma frase → responda em texto puro, sem JSON. Qualquer coisa acima disso → card.
+- A primeira aba deve conter o essencial (veredito/resposta direta); as demais aprofundam.
 
 PERCEPÇÃO E INTERPRETAÇÃO (converse como um analista humano, não como um formulário):
 - Entenda a INTENÇÃO real por trás da mensagem, mesmo quando ela for curta, informal, com erros de digitação, abreviada ou ambígua. Ex.: "e a bósnia?" após falar dos EUA = o usuário quer sua leitura sobre a Bósnia naquele contexto.
@@ -4888,7 +5003,7 @@ async function conversationalFallback(query,apiKey,reqHeaders,signal){
     headers:reqHeaders,
     body:JSON.stringify({model:currentModel,max_tokens:3500,
       system:[{type:'text',text:analystSystemPrompt(),cache_control:{type:'ephemeral'}}],
-      messages:[{role:'user',content:`DATA: ${currentDateFull()}${ctx?`\n\nContexto do torneio:\n${ctx}`:''}\n\n${query}`}],
+      messages:[{role:'user',content:`DATA: ${currentDateFull()}${ctx?`\n\nContexto do torneio:\n${ctx}`:''}\n\n${query}\n\n(Formato desta resposta: TEXTO CORRIDO analítico, sem JSON — este é o modo simplificado.)`}],
       stream:true}),
     signal
   });
@@ -4997,7 +5112,13 @@ async function runAnalysis(){
 
     // Portão de completude: preenche stats-chave faltantes de titulares citados (custo
     // zero se a coleta já veio completa; senão, UMA busca-alvo Haiku + web_search).
+    // Antes do portão: se a coleta regrediu a STRINGS em jogadores_chave (ex.: auto-cura
+    // desligou structured outputs), coage cada nome a objeto {nome} — o portão então
+    // detecta os stats vazios e busca, e a seção "Stats por Jogador" aparece mesmo assim.
     if(rawFacts){
+      try{[rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
+        if(Array.isArray(tm.jogadores_chave))tm.jogadores_chave=tm.jogadores_chave.map(p=>typeof p==='string'?{nome:p}:p);
+      });}catch(_){}
       const g=await fillPlayerGaps(rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
       tokenState.sessionIn+=g.inTokens;tokenState.sessionOut+=g.outTokens;
       tokenState.sessionIn_p1+=g.inTokens;tokenState.sessionOut_p1+=g.outTokens;

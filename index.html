@@ -3357,14 +3357,15 @@ const TSDB_BASE='https://www.thesportsdb.com/api/v1/json/123';
 const TSDB_TTL=15*60*1000;
 async function fetchTsdb(path,cacheKey){
   try{const raw=localStorage.getItem(cacheKey);if(raw){const c=JSON.parse(raw);if(c&&Date.now()-c.t<TSDB_TTL)return c.d;}}catch{}
+  const ctl=new AbortController();const tid=setTimeout(()=>ctl.abort(),8000);
   try{
-    const ctl=new AbortController();const tid=setTimeout(()=>ctl.abort(),8000);
-    const res=await fetch(TSDB_BASE+path,{signal:ctl.signal});clearTimeout(tid);
+    const res=await fetch(TSDB_BASE+path,{signal:ctl.signal});
     if(!res.ok)return null;
     const d=await res.json();
     try{localStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),d}));}catch{}
     return d;
   }catch{return null;}
+  finally{clearTimeout(tid);}
 }
 function _tsdbLine(e){
   const sc=(e.intHomeScore!=null&&e.intAwayScore!=null)?`${e.intHomeScore}x${e.intAwayScore}`:'—';
@@ -4449,13 +4450,17 @@ Extraia placares, classificação do grupo, xG e estilo diretamente das páginas
     if(signal.aborted)throw new Error('cancelled');
     const mkBody=()=>JSON.stringify({model:_useModel,max_tokens:3000,system:SP,messages:msgs,tools:[{type:_useTool,name:'web_search',max_uses:_maxUses}],...(_soP1?{output_config:{format:{type:'json_schema',schema:FACTS_SCHEMA}}}:{})});
     let res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
+    // Auto-cura em 400, do reparo mais barato para o mais destrutivo:
+    // 1º structured outputs (flag local, não muda modelo nem persiste nada);
+    // só se o 400 PERSISTIR desligamos a filtragem dinâmica (persistida + rebaixa Sonnet→Haiku).
+    // Ordem importa: um 400 causado pelo structured outputs não pode sacrificar a dynSearch por engano.
+    if(res.status===400&&_soP1){
+      _soP1=false; // structured outputs não suportado neste acesso/combinação → caminho provado
+      res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
+    }
     if(res.status===400&&_dynActive){
       setDynSearch(false);_dynActive=false;_useModel='claude-haiku-4-5-20251001';_useTool='web_search_20250305';
       try{toast('Filtragem dinâmica indisponível neste acesso — usando busca padrão.');}catch{}
-      res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
-    }
-    if(res.status===400&&_soP1){
-      _soP1=false; // structured outputs não suportado neste acesso/combinação → caminho provado
       res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body:mkBody(),signal});
     }
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
@@ -4522,7 +4527,6 @@ function buildEnrichedQuery(query,rawFacts,ctx){
 // 400 no passado); aqui é o campo "format", validado. Restrições do recurso:
 // additionalProperties:false obrigatório; sem min/max; anuláveis via anyOf.
 const _soStr={type:'string'};
-const _soNum={type:'number'};
 const _soStrArr={type:'array',items:{type:'string'}};
 const _soNullable=t=>({anyOf:[{type:t},{type:'null'}]});
 function _soObj(props){return{type:'object',properties:props,required:Object.keys(props),additionalProperties:false};}

@@ -250,6 +250,21 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .sp-ok{background:#e2ede4;color:#336244}.sp-warn{background:#f4e8d0;color:#7a5a20}
 .tesc{font-size:11px;color:var(--mid);margin-top:5px;line-height:1.5}
 .tkeys{font-size:11px;color:var(--muted);margin-top:5px}
+/* Stats fundamentais por jogador (aba Desempenho) */
+.pstat-team{display:flex;flex-direction:column;gap:.5rem}
+.pstat{background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(160,240,190,.12);border-radius:12px;padding:.65rem .7rem}
+.pstat-hd{display:flex;align-items:baseline;gap:7px;margin-bottom:.5rem}
+.pstat-nome{font-weight:600;font-size:13px}
+.pstat-pos{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(160,240,190,.2);border-radius:4px;padding:1px 5px}
+.pstat-rating{margin-left:auto;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;color:var(--terra)}
+.pstat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:4px}
+.pstat-cell{background:rgba(255,255,255,.05);border:1px solid rgba(160,240,190,.1);border-radius:7px;padding:4px 3px;text-align:center}
+.pstat-v{font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;line-height:1.1}
+.pstat-l{font-size:8.5px;color:var(--muted);margin-top:2px}
+.pstat-cards{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:.5rem;font-size:11px;font-variant-numeric:tabular-nums}
+.pstat-susp{font-size:10px;font-weight:600;background:rgba(240,200,60,.16);color:#f0d060;border-radius:999px;padding:2px 8px}
+.pstat-note{font-size:11px;color:var(--mid);margin-top:.4rem;line-height:1.45}
+.pstat-src{font-size:10px;color:var(--muted);font-style:italic;margin-top:.5rem;text-align:center}
 .lrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
 .lrow:last-child{border-bottom:none}
 .llogic{font-size:11px;color:var(--muted);padding:3px 0 7px}.lhint{font-size:11px;color:var(--muted);margin-top:.6rem}
@@ -2569,6 +2584,29 @@ function tcard(t){
     ${t.escalacao?`<div class="tesc">${esc(t.escalacao)}</div>`:''}
     ${t.jogadores_chave?.length?`<div class="tkeys">★ ${t.jogadores_chave.map(esc).join(' · ')}</div>`:''}`;
 }
+// ── Card de stats fundamentais de UM jogador (dados estruturados da Fase 1) ──
+function _pstatCard(p){
+  if(!p||typeof p!=='object')return '';
+  const has=v=>v!==null&&v!==undefined&&v!=='';
+  const cells=[],add=(v,l)=>{if(has(v))cells.push(`<div class="pstat-cell"><div class="pstat-v">${esc(v)}</div><div class="pstat-l">${l}</div></div>`);};
+  add(p.jogos,'jogos');add(p.minutos,'min');add(p.gols,'gols');add(p.assistencias,'assist');
+  add(p.finalizacoes_por_jogo,'fin/j');add(p.finalizacoes_no_gol_por_jogo,'no gol/j');
+  add(p.grandes_chances_ou_passes_decisivos_por_jogo,'GC-PD/j');
+  add(p.desarmes_por_jogo,'desarm/j');add(p.faltas_cometidas_por_jogo,'faltas/j');add(p.faltas_sofridas_por_jogo,'sofr/j');
+  const cds=[];
+  if(has(p.cartoes_amarelos))cds.push(`🟨 ${esc(p.cartoes_amarelos)}`);
+  if(has(p.cartoes_vermelhos))cds.push(`🟥 ${esc(p.cartoes_vermelhos)}`);
+  const susp=(p.a_um_amarelo_da_suspensao===true||/^(true|sim|yes)$/i.test(String(p.a_um_amarelo_da_suspensao||'')))?'<span class="pstat-susp">⚠ a 1 amarelo da suspensão</span>':'';
+  const cardsRow=(cds.length||susp)?`<div class="pstat-cards">${cds.join('&nbsp;&nbsp;')}${susp}</div>`:'';
+  const pen=(has(p.cobra_penaltis_ou_faltas)&&!/^n[ãa]o$/i.test(String(p.cobra_penaltis_ou_faltas).trim()))?`<div class="pstat-note">🎯 Cobra: ${esc(p.cobra_penaltis_ou_faltas)}</div>`:'';
+  const obs=has(p.observacao)?`<div class="pstat-note">${esc(p.observacao)}</div>`:'';
+  return `<div class="pstat"><div class="pstat-hd"><span class="pstat-nome">${esc(p.nome||'—')}</span>${p.posicao?`<span class="pstat-pos">${esc(p.posicao)}</span>`:''}${has(p.rating_medio)?`<span class="pstat-rating">${esc(p.rating_medio)}</span>`:''}</div>${cells.length?`<div class="pstat-grid">${cells.join('')}</div>`:''}${cardsRow}${pen}${obs}</div>`;
+}
+function _pstatTeam(nome,arr){
+  const players=(Array.isArray(arr)?arr:[]).filter(p=>p&&typeof p==='object'&&p.nome);
+  if(!players.length)return '';
+  return `<div class="pstat-team"><div class="tname">${esc(nome)}</div>${players.map(_pstatCard).join('')}</div>`;
+}
 function ctVanTag(v,hn,an){
   if(!v||v==='equilibrado')return `<span class="ct-van ct-van-e">Equilibrado</span>`;
   if(v==='mandante')return `<span class="ct-van ct-van-m">Vantagem ${hn}</span>`;
@@ -2674,7 +2712,10 @@ function renderResults(d,opts){
 
 
   // ── Tab: Individual ──
-  const tabIndividual=`<div class="teams-full"><div class="tcard">${tcard(d.mandante)}</div><div class="tcard">${tcard(d.visitante)}</div></div>`;
+  const _ps=d._pstats;
+  const _psHas=_ps&&((Array.isArray(_ps.mandante)&&_ps.mandante.length)||(Array.isArray(_ps.visitante)&&_ps.visitante.length));
+  const statsSection=_psHas?`<div class="tab-s"><div class="tab-h">Stats por Jogador · Copa 2026</div><div class="teams-full">${_pstatTeam(d.mandante?.nome||'Mandante',_ps.mandante)}${_pstatTeam(d.visitante?.nome||'Visitante',_ps.visitante)}</div><div class="pstat-src">Números reais coletados na competição (pesquisa Sofascore/FotMob/FBref)</div></div>`:'';
+  const tabIndividual=`<div class="teams-full"><div class="tcard">${tcard(d.mandante)}</div><div class="tcard">${tcard(d.visitante)}</div></div>${statsSection}`;
 
   // ── Tab: Avançado ──
   const tabAvancado=`
@@ -5050,6 +5091,9 @@ async function runAnalysis(){
       if(retryR){lastOut+=retryR.outTokens||0;parsed=parseAnalysisJson(retryR.text);}
     }
     if(!parsed)throw new Error('O modelo não retornou uma análise estruturada. Tente descrever a partida com "PARTIDA: [Time A] x [Time B]" ou use um dos jogos sugeridos.');
+    // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
+    // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
+    try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
     renderResults(parsed);
     // Memória: registra a análise estruturada no fio do chat para que perguntas de
     // acompanhamento ("e se a Bósnia abrir o placar?") sejam fundamentadas pela análise

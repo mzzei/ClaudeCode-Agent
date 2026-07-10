@@ -45,12 +45,13 @@ logado: `INSERT` em `predictions` com `home`, `away`, `match_date`, `prob_home/d
 gravar o que a análise já produziu. Custo: zero tokens.
 
 ### ② Saber quando o jogo terminou
-Reaproveita fonte que **já existe no projeto**: o Worker já busca
-`thesportsdb.com/.../eventspastleague.php?id=4429` para o Sintetizador (ou o app já
-consulta ESPN). Nenhuma fonte nova — é o mesmo dado, olhado com outro propósito.
+Reaproveita fonte que **já existe no projeto**: o app já consulta a ESPN e o
+TheSportsDB (`eventspastleague.php?id=4429`) para a coleta de fatos. Nenhuma fonte
+nova — é o mesmo dado, olhado com outro propósito.
 
 ### ③ Scoring — a peça nova, e por que é um JOB, não um prompt
-Um **cron no Worker** (mesma mecânica do Sintetizador, reaproveitada) roda 1x/dia:
+Um **cron no Worker** (novo — o Worker hoje só faz proxy sob demanda, este é o
+primeiro job agendado do projeto) roda 1x/dia:
 1. Busca `predictions` com `scored_at is null` e `match_date <= hoje` (índice já existe
    no schema: `predictions_pending_idx`).
 2. Casa por nome dos times + data com o resultado real (TheSportsDB/ESPN).
@@ -106,10 +107,10 @@ Renderiza como cards simples: "Alta confiança: 12/17 (71%)" · "Média: 8/15 (5
 
 1. Fiação do cliente Supabase no app (login) — pré-requisito, já combinado.
 2. `INSERT` em `predictions` no `renderResults` (baixo risco, só gravação).
-3. Job de scoring no Worker (reaproveita padrão do cron do Sintetizador).
+3. Job de scoring no Worker (primeiro cron do projeto — Cron Triggers do Cloudflare).
 4. Tela "Meu Desempenho" (leitura + agregação, reaproveita CSS existente).
 5. (v2, opcional) Scoring de tickets ambíguos via Haiku; Brier score; comparação
    entre modelos/fases do prompt.
 
 Cada item acima é testável isoladamente e nenhum quebra o app atual — mesmo padrão
-"aditivo, opt-in, degrada em silêncio" usado no Sintetizador e nas contas.
+"aditivo, opt-in, degrada em silêncio" usado nas contas (Fase 1).

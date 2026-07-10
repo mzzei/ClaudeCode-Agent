@@ -272,14 +272,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .gtbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
 .gtbl tr:last-child td{border-bottom:none}
 .gtbl td:first-child{font-weight:500}
-/* Resumo do Dia (Sintetizador pós-rodada · Worker) */
-.rsd-title{font-size:12px;font-weight:600;line-height:1.35;margin-bottom:3px}
-.rsd-date{font-size:10px;color:var(--muted);margin-bottom:.5rem}
-.rsd-item{display:flex;gap:7px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--mid);line-height:1.45}
-.rsd-item:last-child{border-bottom:none}
-.rsd-dot{width:5px;height:5px;border-radius:50%;background:var(--terra);flex-shrink:0;margin-top:5px}
-.rsd-resumo{font-size:11px;color:var(--mid);line-height:1.5;margin-top:.5rem}
-.rsd-foot{font-size:9px;color:var(--muted);font-style:italic;margin-top:.5rem}
 .lrow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
 .lrow:last-child{border-bottom:none}
 .llogic{font-size:11px;color:var(--muted);padding:3px 0 7px}.lhint{font-size:11px;color:var(--muted);margin-top:.6rem}
@@ -1404,10 +1396,6 @@ body.wc-lite .ls-emblem-aura{animation:none!important}
    <div class="rs-scroll">
     <!-- Featured (empty state) -->
     <div id="rs-featured">
-      <div class="rs-block" id="rs-daily" style="display:none">
-        <div class="rs-lbl">📰 Resumo do Dia</div>
-        <div id="rs-daily-body"></div>
-      </div>
       <div class="rs-block" id="rs-copa-stats" style="display:none">
         <div class="rs-lbl">📊 Estatísticas da Copa</div>
         <div id="rs-copa-stats-body"></div>
@@ -4460,32 +4448,6 @@ async function loadNews(){
 }
 setInterval(loadNews,NEWS_TTL);
 
-// ─── Resumo do Dia (papel #2 · Sintetizador pós-rodada no Worker) ─────────
-// Conteúdo GLOBAL (um documento pra todos), gerado por cron no Worker de madrugada e
-// guardado em KV. O app só BUSCA e exibe — sem chave, sem custo pro usuário, sem estado
-// por usuário (por isso é seguro em qualquer modelo de negócio). Fonte: {Worker}/daily.
-const MERIDIAN_DAILY_URL=''; // opcional: URL /daily pública fixa do Worker do dono → torna global mesmo p/ quem não configurou Worker. Vazio = usa o Worker do usuário.
-function getDailyUrl(){try{const w=(typeof getWorkerUrl==='function')?getWorkerUrl():'';if(w)return w.replace(/\/+$/,'')+'/daily';}catch{}return MERIDIAN_DAILY_URL||'';}
-function _relTimePt(ms){const s=Math.floor((Date.now()-ms)/1000);if(s<3600)return 'há '+Math.max(1,Math.floor(s/60))+' min';if(s<86400)return 'há '+Math.floor(s/3600)+'h';return 'há '+Math.floor(s/86400)+'d';}
-function renderDailySummary(d){
-  const body=document.getElementById('rs-daily-body');if(!body)return;
-  const bullets=Array.isArray(d.destaques)&&d.destaques.length
-    ?d.destaques.slice(0,6).map(x=>`<div class="rsd-item"><span class="rsd-dot"></span><span>${esc(textFrom(x))}</span></div>`).join(''):'';
-  body.innerHTML=`${d.titulo?`<div class="rsd-title">${esc(d.titulo)}</div>`:''}${d.date?`<div class="rsd-date">${esc(d.date)}</div>`:''}${bullets}${d.resumo?`<p class="rsd-resumo">${esc(d.resumo)}</p>`:''}${d.generated_at?`<div class="rsd-foot">atualizado ${esc(_relTimePt(d.generated_at))}</div>`:''}`;
-  document.getElementById('rs-daily').style.display='block';
-}
-async function loadDailySummary(){
-  const url=getDailyUrl();if(!url)return;
-  try{
-    const ctl=new AbortController();const tid=setTimeout(()=>ctl.abort(),7000);
-    const res=await fetch(url,{signal:ctl.signal});clearTimeout(tid);
-    if(!res.ok)return;
-    const d=await res.json();
-    if(!d||d.ok===false||!(d.titulo||d.resumo||(Array.isArray(d.destaques)&&d.destaques.length)))return;
-    renderDailySummary(d);
-  }catch{}
-}
-loadDailySummary();
 loadHistory();renderRecentAnalyses();renderSidebarHistory();maybeShowWelcome();applyLang();
 document.addEventListener('click',e=>{if(!e.target.closest('.sel-pop')&&!e.target.closest('.i-sel-btn'))closeSelPops();});
 // ESPN não requer chave — carrega standings/agenda e notícias imediatamente

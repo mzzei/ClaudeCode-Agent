@@ -2733,7 +2733,7 @@ function renderResults(d,opts){
   const tabResumo=`
     ${d.contexto_fase||d.confianca_geral?`<div class="tab-s">
       <div class="tab-h">1. Resumo</div>
-      <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||esc(d.confianca_geral)}</span>
+      <span class="badge ${cM[d.confianca_geral]||'b-warn'}">${cL[d.confianca_geral]||esc(d.confianca_geral)}</span>${d._audit?`<span class="badge ${d._audit.n?'b-warn':'b-ok'}" style="margin-left:6px" title="Verificação automática de consistência antes da entrega">⚖ auditada${d._audit.n?` · ${d._audit.n} ressalva${d._audit.n>1?'s':''}`:' · sem ressalvas'}</span>`:''}
       ${d.contexto_fase?`<p class="tab-body">${esc(d.contexto_fase)}</p>`:''}
     </div>`:''}
     ${d.fatores_decisivos?.length?`<div class="tab-s">
@@ -4713,6 +4713,47 @@ async function fillPlayerGaps(rawFacts,apiKey,signal,onUpdate){
     return{inTokens:accIn,outTokens:accOut};
   }catch(e){if(e&&(e.name==='AbortError'||e.message==='cancelled'))throw e;return{inTokens:0,outTokens:0};}
 }
+
+// ─── Fase 3 · Verificador (auditor pré-render) ────────────────────────────
+// Papel novo no pipeline: um crítico BARATO (Haiku, sem web_search) que recebe os
+// fatos coletados + a análise pronta e aponta problemas OBJETIVOS antes de renderizar.
+// Ele NUNCA reescreve a análise (modelo barato reescrevendo o analista degradaria o
+// resultado): devolve ressalvas, e a fusão é feita por CÓDIGO — anota em "incerteza",
+// rebaixa confiança mal calibrada e carimba o selo de auditoria no card.
+function _applyAudit(parsed,v){
+  if(!parsed||!v)return 0;
+  const rs=Array.isArray(v.ressalvas)?v.ressalvas.filter(r=>r&&r.problema).slice(0,4):[];
+  if(rs.length){
+    parsed.incerteza=Array.isArray(parsed.incerteza)?parsed.incerteza:[];
+    rs.forEach(r=>parsed.incerteza.push({fator:`Auditoria (${r.gravidade==='alta'?'grave':'atenção'}): ${r.problema}`,impacto:r.onde||'apontado na verificação automática pré-entrega'}));
+  }
+  if(v.rebaixar_confianca===true&&parsed.confianca_geral==='alto')parsed.confianca_geral='medio';
+  parsed._audit={veredito:rs.length?'com_ressalvas':'aprovada',n:rs.length};
+  return rs.length;
+}
+async function verifyAnalysis(parsed,rawFacts,apiKey,signal,onUpdate){
+  try{
+    if(!parsed)return null;
+    onUpdate&&onUpdate({status:'Auditando análise…',phase:2});
+    const SP='Você é um AUDITOR de análises de futebol da Copa 2026. Recebe (A) FATOS COLETADOS e (B) a ANÁLISE final. NÃO refaça a análise; aponte apenas problemas OBJETIVOS e verificáveis nos dois blocos: '
+      +'1) INCONSISTÊNCIA NUMÉRICA — probabilidade de ticket incompatível com os lambdas declarados; múltipla cuja probabilidade combinada não bate com o produto das pernas; 1X2 que não soma ~100%. '
+      +'2) FALTA DE LASTRO — afirmação factual central de (B) que NÃO aparece em (A) (possível alucinação). Se (A) estiver vazio, pule este critério. '
+      +'3) CONFIANÇA MAL CALIBRADA — "alto"/"alta" apoiada em fonte única ou convivendo com lacunas graves declaradas. '
+      +'4) VALOR IMPLAUSÍVEL — xG fora de 0–4, mais de 7 jogos num Mundial, rating fora de 4–10, probabilidade fora de 1–95%. '
+      +'5) CONTRADIÇÃO INTERNA entre seções de (B). '
+      +'Seja conservador: só aponte o que é objetivo; NADA de opinião tática. Máximo 4 ressalvas, as mais graves primeiro. '
+      +'Responda APENAS JSON: {"veredito":"aprovada|com_ressalvas","rebaixar_confianca":true|false,"ressalvas":[{"gravidade":"alta|media","problema":"","onde":""}]}';
+    const body=JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:800,system:SP,
+      messages:[{role:'user',content:`(A) FATOS COLETADOS:\n${JSON.stringify(rawFacts||{})}\n\n(B) ANÁLISE FINAL:\n${JSON.stringify(parsed)}`}]});
+    const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body,signal});
+    if(!res.ok)return null;
+    const data=await res.json();const u=data.usage||{};
+    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const m=txt.match(/\{[\s\S]*\}/);let v=null;try{if(m)v=JSON.parse(m[0]);}catch{}
+    if(v)_applyAudit(parsed,v);
+    return{inTokens:u.input_tokens||0,outTokens:u.output_tokens||0};
+  }catch(e){if(e&&(e.name==='AbortError'||e.message==='cancelled'))throw e;return null;}
+}
 // ─── Structured Outputs (output_config.format · json_schema) — FASE 1 ────
 // Garante JSON 100% válido direto da API na COLETA. Testado AO VIVO via Worker
 // (07/2026): Haiku 4.5 e Sonnet 4.6, com thinking budget_tokens, web_search e
@@ -5215,6 +5256,10 @@ async function runAnalysis(){
     // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
     // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
     try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
+    // Fase 3 · Verificador: auditoria barata (Haiku) da análise pronta ANTES de renderizar.
+    // Falha do auditor nunca bloqueia a entrega (retorna null e a análise sai sem selo).
+    const _va=await verifyAnalysis(parsed,rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:2}));
+    if(_va){tokenState.sessionIn+=_va.inTokens;tokenState.sessionOut+=_va.outTokens;}
     renderResults(parsed);
     // Memória: registra a análise estruturada no fio do chat para que perguntas de
     // acompanhamento ("e se a Bósnia abrir o placar?") sejam fundamentadas pela análise

@@ -4552,6 +4552,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'Fabrizio Romano no X (@FabrizioRomano) para transferências, lesões e escalações de última hora; '
     +'imprensa internacional renomada: BBC Sport, The Guardian, The Athletic, ESPN FC, Sky Sports, Marca, AS, L\'Équipe, Gazzetta dello Sport e Kicker.';
   const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
+    +'RESULTADOS JÁ DISPUTADOS: os placares dos jogos que cada seleção já fez na Copa são FATOS DUROS e costumam estar no bloco de dados reais fornecido (ESPN/TheSportsDB) — extraia o PLACAR EXATO de cada um para "resultados_copa" (ex.: "Espanha 2x1 Uruguai (oitavas)"). Nunca escreva "resultado inferido do contexto": ou o placar está nos dados/busca (use o número), ou registre honestamente que não veio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
     +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — "jogadores_chave" é uma LISTA DE OBJETOS: um objeto por jogador citado (mire nos 3-5 titulares mais decisivos de cada seleção). Cada objeto tem o CONJUNTO FUNDAMENTAL OBRIGATÓRIO de campos, preenchidos com números REAIS da Copa 2026 vindos da busca: "nome", "posicao", "jogos", "minutos", "gols", "assistencias", "finalizacoes_por_jogo", "finalizacoes_no_gol_por_jogo", "grandes_chances_ou_passes_decisivos_por_jogo", "cartoes_amarelos", "cartoes_vermelhos", "a_um_amarelo_da_suspensao" (true/false), "faltas_cometidas_por_jogo", "faltas_sofridas_por_jogo", "desarmes_por_jogo", "cobra_penaltis_ou_faltas" (ex.: "pênaltis e faltas"/"faltas"/"não"), "rating_medio", e "observacao" (texto livre p/ o que não couber acima — p/ goleiros use aqui: defesas/jogo, clean sheets, gols sofridos; e sequências/lesões relevantes). Esses dados fundamentam os mercados de jogador e são PÚBLICOS e quase sempre encontráveis — deixar os campos-chave (gols, finalizacoes_no_gol_por_jogo, cartoes_amarelos, rating_medio) vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. Use null (não invente) só quando a busca realmente não trouxer aquele número; SÓ use valores da busca, nunca de memória, e descarte implausíveis (máx. 7 jogos num Mundial).\n'
     +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
@@ -4664,6 +4665,9 @@ function buildEnrichedQuery(query,rawFacts,ctx){
 // inspeciona o JSON em memória — nenhuma chamada de API).
 const _PLAYER_CRITICAL=['gols','finalizacoes_no_gol_por_jogo','cartoes_amarelos','rating_medio'];
 const _PLAYER_FIELDS=['posicao','jogos','minutos','gols','assistencias','finalizacoes_por_jogo','finalizacoes_no_gol_por_jogo','grandes_chances_ou_passes_decisivos_por_jogo','cartoes_amarelos','cartoes_vermelhos','a_um_amarelo_da_suspensao','faltas_cometidas_por_jogo','faltas_sofridas_por_jogo','desarmes_por_jogo','cobra_penaltis_ou_faltas','rating_medio','observacao'];
+// Fatos de TIME públicos e estáveis que NUNCA devem virar lacuna — o portão os
+// busca deterministicamente se a coleta vier vazia (mesmo racional do ranking na regra).
+const _TEAM_CRITICAL=['ranking_fifa'];
 function _pgEmpty(v){return v===null||v===undefined||v==='';}
 function _pgNorm(s){return String(s||'').trim().toLowerCase();}
 function _mergePlayerPatch(rawFacts,patchArr){
@@ -4676,7 +4680,16 @@ function _mergePlayerPatch(rawFacts,patchArr){
     });
   });
 }
-async function fillPlayerGaps(rawFacts,apiKey,signal,onUpdate){
+function _mergeTeamPatch(rawFacts,timesArr){
+  if(!Array.isArray(timesArr))return;
+  const byName={};timesArr.forEach(t=>{if(t&&t.nome)byName[_pgNorm(t.nome)]=t;});
+  [rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
+    if(!tm||!tm.nome)return;
+    const src=byName[_pgNorm(tm.nome)];if(!src)return;
+    _TEAM_CRITICAL.forEach(f=>{if(_pgEmpty(tm[f])&&!_pgEmpty(src[f]))tm[f]=src[f];});
+  });
+}
+async function fillDataGaps(rawFacts,apiKey,signal,onUpdate){
   try{
     if(!rawFacts)return{inTokens:0,outTokens:0};
     const gaps=[];
@@ -4687,11 +4700,20 @@ async function fillPlayerGaps(rawFacts,apiKey,signal,onUpdate){
         if(missing.length)gaps.push({nome:p.nome,faltando:missing});
       });
     });
-    if(!gaps.length)return{inTokens:0,outTokens:0}; // completo → custo zero, sem chamada
-    onUpdate&&onUpdate({status:'Completando stats faltantes…',phase:1});
-    const list=gaps.map(g=>`- ${g.nome}: faltam ${g.faltando.join(', ')}`).join('\n');
-    const SP='Você preenche stats FALTANTES de jogadores na Copa do Mundo 2026 buscando na web (Sofascore/FotMob/FBref). Retorne APENAS JSON válido: {"jogadores":[{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}]}. Preencha ao menos os campos pedidos como faltantes de cada jogador. Use null quando a busca não trouxer o número; NUNCA invente de memória; descarte implausíveis (máx 7 jogos num Mundial).';
-    const msgs=[{role:'user',content:`DATA: ${currentDateFull()}. Busque e preencha os stats faltantes destes jogadores na Copa 2026:\n${list}`}];
+    // Fatos de TIME faltantes (ranking FIFA): público/estável — não pode virar lacuna.
+    const teamGaps=[];
+    [rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
+      if(!tm||!tm.nome)return;
+      const missing=_TEAM_CRITICAL.filter(f=>_pgEmpty(tm[f]));
+      if(missing.length)teamGaps.push({nome:tm.nome,faltando:missing});
+    });
+    if(!gaps.length&&!teamGaps.length)return{inTokens:0,outTokens:0}; // completo → custo zero
+    onUpdate&&onUpdate({status:'Completando dados faltantes…',phase:1});
+    const partes=[];
+    if(teamGaps.length)partes.push('SELEÇÕES (ranking FIFA atual é público — ex.: "8º"):\n'+teamGaps.map(g=>`- ${g.nome}: faltam ${g.faltando.join(', ')}`).join('\n'));
+    if(gaps.length)partes.push('JOGADORES:\n'+gaps.map(g=>`- ${g.nome}: faltam ${g.faltando.join(', ')}`).join('\n'));
+    const SP='Você preenche dados FALTANTES da Copa do Mundo 2026 buscando na web (ranking FIFA oficial · Sofascore/FotMob/FBref). Retorne APENAS JSON válido: {"times":[{"nome":"","ranking_fifa":""}],"jogadores":[{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}]}. Preencha ao menos os campos pedidos. Use null/"" quando a busca não trouxer; NUNCA invente de memória; descarte implausíveis (máx 7 jogos num Mundial).';
+    const msgs=[{role:'user',content:`DATA: ${currentDateFull()}. Busque e preencha os dados faltantes na Copa 2026:\n${partes.join('\n\n')}`}];
     let accIn=0,accOut=0;
     for(let i=0;i<3;i++){
       if(signal.aborted)break;
@@ -4702,7 +4724,7 @@ async function fillPlayerGaps(rawFacts,apiKey,signal,onUpdate){
       if(data.stop_reason==='end_turn'){
         const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
         const m=txt.match(/\{[\s\S]*\}/);let patch=null;try{if(m)patch=JSON.parse(m[0]);}catch{}
-        if(patch&&Array.isArray(patch.jogadores))_mergePlayerPatch(rawFacts,patch.jogadores);
+        if(patch){if(Array.isArray(patch.jogadores))_mergePlayerPatch(rawFacts,patch.jogadores);if(Array.isArray(patch.times))_mergeTeamPatch(rawFacts,patch.times);}
         break;
       }
       if(data.stop_reason==='tool_use'){
@@ -4788,7 +4810,7 @@ PARTIDA PRÉ-DEFINIDA: quando a mensagem iniciar com "PARTIDA:", esses dados sã
 
 OS FATOS JÁ FORAM COLETADOS PELO AGENTE DE PESQUISA e são fornecidos na mensagem. NÃO faça pesquisas adicionais.
 
-LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em "lacunas" um dado que (a) esteja realmente ausente dos dados fornecidos E (b) afete MATERIALMENTE a conclusão da análise. Reserve "lacunas" para dados que NENHUMA fonte publica (ex.: um xG específico que não existe para aquela partida). NÃO liste como lacuna informação que é PÚBLICA e encontrável — técnico atual, escalação/onze provável, ranking FIFA: se algum desses não veio nos dados, é LIMITE DE COLETA (a busca não trouxe), não um fato inexistente; mencione no máximo uma vez, de forma sucinta e sem especular o valor. Também não vire lacuna: estatísticas individuais de reservas, histórico pessoal de goleiro, ou possíveis cartões acumulados. Antes de declarar qualquer lacuna, tente derivar/estimar a partir dos dados já disponíveis (ex.: forma, xG, resultados). Prefira uma análise completa: lacuna é exceção, não hábito.
+LACUNAS — critério rigoroso (evite lacunas desnecessárias): só registre em "lacunas" um dado que (a) esteja realmente ausente dos dados fornecidos E (b) afete MATERIALMENTE a conclusão da análise. Reserve "lacunas" para dados que NENHUMA fonte publica (ex.: um xG específico que não existe para aquela partida). NÃO liste como lacuna informação que é PÚBLICA e encontrável — técnico atual, escalação/onze provável, ranking FIFA, e RESULTADO/PLACAR de jogo já disputado (fato duro, sempre confirmável em ESPN/TheSportsDB): se algum desses não veio nos dados, é LIMITE DE COLETA (a busca não trouxe), não um fato inexistente; mencione no máximo uma vez, de forma sucinta e sem especular o valor. Placar de jogo concluído JAMAIS deve ser "inferido do contexto" nem virar lacuna — se você o tem no bloco de dados reais/resultados, use o número exato. Também não vire lacuna: estatísticas individuais de reservas, histórico pessoal de goleiro, ou possíveis cartões acumulados. Antes de declarar qualquer lacuna, tente derivar/estimar a partir dos dados já disponíveis (ex.: forma, xG, resultados). Prefira uma análise completa: lacuna é exceção, não hábito.
 
 ${GROUNDING_RULE}
 Os FATOS COLETADOS e o CONTEXTO DO TORNEIO fornecidos na mensagem são a sua única fonte de fatos voláteis. Exemplos de erro grave: citar um técnico que já deixou a seleção, ou escalar um jogador lesionado/fora da Copa.
@@ -5152,16 +5174,16 @@ async function runAnalysis(){
     tokenState.sessionIn_p1+=p1in;tokenState.sessionOut_p1+=p1out;
     _thkP1Toks=p1in+p1out;
 
-    // Portão de completude: preenche stats-chave faltantes de titulares citados (custo
-    // zero se a coleta já veio completa; senão, UMA busca-alvo Haiku + web_search).
-    // Antes do portão: se a coleta regrediu a STRINGS em jogadores_chave (ex.: auto-cura
-    // desligou structured outputs), coage cada nome a objeto {nome} — o portão então
-    // detecta os stats vazios e busca, e a seção "Stats por Jogador" aparece mesmo assim.
+    // Portão de completude: preenche dados-chave faltantes (stats de titulares citados
+    // E ranking FIFA de time) — custo zero se a coleta já veio completa; senão, UMA
+    // busca-alvo Haiku + web_search cobrindo os dois. Antes do portão: se a coleta
+    // regrediu a STRINGS em jogadores_chave (ex.: auto-cura desligou structured outputs),
+    // coage cada nome a objeto {nome} — o portão então detecta os stats vazios e busca.
     if(rawFacts){
       try{[rawFacts.mandante,rawFacts.visitante].filter(Boolean).forEach(tm=>{
         if(Array.isArray(tm.jogadores_chave))tm.jogadores_chave=tm.jogadores_chave.map(p=>typeof p==='string'?{nome:p}:p);
       });}catch(_){}
-      const g=await fillPlayerGaps(rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
+      const g=await fillDataGaps(rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
       tokenState.sessionIn+=g.inTokens;tokenState.sessionOut+=g.outTokens;
       tokenState.sessionIn_p1+=g.inTokens;tokenState.sessionOut_p1+=g.outTokens;
       _thkP1Toks+=g.inTokens+g.outTokens;

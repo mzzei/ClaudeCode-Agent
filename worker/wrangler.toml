@@ -6,3 +6,15 @@ compatibility_date = "2024-11-01"
 #   npx wrangler secret put ANTHROPIC_KEY
 #   npx wrangler secret put AF_KEY
 # (ou pelo painel: Workers & Pages → seu Worker → Settings → Variables and Secrets)
+
+# ── Resumo do Dia (Sintetizador pós-rodada) ──
+# Cron: 08:00 UTC = 05:00 BRT — depois dos jogos da noite. Reutiliza ANTHROPIC_KEY.
+[triggers]
+crons = ["0 8 * * *"]
+
+# KV que guarda o resumo (um documento global, chave "daily"). Crie uma vez:
+#   npx wrangler kv namespace create MERIDIAN_KV
+# e cole o "id" retornado abaixo (substitua o placeholder):
+[[kv_namespaces]]
+binding = "MERIDIAN_KV"
+id = "COLE_AQUI_O_ID_DO_KV"

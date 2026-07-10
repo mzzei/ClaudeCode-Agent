@@ -72,6 +72,16 @@ export default {
         return new Response(r.body, { status: r.status, headers: { ...CORS, 'Content-Type': ct } });
       }
 
+      // ── Resumo do Dia: {worker}/daily ─────────────────────────────────────
+      // Documento GLOBAL gerado pelo cron (scheduled) e guardado em KV. Sem chave,
+      // sem estado por usuário — só leitura. Devolve {ok:false} enquanto não gerado.
+      if (url.pathname === '/daily') {
+        const cached = env.MERIDIAN_KV ? await env.MERIDIAN_KV.get('daily') : null;
+        return new Response(cached || JSON.stringify({ ok: false }), {
+          headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=900' },
+        });
+      }
+
       // ── Health check ──────────────────────────────────────────────────────
       if (url.pathname === '/' || url.pathname === '/health') {
         return new Response(JSON.stringify({ ok: true, service: 'meridian-proxy' }),
@@ -84,4 +94,55 @@ export default {
         { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });
     }
   },
+
+  // ── Cron (Sintetizador pós-rodada) ──────────────────────────────────────
+  // Dispara pelo schedule do wrangler.toml (madrugada). Reutiliza ANTHROPIC_KEY
+  // (a mesma do proxy) — nenhuma chave nova. waitUntil garante que o Worker não
+  // encerre antes de gravar o KV.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(genDaily(env));
+  },
 };
+
+// Gera o "Resumo do Dia" a partir de dados públicos (TheSportsDB, liga 4429) e grava
+// um único documento em KV para todos os usuários. Silencioso em falha — o próximo
+// cron tenta de novo; o app apenas não mostra o bloco enquanto não houver documento.
+async function genDaily(env) {
+  if (!env.ANTHROPIC_KEY || !env.MERIDIAN_KV) return;
+  try {
+    const TSDB = 'https://www.thesportsdb.com/api/v1/json/123';
+    const [pastR, nextR] = await Promise.all([
+      fetch(TSDB + '/eventspastleague.php?id=4429'),
+      fetch(TSDB + '/eventsnextleague.php?id=4429'),
+    ]);
+    const past = pastR.ok ? await pastR.json() : null;
+    const next = nextR.ok ? await nextR.json() : null;
+    const line = (e) => `${e.dateEvent || ''} · ${e.strHomeTeam} ${(e.intHomeScore != null && e.intAwayScore != null) ? e.intHomeScore + 'x' + e.intAwayScore : '—'} ${e.strAwayTeam}${e.intRound ? ' (rodada ' + e.intRound + ')' : ''}`;
+    const pastTxt = ((past && past.events) || []).slice(0, 12).map(line).join('\n');
+    const nextTxt = ((next && next.events) || []).slice(0, 8).map(line).join('\n');
+    if (!pastTxt && !nextTxt) return; // sem dados → não sobrescreve o documento anterior
+    const facts = `RESULTADOS RECENTES:\n${pastTxt || '(sem dados)'}\n\nPRÓXIMOS JOGOS:\n${nextTxt || '(sem dados)'}`;
+    const SP = 'Você é o editor do Meridian. Escreva um RESUMO DO DIA da Copa do Mundo 2026, curto e informativo, em pt-BR, a partir SOMENTE dos dados fornecidos. NUNCA invente resultados que não estejam nos dados. Responda APENAS JSON: {"titulo":"1 frase com o fato mais marcante do dia","destaques":["3 a 5 bullets curtos: resultados-chave, quem avançou/caiu, o próximo grande jogo"],"resumo":"2-3 frases de contexto do momento do torneio"}';
+    const body = JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 700, system: SP, messages: [{ role: 'user', content: facts }] });
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': env.ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body,
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+    const txt = ((data.content) || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+    const m = txt.match(/\{[\s\S]*\}/); if (!m) return;
+    let obj; try { obj = JSON.parse(m[0]); } catch { return; }
+    const out = {
+      date: new Date().toISOString().slice(0, 10),
+      generated_at: Date.now(),
+      titulo: obj.titulo || '',
+      destaques: Array.isArray(obj.destaques) ? obj.destaques.slice(0, 6) : [],
+      resumo: obj.resumo || '',
+    };
+    await env.MERIDIAN_KV.put('daily', JSON.stringify(out));
+  } catch (e) {
+    // silencioso — próximo cron tenta de novo
+  }
+}

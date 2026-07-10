@@ -5,9 +5,7 @@ Um Worker serverless (grátis) que resolve dois problemas de uma vez:
 1. **API-Football não funciona no navegador** (CORS bloqueia). O Worker chama a AF do lado do servidor e devolve com CORS → técnico, escalação e estatísticas passam a funcionar.
 2. **Chave da Anthropic no navegador** é menos seguro. Com o Worker, a chave fica no servidor (variável de ambiente), e o navegador não a envia.
 
-Rotas: `{worker}/af/*` → API-Football · `{worker}/v1/*` → Anthropic · `{worker}/daily` → Resumo do Dia (leitura).
-
-Além do proxy, o Worker roda um **cron** que gera o **Resumo do Dia** da Copa (papel "Sintetizador pós-rodada"): conteúdo global, um documento para todos os usuários, sem custo para eles. Veja a seção própria abaixo.
+Rotas: `{worker}/af/*` → API-Football · `{worker}/v1/*` → Anthropic · `{worker}/daily` → Resumo do Dia (opcional, ver nota no fim).
 
 ---
 
@@ -42,11 +40,30 @@ Para o app **usar a API-Football, é preciso ter algo no campo "API Key API-Foot
 
 Anthropic: o app já roteava `/v1/messages` pela Worker URL; o Worker injeta a `ANTHROPIC_KEY`. Se a AF falhar por qualquer motivo, o app cai automaticamente na ESPN (nada quebra).
 
-## Resumo do Dia (cron + KV) — setup uma vez
+## Segurança
 
-O Worker gera de madrugada (`08:00 UTC = 05:00 BRT`) um resumo do dia da Copa a partir de dados públicos (TheSportsDB) usando **a mesma `ANTHROPIC_KEY`** já configurada — nenhuma chave nova. Custa ~1 centavo/dia (uma chamada Haiku) e o resultado é **global**: todos os usuários veem o mesmo bloco "📰 Resumo do Dia" no painel direito, sem gastar a chave deles.
+- Nenhuma chave fica no código nem no repositório — só nas *Secrets* do Cloudflare.
+- Se a sua chave AF já foi exposta em algum lugar, **rotacione-a** no painel da API-Football e use a nova (de preferência no modo "chave só no servidor" acima).
+- O CORS está aberto (`*`) por simplicidade; se quiser restringir, troque `Access-Control-Allow-Origin` no `worker.js` pela URL do seu site.
 
-Falta só criar o **KV** (o armazenamento onde o resumo fica):
+---
+
+## Resumo do Dia (`/daily`) — opcional, não prioritário
+
+**Status honesto:** esta feature é cosmética, não estrutural. Foi construída como a
+prova mais barata/sem-risco de que o Worker podia rodar cron + gravar estado — não
+porque agregue inteligência de análise. Ela gera uma manchete diária ("hoje a Suíça
+eliminou a Colômbia…") e não interage com o pipeline de análise (coletor → portão →
+analista → verificador), que é o cérebro de verdade e já roda 100% no navegador,
+sem depender de nada disto.
+
+**Não é pré-requisito para nada.** O app funciona por completo sem ela — o bloco
+"📰 Resumo do Dia" simplesmente não aparece se o KV não existir (`{worker}/daily`
+devolve `{"ok": false}`, e o app degrada em silêncio). Não bloqueia lançamento, não
+bloqueia os próximos papéis (Backtester, Sentinela) — eles usam Supabase/contas,
+não este KV.
+
+Se um dia quiser ligá-la mesmo assim (baixo custo, ~1 centavo/dia):
 
 ```bash
 cd worker
@@ -55,13 +72,6 @@ npx wrangler kv namespace create MERIDIAN_KV
 npx wrangler deploy
 ```
 
-Pelo painel (sem CLI): **Workers & Pages → KV → Create namespace** (nome `MERIDIAN_KV`) → no seu Worker, **Settings → Bindings → Add → KV namespace** (Variable name: `MERIDIAN_KV`). O cron já está no `wrangler.toml`; pelo painel, confira em **Settings → Triggers → Cron Triggers**.
-
-- **Testar sem esperar a madrugada:** no painel do Worker, **Triggers → Cron → "Trigger"** (ou `npx wrangler dev` e dispare o scheduled). Depois abra `{worker}/daily` no navegador — deve retornar o JSON `{titulo, destaques, resumo}`. Enquanto não gerar, retorna `{ "ok": false }` e o app simplesmente não mostra o bloco.
-- **Tornar global mesmo para quem não configurou Worker:** no `index.html`, preencha a constante `MERIDIAN_DAILY_URL` com a URL pública `https://SEU-WORKER.workers.dev/daily`. Vazio = o app usa o Worker que o próprio usuário configurou.
-
-## Segurança
-
-- Nenhuma chave fica no código nem no repositório — só nas *Secrets* do Cloudflare.
-- Se a sua chave AF já foi exposta em algum lugar, **rotacione-a** no painel da API-Football e use a nova (de preferência no modo "chave só no servidor" acima).
-- O CORS está aberto (`*`) por simplicidade; se quiser restringir, troque `Access-Control-Allow-Origin` no `worker.js` pela URL do seu site.
+Pelo painel: **Workers & Pages → KV → Create namespace** (`MERIDIAN_KV`) → no seu
+Worker, **Settings → Bindings → Add → KV namespace**. Teste sem esperar a madrugada
+em **Triggers → Cron → "Trigger"**, depois abra `{worker}/daily`.

@@ -6,7 +6,13 @@ echo   WorldCup Agent - servidor local
 echo ============================================
 echo.
 echo Iniciando servidor em http://localhost:3456/ ...
-start "WorldCup Agent (servidor)" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0serve.ps1"
+rem Prefere o servidor Node (robusto a concorrencia e desconexao); cai no PowerShell se node nao existir.
+where node >nul 2>nul
+if %errorlevel%==0 (
+  start "WorldCup Agent (servidor)" node "%~dp0serve.js"
+) else (
+  start "WorldCup Agent (servidor)" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0serve.ps1"
+)
 echo Aguardando o servidor subir...
 timeout /t 2 /nobreak >nul
 echo Abrindo no navegador...

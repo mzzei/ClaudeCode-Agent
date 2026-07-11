@@ -26,7 +26,7 @@ Nunca deixar trabalho "pendurado" (editado mas não commitado/enviado) numa máq
 
 - Repo: `mzzei/ClaudeCode-Agent` · branch `main`
 - App inteiro em `index.html` (single file, sem frameworks)
-- Rodar local: `Iniciar WorldCup Agent.bat` (sobe `serve.ps1` na porta 3456) — não abrir `index.html` direto via `file://`
+- Rodar local: `Iniciar WorldCup Agent.bat` (sobe `serve.js` via Node na porta 3456; cai em `serve.ps1` se node faltar) — não abrir `index.html` direto via `file://`
 - PWA: `manifest.json` + `sw.js` (network-first) + ícones em `assets/`
 - Produto se chama **Meridian** (nome da pasta/repo ficou o antigo, não renomeado)
 

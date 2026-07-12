@@ -2660,6 +2660,28 @@ function _formationGroups(f){
   return [1,...g]; // GK + linhas defesa→ataque
 }
 function _cleanName(s){return String(s||'').replace(/^\s*\d+[-\d]*\s*[:：\-–]?\s*/,'').replace(/\([^)]*\)/g,'').replace(/^[·•\-–\s]+/,'').trim();}
+// Infere a posição de cada jogador pela LINHA e pela FORMAÇÃO (rows em ordem GK→ataque):
+// laterais nas pontas da defesa, zagueiros no miolo; volante na linha de meio mais baixa,
+// meias acima; pontas nas laterais do ataque, centroavante no meio. Respeita posição já
+// preenchida (caminho estruturado com onze_provavel). Só rotula se o 1º grupo é o goleiro.
+function _assignRoles(rows){
+  if(!rows||!rows.length)return rows;
+  const n=rows.length;
+  if(!(rows[0]&&rows[0].length===1))return rows; // shape não-padrão → mantém pontos simples
+  const firstMid=2,lastMid=n-2; // faixa de linhas de meio (quando há)
+  rows.forEach((line,li)=>{
+    const len=line.length;
+    line.forEach((p,si)=>{
+      if(p.posicao)return;
+      const edge=(si===0||si===len-1);
+      if(li===0)p.posicao='GOL';
+      else if(li===1)p.posicao=(len>=4&&edge)?'LAT':'ZAG';        // defesa
+      else if(li===n-1)p.posicao=(len>=3&&edge)?'PON':'ATA';       // ataque
+      else p.posicao=(lastMid>firstMid&&li===firstMid)?'VOL':'MEI';// meio (linha baixa=VOL)
+    });
+  });
+  return rows;
+}
 // Retorna linhas [GK, ...defesa→ataque] de objetos {nome,posicao} a partir do texto.
 function _lineupRowsFromText(text,formacao){
   if(!text)return null;
@@ -2671,13 +2693,14 @@ function _lineupRowsFromText(text,formacao){
   if(segs.length>=3){
     const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
     const total=rows.reduce((a,r)=>a+r.length,0);
-    if(total>=10&&total<=11){if(rows[0]&&rows[0].length===1)rows[0][0].posicao='GOL';return rows;}
+    if(total>=10&&total<=11)return _assignRoles(rows);
   }
   // Caso B: nomes corridos + formação conhecida → fatia pela formação
   const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
   const groups=_formationGroups(fUse);
   if(names.length>=10&&names.length<=11&&groups){
-    let i=0;return groups.map((g,gi)=>{const r=names.slice(i,i+g).map(n=>({nome:n,posicao:gi===0?'GOL':''}));i+=g;return r;});
+    let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(nm=>({nome:nm,posicao:''}));i+=g;return r;});
+    return _assignRoles(rows);
   }
   return null;
 }

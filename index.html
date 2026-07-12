@@ -265,6 +265,23 @@ body{font-family:var(--sans);background:radial-gradient(120% 90% at 50% -10%,#0c
 .pstat-susp{font-size:10px;font-weight:600;background:rgba(240,200,60,.16);color:#f0d060;border-radius:999px;padding:2px 8px}
 .pstat-note{font-size:11px;color:var(--mid);margin-top:.4rem;line-height:1.45}
 .pstat-src{font-size:10px;color:var(--muted);font-style:italic;margin-top:.5rem;text-align:center}
+/* Escalação provável: mapa de campo (meio-campo vertical, ataque para cima) */
+.pitch-team{display:flex;flex-direction:column;gap:7px;min-width:0}
+.pitch-hd{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.pitch-form{font-size:11px;font-weight:700;color:var(--terra);font-variant-numeric:tabular-nums}
+.pitch{position:relative;aspect-ratio:3/3.8;background:linear-gradient(180deg,rgba(46,128,76,.30),rgba(18,64,38,.42));border:1.5px solid rgba(255,255,255,.16);border-radius:10px;display:flex;flex-direction:column;justify-content:space-between;padding:16px 4px 8px;overflow:hidden}
+.pitch::before{content:'';position:absolute;left:50%;top:0;transform:translate(-50%,-58%);width:38%;aspect-ratio:1;border:1.5px solid rgba(255,255,255,.18);border-radius:50%}
+.pitch::after{content:'';position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);width:58%;height:15%;border:1.5px solid rgba(255,255,255,.18);border-bottom:none;border-radius:5px 5px 0 0}
+.p-row{display:flex;justify-content:space-evenly;position:relative;z-index:1;gap:1px}
+.p-player{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;flex:1}
+.p-dot{width:21px;height:21px;border-radius:50%;background:linear-gradient(160deg,rgba(52,150,94,.9),rgba(16,58,34,.95));border:1.5px solid rgba(180,245,205,.55);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;letter-spacing:.02em;color:#d6f95a;flex-shrink:0}
+.p-name{font-size:8.5px;line-height:1.15;color:#eaf6ee;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.65)}
+.pitch-meta{font-size:10.5px;color:var(--mid);line-height:1.5}
+.pitch-meta b{color:var(--deep)}
+.pitch-fallback{font-size:11px;color:var(--mid);line-height:1.55;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem}
+/* Cartões & Faltas: resumo disciplinar por time */
+.cf-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:999px;padding:3px 9px;margin:2px 3px 2px 0}
+.cf-chip .cf-susp{font-size:9px;font-weight:700;color:#f0d060}
 /* Tabela genérica dos cards dinâmicos do chat */
 .gtbl-wrap{overflow-x:auto}
 .gtbl{width:100%;border-collapse:collapse;font-size:12px}
@@ -2445,8 +2462,7 @@ function showTab(cardId,tab){
   card.querySelectorAll('.a-tc').forEach(t=>t.style.display='none');
   card.querySelectorAll('.a-tab').forEach(t=>t.classList.remove('active'));
   const tc=document.getElementById('at-'+tab+'-'+cardId);if(tc)tc.style.display='block';
-  const tabs=['resumo','tatica','individual','avancado'];
-  const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];if(btn)btn.classList.add('active');
+  const btn=card.querySelector('.a-tab[data-tab="'+tab+'"]');if(btn)btn.classList.add('active');
 }
 function doPrint(){document.body.classList.add('printing');setTimeout(function(){window.print();},40);}
 window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
@@ -2467,8 +2483,10 @@ function showTab(cardId,tab){
   card.querySelectorAll('.a-tc').forEach(t=>t.style.display='none');
   card.querySelectorAll('.a-tab').forEach(t=>t.classList.remove('active'));
   const tc=document.getElementById(`at-${tab}-${cardId}`);if(tc)tc.style.display='block';
-  const tabs=['resumo','tatica','individual','avancado'];
-  const btn=card.querySelectorAll('.a-tab')[tabs.indexOf(tab)];
+  // Resolve o botão por data-tab (robusto a qualquer nº de abas; cards antigos sem
+  // data-tab caem no fallback por ordem).
+  const _order=['resumo','tatica','individual','cartoes','escalacao','avancado'];
+  const btn=card.querySelector(`.a-tab[data-tab="${tab}"]`)||card.querySelectorAll('.a-tab')[_order.indexOf(tab)];
   if(btn){
     btn.classList.add('active');
     const pill=card.querySelector('.a-tab-pill');
@@ -2617,6 +2635,63 @@ function _pstatTeam(nome,arr){
     &&Object.keys(p).some(k=>k!=='nome'&&k!=='posicao'&&hasVal(p[k])));
   if(!players.length)return '';
   return `<div class="pstat-team"><div class="tname">${esc(nome)}</div>${players.map(_pstatCard).join('')}</div>`;
+}
+
+// ── Escalação provável: mapa de campo (dados estruturados da Fase 1, via _lineups) ──
+function _posBucket(p){
+  const s=String(p||'').toLowerCase();
+  if(/gol|gk|goleiro|keeper/.test(s))return 'GK';
+  if(/zag|lat|lad|lae|ala|def|cb|\blb\b|\brb\b|central|terceiro/.test(s))return 'DEF';
+  if(/vol|mei|mid|\bcm\b|\bdm\b|\bam\b|interior|armador/.test(s))return 'MID';
+  if(/ata|pon|centroav|\bst\b|\bfw\b|wing|extremo|frente/.test(s))return 'ATA';
+  return 'MID';
+}
+function _posShort(p){const s=String(p||'').trim().toUpperCase();return s?esc(s.slice(0,3)):'•';}
+function _pitchPlayer(p){return `<div class="p-player"><div class="p-dot">${_posShort(p.posicao)}</div><div class="p-name" title="${esc(p.nome)}">${esc(p.nome)}</div></div>`;}
+function _pitchTeam(t){
+  if(!t)return '<div></div>';
+  const nome=esc(t.nome||'—');
+  const onze=(Array.isArray(t.onze)?t.onze:[]).filter(p=>p&&p.nome);
+  let body='';
+  if(onze.length>=7){
+    // Distribui por linhas (ataque no topo → goleiro embaixo). Bucket por posição;
+    // linha vazia é omitida. Tolerante a 8-11 nomes (escalação parcial ainda rende mapa).
+    const rows={ATA:[],MID:[],DEF:[],GK:[]};
+    onze.slice(0,11).forEach(p=>rows[_posBucket(p.posicao)].push(p));
+    // Sem posições (tudo caiu em MID)? distribui pela ordem clássica GK→DEF→MID→ATA.
+    if(!rows.GK.length&&!rows.DEF.length&&!rows.ATA.length&&rows.MID.length>=7){
+      const o=rows.MID;rows.GK=[o[0]];rows.DEF=o.slice(1,5);rows.MID=o.slice(5,8);rows.ATA=o.slice(8,11);
+    }
+    const order=['ATA','MID','DEF','GK'];
+    body=`<div class="pitch">${order.map(k=>rows[k].length?`<div class="p-row">${rows[k].map(_pitchPlayer).join('')}</div>`:'').join('')}</div>`;
+  }else if(t.escalacao_str){
+    body=`<div class="pitch-fallback">${esc(t.escalacao_str)}</div>`;
+  }else{
+    body=`<div class="pitch-fallback" style="color:var(--muted)">Escalação não coletada nesta análise.</div>`;
+  }
+  const banco=(Array.isArray(t.banco)?t.banco:[]).filter(Boolean);
+  return `<div class="pitch-team">
+    <div class="pitch-hd"><div class="tname" style="margin-bottom:0">${nome}</div>${t.formacao?`<span class="pitch-form">${esc(t.formacao)}</span>`:''}</div>
+    ${body}
+    ${t.tecnico?`<div class="pitch-meta">👔 Técnico: <b>${esc(t.tecnico)}</b></div>`:''}
+    ${banco.length?`<div class="pitch-meta">🪑 Banco: ${banco.map(esc).join(' · ')}</div>`:''}
+  </div>`;
+}
+// Resumo disciplinar por time a partir dos stats já coletados (_pstats): chips de
+// cartões/faltas por jogador — dados REAIS anexados por código, o modelo não re-digita.
+function _cfStatsChips(nome,arr){
+  const has=v=>v!==null&&v!==undefined&&v!=='';
+  const rel=(Array.isArray(arr)?arr:[]).filter(p=>p&&p.nome&&(has(p.cartoes_amarelos)||has(p.cartoes_vermelhos)||has(p.faltas_cometidas_por_jogo)||p.a_um_amarelo_da_suspensao===true));
+  if(!rel.length)return '';
+  return `<div class="pstat-team"><div class="tname">${esc(nome)}</div><div>${rel.map(p=>{
+    const parts=[];
+    if(has(p.cartoes_amarelos)&&Number(p.cartoes_amarelos)>0)parts.push(`🟨${esc(p.cartoes_amarelos)}`);
+    if(has(p.cartoes_vermelhos)&&Number(p.cartoes_vermelhos)>0)parts.push(`🟥${esc(p.cartoes_vermelhos)}`);
+    if(has(p.faltas_cometidas_por_jogo))parts.push(`${esc(p.faltas_cometidas_por_jogo)} faltas/j`);
+    const susp=(p.a_um_amarelo_da_suspensao===true)?'<span class="cf-susp">⚠ pendurado</span>':'';
+    if(!parts.length&&!susp)return '';
+    return `<span class="cf-chip"><b>${esc(p.nome)}</b> ${parts.join(' · ')}${susp}</span>`;
+  }).filter(Boolean).join('')}</div></div>`;
 }
 
 // ─── Card genérico com abas (design universal de resposta do chat) ─────────
@@ -2805,6 +2880,45 @@ function renderResults(d,opts){
   const statsSection=_psHas?`<div class="tab-s"><div class="tab-h">Stats por Jogador · Copa 2026</div><div class="teams-full">${_pstatTeam(d.mandante?.nome||'Mandante',_ps.mandante)}${_pstatTeam(d.visitante?.nome||'Visitante',_ps.visitante)}</div><div class="pstat-src">Números reais coletados na competição (pesquisa Sofascore/FotMob/FBref)</div></div>`:'';
   const tabIndividual=`<div class="teams-full"><div class="tcard">${tcard(d.mandante)}</div><div class="tcard">${tcard(d.visitante)}</div></div>${statsSection}`;
 
+  // ── Tab: Cartões & Faltas ──
+  const cf=d.cartoes_faltas;
+  const cfEventos=Array.isArray(cf?.eventos)?cf.eventos.filter(e=>e&&e.evento):[];
+  const cfRisco=Array.isArray(cf?.jogadores_risco)?cf.jogadores_risco.filter(j=>j&&j.nome):[];
+  const cfStats=_psHas?(_cfStatsChips(d.mandante?.nome||'Mandante',_ps.mandante)+_cfStatsChips(d.visitante?.nome||'Visitante',_ps.visitante)):'';
+  const tabCartoes=(cf&&(cfEventos.length||cf.analise||cfRisco.length))?`
+    ${cf.analise?`<div class="tab-s">
+      <div class="tab-h">1. Leitura Disciplinar</div>
+      <p class="tab-body">${esc(textFrom(cf.analise))}</p>
+    </div>`:''}
+    ${cfEventos.length?`<div class="tab-s">
+      <div class="tab-h">2. Probabilidades · Cartões e Faltas</div>
+      ${cfEventos.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="transform:scaleX(0)"></div></div><div class="ev-reason">${esc(textFrom(e.fundamento||''))}</div></div>`).join('')}
+    </div>`:''}
+    ${cfRisco.length?`<div class="tab-s">
+      <div class="tab-h">3. Jogadores sob Risco</div>
+      ${cfRisco.map(j=>`<div class="urow"><span class="udot"></span><span><strong>${esc(j.nome)}</strong>${j.time?` (${esc(textFrom(j.time))})`:''} — ${esc(textFrom(j.motivo||''))}</span></div>`).join('')}
+    </div>`:''}
+    ${cfStats?`<div class="tab-s">
+      <div class="tab-h">Cartões e Faltas Acumulados · Coletados</div>
+      <div class="teams-full">${cfStats}</div>
+      <div class="pstat-src">Números reais da competição (pesquisa Sofascore/FotMob)</div>
+    </div>`:''}
+    ${cf.conclusao?`<div class="tab-s">
+      <div class="tab-h">Síntese</div>
+      <p class="ct-diag">${esc(textFrom(cf.conclusao))}</p>
+    </div>`:''}`
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
+
+  // ── Tab: Escalação (mapa de campo — dados da Fase 1 via _lineups, sem re-digitação) ──
+  const lu=d._lineups;
+  const tabEscalacao=(lu&&(lu.mandante||lu.visitante))?`
+    <div class="tab-s">
+      <div class="tab-h">Escalações Prováveis</div>
+      <div class="teams-full">${_pitchTeam(lu.mandante)}${_pitchTeam(lu.visitante)}</div>
+      <div class="pstat-src">Escalações prováveis coletadas na pesquisa — podem mudar até o apito inicial</div>
+    </div>`
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">Escalações não disponíveis — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-las.</p></div>`;
+
   // ── Tab: Avançado ──
   const tabAvancado=`
     <div class="tab-s">
@@ -2842,14 +2956,18 @@ function renderResults(d,opts){
     <div class="a-title">${titleHtml}</div>
     <div class="a-tabs">
       <div class="a-tab-pill"></div>
-      <button class="a-tab active" onclick="showTab(${id},'resumo')">Resumo</button>
-      <button class="a-tab" onclick="showTab(${id},'tatica')">Tática</button>
-      <button class="a-tab" onclick="showTab(${id},'individual')">Desempenho</button>
-      <button class="a-tab" onclick="showTab(${id},'avancado')">Dados Avançados</button>
+      <button class="a-tab active" data-tab="resumo" onclick="showTab(${id},'resumo')">Resumo</button>
+      <button class="a-tab" data-tab="tatica" onclick="showTab(${id},'tatica')">Tática</button>
+      <button class="a-tab" data-tab="individual" onclick="showTab(${id},'individual')">Desempenho</button>
+      <button class="a-tab" data-tab="cartoes" onclick="showTab(${id},'cartoes')">Cartões & Faltas</button>
+      <button class="a-tab" data-tab="escalacao" onclick="showTab(${id},'escalacao')">Escalação</button>
+      <button class="a-tab" data-tab="avancado" onclick="showTab(${id},'avancado')">Dados Avançados</button>
     </div>
     <div id="at-resumo-${id}" class="a-tc">${tabResumo}</div>
     <div id="at-tatica-${id}" class="a-tc" style="display:none">${tabTatica}</div>
     <div id="at-individual-${id}" class="a-tc" style="display:none">${tabIndividual}</div>
+    <div id="at-cartoes-${id}" class="a-tc" style="display:none">${tabCartoes}</div>
+    <div id="at-escalacao-${id}" class="a-tc" style="display:none">${tabEscalacao}</div>
     <div id="at-avancado-${id}" class="a-tc" style="display:none">${tabAvancado}</div>
   </div>`;
   const cardEl=el.firstElementChild;
@@ -2947,6 +3065,8 @@ METODOLOGIA:
 
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
+ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS coletados por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (3-5 mercados disciplinares com probabilidade e fundamento NOS NÚMEROS COLETADOS — ex.: "Mais de 4.5 cartões no jogo", "[Jogador] recebe cartão", "Mais de 24.5 faltas totais"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares coletados forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
 VALIDAÇÃO CRUZADA DE CONFIANÇA: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) estejam CONSISTENTES entre 2+ fontes independentes das suas buscas; fato de fonte única sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre em "incerteza". Aplique o mesmo critério à "confianca" de cada ticket.
@@ -2961,7 +3081,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Schedule loader (cache-first) ────────────────────────────────────────
 function _loadSchedCache(){
@@ -4524,7 +4644,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // conjunto fundamental de stats da competição — assim os mercados de jogador ficam cobertos
   // já na coleta e o portão de completude consegue checar campo a campo depois.
   const _pStat='{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}';
-  const _teamTpl='{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","jogadores_chave":['+_pStat+'],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]}';
+  const _teamTpl='{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","formacao":"","onze_provavel":[{"nome":"","posicao":""}],"banco":[],"jogadores_chave":['+_pStat+'],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]}';
   const SCHEMA='{"mandante":'+_teamTpl+',"visitante":'+_teamTpl+',"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
   // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
@@ -4554,6 +4674,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   const _coverNote='IMPORTANTE: preencha TODOS os campos do schema (técnico, ranking FIFA atual, lesões/desfalques, escalação, xG, estilo ofensivo, vulnerabilidades) a partir do que cada busca retornar e dos dados já fornecidos — cada busca cobre várias dimensões. O ranking FIFA de cada seleção é público e estável — sempre preencha "ranking_fifa" (ex.: "12º"); não o deixe vazio.\n'
     +'RESULTADOS JÁ DISPUTADOS: os placares dos jogos que cada seleção já fez na Copa são FATOS DUROS e costumam estar no bloco de dados reais fornecido (ESPN/TheSportsDB) — extraia o PLACAR EXATO de cada um para "resultados_copa" (ex.: "Espanha 2x1 Uruguai (oitavas)"). Nunca escreva "resultado inferido do contexto": ou o placar está nos dados/busca (use o número), ou registre honestamente que não veio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
+    +'ESCALAÇÃO ESTRUTURADA (alimenta o mapa de campo do app): além do texto em "escalacao_provavel", preencha "formacao" (ex.: "4-3-3"), "onze_provavel" como LISTA DE 11 OBJETOS {nome, posicao} na ordem goleiro→defesa→meio→ataque, com posicao abreviada (GOL, ZAG, LAD, LAE, VOL, MEI, PON, ATA), e "banco" com os suplentes prováveis que a fonte citar (lista de nomes; vazio se a fonte não trouxer). As páginas de escalação provável (Sofascore/imprensa) publicam onze + banco — extraia dos resultados, nunca de memória.\n'
     +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — "jogadores_chave" é uma LISTA DE OBJETOS: um objeto por jogador citado (mire nos 3-5 titulares mais decisivos de cada seleção). Cada objeto tem o CONJUNTO FUNDAMENTAL OBRIGATÓRIO de campos, preenchidos com números REAIS da Copa 2026 vindos da busca: "nome", "posicao", "jogos", "minutos", "gols", "assistencias", "finalizacoes_por_jogo", "finalizacoes_no_gol_por_jogo", "grandes_chances_ou_passes_decisivos_por_jogo", "cartoes_amarelos", "cartoes_vermelhos", "a_um_amarelo_da_suspensao" (true/false), "faltas_cometidas_por_jogo", "faltas_sofridas_por_jogo", "desarmes_por_jogo", "cobra_penaltis_ou_faltas" (ex.: "pênaltis e faltas"/"faltas"/"não"), "rating_medio", e "observacao" (texto livre p/ o que não couber acima — p/ goleiros use aqui: defesas/jogo, clean sheets, gols sofridos; e sequências/lesões relevantes). Esses dados fundamentam os mercados de jogador e são PÚBLICOS e quase sempre encontráveis — deixar os campos-chave (gols, finalizacoes_no_gol_por_jogo, cartoes_amarelos, rating_medio) vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. Use null (não invente) só quando a busca realmente não trouxer aquele número; SÓ use valores da busca, nunca de memória, e descarte implausíveis (máx. 7 jogos num Mundial).\n'
     +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
@@ -4791,7 +4912,7 @@ function _soObj(props){return{type:'object',properties:props,required:Object.key
 // jogadores_chave agora é uma lista de objetos estruturados (15 stats fundamentais + nome/posição/observação).
 const _soN=()=>_soNullable('number');
 const _soPlayer=()=>_soObj({nome:_soStr,posicao:_soStr,jogos:_soN(),minutos:_soN(),gols:_soN(),assistencias:_soN(),finalizacoes_por_jogo:_soN(),finalizacoes_no_gol_por_jogo:_soN(),grandes_chances_ou_passes_decisivos_por_jogo:_soN(),cartoes_amarelos:_soN(),cartoes_vermelhos:_soN(),a_um_amarelo_da_suspensao:_soNullable('boolean'),faltas_cometidas_por_jogo:_soN(),faltas_sofridas_por_jogo:_soN(),desarmes_por_jogo:_soN(),cobra_penaltis_ou_faltas:_soStr,rating_medio:_soN(),observacao:_soStr});
-const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,jogadores_chave:{type:'array',items:_soPlayer()},estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
+const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,formacao:_soStr,onze_provavel:{type:'array',items:_soObj({nome:_soStr,posicao:_soStr})},banco:_soStrArr,jogadores_chave:{type:'array',items:_soPlayer()},estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
 const FACTS_SCHEMA=_soObj({mandante:_soTeamP1(),visitante:_soTeamP1(),contexto_fase:_soStr,grupo_classificacao:_soStr,lacunas:_soStrArr});
 // Fase 2 (análise): structured outputs NÃO é usado. Testado ao vivo (07/2026):
 // o schema completo da análise (19 campos, confronto_tatico aninhado etc.) excede
@@ -4841,6 +4962,8 @@ METODOLOGIA:
 
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
+ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS presentes nos dados fornecidos por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (3-5 mercados disciplinares com probabilidade e fundamento NOS NÚMEROS FORNECIDOS — ex.: "Mais de 4.5 cartões no jogo", "[Jogador] recebe cartão", "Mais de 24.5 faltas totais"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares fornecidos forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 
 VALIDAÇÃO CRUZADA DE CONFIANÇA: os dados fornecidos vêm de fontes INDEPENDENTES (bloco da API/ESPN, bloco TheSportsDB e fatos da pesquisa web). Pondere a corroboração entre elas: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) sejam CONSISTENTES entre 2+ fontes; um fato presente em UMA única fonte sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre o conflito em "incerteza" (fator + impacto). Aplique o mesmo critério à "confianca" de cada sugestão de ticket: "alta" só com fundamento corroborado por 2+ fontes.
@@ -4855,7 +4978,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Conversational chat ─────────────────────────────────────────────────
 // Detecta se a pergunta pede dados REAIS (resultado/placar/classificação/estado atual).
@@ -5280,6 +5403,17 @@ async function runAnalysis(){
     // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
     // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
     try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
+    // Escalações estruturadas da Fase 1 → _lineups (mapa de campo na aba Escalação),
+    // anexadas por CÓDIGO como _pstats — o modelo da Fase 2 não re-digita 22+ nomes.
+    try{if(rawFacts){
+      const L=t=>{if(!t)return null;return{nome:t.nome||'',formacao:t.formacao||'',
+        onze:(Array.isArray(t.onze_provavel)?t.onze_provavel:[]).map(p=>typeof p==='string'?{nome:p,posicao:''}:p).filter(p=>p&&p.nome),
+        banco:(Array.isArray(t.banco)?t.banco:[]).map(x=>textFrom(x)).filter(Boolean),
+        tecnico:t.tecnico||'',escalacao_str:t.escalacao_provavel||''};};
+      const lm=L(rawFacts.mandante),lv=L(rawFacts.visitante);
+      const has=x=>x&&(x.onze.length||x.escalacao_str||x.banco.length);
+      if(has(lm)||has(lv))parsed._lineups={mandante:lm,visitante:lv};
+    }}catch(_){}
     // Fase 3 · Verificador: auditoria barata (Haiku) da análise pronta ANTES de renderizar.
     // Falha do auditor nunca bloqueia a entrega (retorna null e a análise sai sem selo).
     const _va=await verifyAnalysis(parsed,rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:2}));

@@ -2637,7 +2637,11 @@ function _pstatTeam(nome,arr){
   return `<div class="pstat-team"><div class="tname">${esc(nome)}</div>${players.map(_pstatCard).join('')}</div>`;
 }
 
-// ── Escalação provável: mapa de campo (dados estruturados da Fase 1, via _lineups) ──
+// ── Escalação provável: mapa de campo ──
+// Fonte preferida: onze_provavel estruturado (Fase 1). Se não veio, DERIVA as linhas
+// do TEXTO de escalação (que o modelo preenche de forma confiável) — pelo próprio
+// agrupamento do texto (linhas separadas por ';') ou fatiando pela formação. Assim o
+// mapa aparece mesmo quando o campo estruturado novo falha.
 function _posBucket(p){
   const s=String(p||'').toLowerCase();
   if(/gol|gk|goleiro|keeper/.test(s))return 'GK';
@@ -2648,26 +2652,56 @@ function _posBucket(p){
 }
 function _posShort(p){const s=String(p||'').trim().toUpperCase();return s?esc(s.slice(0,3)):'•';}
 function _pitchPlayer(p){return `<div class="p-player"><div class="p-dot">${_posShort(p.posicao)}</div><div class="p-name" title="${esc(p.nome)}">${esc(p.nome)}</div></div>`;}
+function _formationGroups(f){
+  const nums=String(f||'').match(/\d+/g);
+  if(!nums||nums.length<2||nums.length>4)return null;
+  const g=nums.map(Number),outfield=g.reduce((a,b)=>a+b,0);
+  if(outfield<9||outfield>10)return null;
+  return [1,...g]; // GK + linhas defesa→ataque
+}
+function _cleanName(s){return String(s||'').replace(/^\s*\d+[-\d]*\s*[:：\-–]?\s*/,'').replace(/\([^)]*\)/g,'').replace(/^[·•\-–\s]+/,'').trim();}
+// Retorna linhas [GK, ...defesa→ataque] de objetos {nome,posicao} a partir do texto.
+function _lineupRowsFromText(text,formacao){
+  if(!text)return null;
+  const fMatch=text.match(/\b\d(?:\s*-\s*\d){1,3}\b/);
+  const fUse=(formacao||(fMatch?fMatch[0].replace(/\s/g,''):'')||'').trim();
+  const clean=text.replace(/\b\d(?:\s*-\s*\d){1,3}\b\s*[:：\-–]?/,' ').trim();
+  // Caso A: o texto já separa linhas por ';' (convenção GK; DEF; MID; ATA)
+  const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
+  if(segs.length>=3){
+    const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
+    const total=rows.reduce((a,r)=>a+r.length,0);
+    if(total>=10&&total<=11){if(rows[0]&&rows[0].length===1)rows[0][0].posicao='GOL';return rows;}
+  }
+  // Caso B: nomes corridos + formação conhecida → fatia pela formação
+  const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
+  const groups=_formationGroups(fUse);
+  if(names.length>=10&&names.length<=11&&groups){
+    let i=0;return groups.map((g,gi)=>{const r=names.slice(i,i+g).map(n=>({nome:n,posicao:gi===0?'GOL':''}));i+=g;return r;});
+  }
+  return null;
+}
+function _pitchRows(rows){ // rows em ordem GK→ataque; exibe ataque em cima
+  return `<div class="pitch">${[...rows].reverse().map(r=>(r&&r.length)?`<div class="p-row">${r.map(_pitchPlayer).join('')}</div>`:'').join('')}</div>`;
+}
 function _pitchTeam(t){
   if(!t)return '<div></div>';
   const nome=esc(t.nome||'—');
   const onze=(Array.isArray(t.onze)?t.onze:[]).filter(p=>p&&p.nome);
   let body='';
-  if(onze.length>=7){
-    // Distribui por linhas (ataque no topo → goleiro embaixo). Bucket por posição;
-    // linha vazia é omitida. Tolerante a 8-11 nomes (escalação parcial ainda rende mapa).
-    const rows={ATA:[],MID:[],DEF:[],GK:[]};
+  if(Array.isArray(t.rows)&&t.rows.length){
+    body=_pitchRows(t.rows);
+  }else if(onze.length>=7){
+    const rows={GK:[],DEF:[],MID:[],ATA:[]};
     onze.slice(0,11).forEach(p=>rows[_posBucket(p.posicao)].push(p));
-    // Sem posições (tudo caiu em MID)? distribui pela ordem clássica GK→DEF→MID→ATA.
     if(!rows.GK.length&&!rows.DEF.length&&!rows.ATA.length&&rows.MID.length>=7){
       const o=rows.MID;rows.GK=[o[0]];rows.DEF=o.slice(1,5);rows.MID=o.slice(5,8);rows.ATA=o.slice(8,11);
     }
-    const order=['ATA','MID','DEF','GK'];
-    body=`<div class="pitch">${order.map(k=>rows[k].length?`<div class="p-row">${rows[k].map(_pitchPlayer).join('')}</div>`:'').join('')}</div>`;
+    body=_pitchRows([rows.GK,rows.DEF,rows.MID,rows.ATA]);
   }else if(t.escalacao_str){
     body=`<div class="pitch-fallback">${esc(t.escalacao_str)}</div>`;
   }else{
-    body=`<div class="pitch-fallback" style="color:var(--muted)">Escalação não coletada nesta análise.</div>`;
+    body=`<div class="pitch-fallback" style="color:var(--muted)">Onze provável não coletado nesta análise.</div>`;
   }
   const banco=(Array.isArray(t.banco)?t.banco:[]).filter(Boolean);
   return `<div class="pitch-team">
@@ -5403,17 +5437,27 @@ async function runAnalysis(){
     // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
     // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
     try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
-    // Escalações estruturadas da Fase 1 → _lineups (mapa de campo na aba Escalação),
-    // anexadas por CÓDIGO como _pstats — o modelo da Fase 2 não re-digita 22+ nomes.
-    try{if(rawFacts){
-      const L=t=>{if(!t)return null;return{nome:t.nome||'',formacao:t.formacao||'',
-        onze:(Array.isArray(t.onze_provavel)?t.onze_provavel:[]).map(p=>typeof p==='string'?{nome:p,posicao:''}:p).filter(p=>p&&p.nome),
-        banco:(Array.isArray(t.banco)?t.banco:[]).map(x=>textFrom(x)).filter(Boolean),
-        tecnico:t.tecnico||'',escalacao_str:t.escalacao_provavel||''};};
-      const lm=L(rawFacts.mandante),lv=L(rawFacts.visitante);
-      const has=x=>x&&(x.onze.length||x.escalacao_str||x.banco.length);
+    // Escalações → _lineups (mapa de campo). Fonte: onze_provavel estruturado da Fase 1
+    // se veio; senão as linhas são DERIVADAS do texto de escalação (via _lineupRowsFromText).
+    // Puxa da Fase 1 (rawFacts) OU, como fallback, da própria saída da Fase 2 (formação do
+    // técnico + escalação em texto) — assim o mapa aparece em qualquer análise real.
+    try{
+      const mkLineup=(teamKey,tecKey)=>{
+        const rf=rawFacts&&rawFacts[teamKey], p2=parsed[teamKey], tec2=parsed[tecKey];
+        const nome=(rf&&rf.nome)||(p2&&p2.nome)||'';
+        const formacao=(rf&&rf.formacao)||(tec2&&tec2.formacao)||'';
+        const tecnico=(rf&&rf.tecnico)||(tec2&&tec2.nome)||'';
+        const banco=(rf&&Array.isArray(rf.banco)?rf.banco:[]).map(x=>textFrom(x)).filter(Boolean);
+        const escalacao_str=(rf&&rf.escalacao_provavel)||(p2&&p2.escalacao)||'';
+        let onze=(rf&&Array.isArray(rf.onze_provavel)?rf.onze_provavel:[]).map(p=>typeof p==='string'?{nome:p,posicao:''}:p).filter(p=>p&&p.nome);
+        let rows=null;
+        if(onze.length<7){rows=_lineupRowsFromText(escalacao_str,formacao);if(rows)onze=[];}
+        return {nome,formacao,tecnico,banco,escalacao_str,onze,rows};
+      };
+      const lm=mkLineup('mandante','tecnico_mandante'), lv=mkLineup('visitante','tecnico_visitante');
+      const has=x=>x&&((x.rows&&x.rows.length)||(x.onze&&x.onze.length)||x.escalacao_str||(x.banco&&x.banco.length)||x.tecnico||x.formacao);
       if(has(lm)||has(lv))parsed._lineups={mandante:lm,visitante:lv};
-    }}catch(_){}
+    }catch(_){}
     // Fase 3 · Verificador: auditoria barata (Haiku) da análise pronta ANTES de renderizar.
     // Falha do auditor nunca bloqueia a entrega (retorna null e a análise sai sem selo).
     const _va=await verifyAnalysis(parsed,rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:2}));

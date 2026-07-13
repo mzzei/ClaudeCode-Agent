@@ -2653,13 +2653,23 @@ function _posBucket(p){
 function _posShort(p){const s=String(p||'').trim().toUpperCase();return s?esc(s.slice(0,3)):'•';}
 function _pitchPlayer(p){return `<div class="p-player"><div class="p-dot">${_posShort(p.posicao)}</div><div class="p-name" title="${esc(p.nome)}">${esc(p.nome)}</div></div>`;}
 function _formationGroups(f){
-  const nums=String(f||'').match(/\d+/g);
+  // Usa só o PRIMEIRO padrão "n-n-n" do texto — times/técnicos costumam citar variações
+  // ("4-3-3 / 4-2-3-1 fluido"); pegar todos os dígitos misturaria duas formações num shape inválido.
+  const m=String(f||'').match(/\d(?:\s*-\s*\d){2,3}/);
+  if(!m)return null;
+  const nums=m[0].match(/\d+/g);
   if(!nums||nums.length<2||nums.length>4)return null;
   const g=nums.map(Number),outfield=g.reduce((a,b)=>a+b,0);
   if(outfield<9||outfield>10)return null;
   return [1,...g]; // GK + linhas defesa→ataque
 }
-function _cleanName(s){return String(s||'').replace(/^\s*\d+[-\d]*\s*[:：\-–]?\s*/,'').replace(/\([^)]*\)/g,'').replace(/^[·•\-–\s]+/,'').trim();}
+function _cleanName(s){
+  const out=String(s||'').replace(/^\s*\d+[-\d]*\s*[:：\-–]?\s*/,'').replace(/\([^)]*\)/g,'').replace(/\[[^\]]*\]/g,'').replace(/^[·•\-–\s]+/,'').replace(/[.\s]+$/,'').trim();
+  // Um slot titular inteiramente entre colchetes (ex.: "[substituto a confirmar]") não pode
+  // simplesmente desaparecer — isso desalinharia o resto da escalação com a formação real.
+  if(!out&&/\[[^\]]*\]/.test(String(s||'')))return 'A confirmar';
+  return out;
+}
 // Infere a posição de cada jogador pela LINHA e pela FORMAÇÃO (rows em ordem GK→ataque):
 // laterais nas pontas da defesa, zagueiros no miolo; volante na linha de meio mais baixa,
 // meias acima; pontas nas laterais do ataque, centroavante no meio. Respeita posição já
@@ -2685,22 +2695,29 @@ function _assignRoles(rows){
 // Retorna linhas [GK, ...defesa→ataque] de objetos {nome,posicao} a partir do texto.
 function _lineupRowsFromText(text,formacao){
   if(!text)return null;
-  const fMatch=text.match(/\b\d(?:\s*-\s*\d){1,3}\b/);
+  // Remove o rabo de banco/suplentes (o app já mostra "banco" à parte via t.banco) —
+  // do contrário nomes de reserva vazam pra dentro da última linha titular.
+  const noBench=text.replace(/\b(banco|bench|suplentes|reservas)\s*:.*/is,'').trim();
+  const fMatch=noBench.match(/\d(?:\s*-\s*\d){2,3}/);
   const fUse=(formacao||(fMatch?fMatch[0].replace(/\s/g,''):'')||'').trim();
-  const clean=text.replace(/\b\d(?:\s*-\s*\d){1,3}\b\s*[:：\-–]?/,' ').trim();
-  // Caso A: o texto já separa linhas por ';' (convenção GK; DEF; MID; ATA)
-  const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
-  if(segs.length>=3){
-    const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
-    const total=rows.reduce((a,r)=>a+r.length,0);
-    if(total>=10&&total<=11)return _assignRoles(rows);
-  }
-  // Caso B: nomes corridos + formação conhecida → fatia pela formação
-  const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
+  const clean=noBench.replace(/\b\d(?:\s*-\s*\d){1,3}\b\s*[:：\-–]?/,' ').trim();
   const groups=_formationGroups(fUse);
+  // Caso A (prioritário): a FORMAÇÃO REAL do time define o número/tamanho das linhas —
+  // nunca deixar a pontuação do texto livre "inventar" um shape que não é o formacional real.
+  const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
   if(names.length>=10&&names.length<=11&&groups){
     let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(nm=>({nome:nm,posicao:''}));i+=g;return r;});
     return _assignRoles(rows);
+  }
+  // Caso B (fallback só quando a formação não é conhecida/parseável): o texto já separa
+  // linhas por ';' (convenção GK; DEF; MID; ATA) — aceito, mas sem inferir shape formacional.
+  if(!groups){
+    const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
+    if(segs.length>=3){
+      const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
+      const total=rows.reduce((a,r)=>a+r.length,0);
+      if(total>=10&&total<=11)return _assignRoles(rows);
+    }
   }
   return null;
 }
@@ -2749,6 +2766,34 @@ function _cfStatsChips(nome,arr){
     if(!parts.length&&!susp)return '';
     return `<span class="cf-chip"><b>${esc(p.nome)}</b> ${parts.join(' · ')}${susp}</span>`;
   }).filter(Boolean).join('')}</div></div>`;
+}
+// Rede de segurança determinística: a instrução de prompt pede EXATAMENTE 7 eventos, mas
+// isso não é uma trava — se os dados de cartão/falta coletados forem escassos, o modelo pode
+// entregar menos por prudência. Em vez de reenviar ao modelo (custo/latência), completa via
+// CÓDIGO com mercados-modelo genéricos e conservadores, sem inventar números novos.
+function _padCartoesEventos(eventos){
+  const list=(Array.isArray(eventos)?eventos:[]).filter(e=>e&&e.evento);
+  if(list.length>=7)return list;
+  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9À-ú]+/g,'');
+  const have=new Set(list.map(e=>norm(e.evento)));
+  const EST='Estimativa conservadora — dados de cartões/faltas coletados foram insuficientes para fundamentar mais mercados com precisão.';
+  const pool=[
+    {evento:'Mais de 3.5 cartões amarelos totais no jogo',probabilidade:0.55,fundamento:EST},
+    {evento:'Mais de 5.5 cartões amarelos totais no jogo',probabilidade:0.35,fundamento:EST},
+    {evento:'Mais de 24.5 faltas totais no jogo',probabilidade:0.5,fundamento:EST},
+    {evento:'Ambas as equipes recebem cartão',probabilidade:0.65,fundamento:EST},
+    {evento:'Cartão no 1º tempo',probabilidade:0.55,fundamento:EST},
+    {evento:'Cartão vermelho no jogo',probabilidade:0.12,fundamento:EST},
+    {evento:'Mais de 1.5 cartões amarelos do time mandante',probabilidade:0.5,fundamento:EST},
+    {evento:'Mais de 1.5 cartões amarelos do time visitante',probabilidade:0.5,fundamento:EST}
+  ];
+  const out=list.slice();
+  for(const cand of pool){
+    if(out.length>=7)break;
+    if(have.has(norm(cand.evento)))continue;
+    out.push(cand);have.add(norm(cand.evento));
+  }
+  return out;
 }
 
 // ─── Card genérico com abas (design universal de resposta do chat) ─────────
@@ -2964,7 +3009,7 @@ function renderResults(d,opts){
       <div class="tab-h">Síntese</div>
       <p class="ct-diag">${esc(textFrom(cf.conclusao))}</p>
     </div>`:''}`
-  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${d._featCartoes?'Dados de cartões e faltas não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.':'Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.'}</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
 
   // ── Tab: Escalação (mapa de campo — dados da Fase 1 via _lineups, sem re-digitação) ──
   const lu=d._lineups;
@@ -2974,7 +3019,7 @@ function renderResults(d,opts){
       <div class="teams-full">${_pitchTeam(lu.mandante)}${_pitchTeam(lu.visitante)}</div>
       <div class="pstat-src">Escalações prováveis coletadas na pesquisa — podem mudar até o apito inicial</div>
     </div>`
-  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">Escalações não disponíveis — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-las.</p></div>`;
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${d._featLineups?'Dados de escalação não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.':'Escalações não disponíveis — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-las.'}</p></div>`;
 
   // ── Tab: Avançado ──
   const tabAvancado=`
@@ -4732,6 +4777,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'RESULTADOS JÁ DISPUTADOS: os placares dos jogos que cada seleção já fez na Copa são FATOS DUROS e costumam estar no bloco de dados reais fornecido (ESPN/TheSportsDB) — extraia o PLACAR EXATO de cada um para "resultados_copa" (ex.: "Espanha 2x1 Uruguai (oitavas)"). Nunca escreva "resultado inferido do contexto": ou o placar está nos dados/busca (use o número), ou registre honestamente que não veio.\n'
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
     +'ESCALAÇÃO ESTRUTURADA (alimenta o mapa de campo do app): além do texto em "escalacao_provavel", preencha "formacao" (ex.: "4-3-3"), "onze_provavel" como LISTA DE 11 OBJETOS {nome, posicao} na ordem goleiro→defesa→meio→ataque, com posicao abreviada (GOL, ZAG, LAD, LAE, VOL, MEI, PON, ATA), e "banco" com os suplentes prováveis que a fonte citar (lista de nomes; vazio se a fonte não trouxer). As páginas de escalação provável (Sofascore/imprensa) publicam onze + banco — extraia dos resultados, nunca de memória.\n'
+    +'PROIBIDO INVENTAR NOME DE JOGADOR (erro gravíssimo, nunca aceitável): cada nome em "onze_provavel", "banco" e "escalacao_provavel" TEM de aparecer literalmente nos resultados de busca. Nunca escreva um jogador "como opção/alternativa" (ex.: "X ou Y") a menos que AMBOS os nomes venham da mesma fonte para aquele slot. Se não tiver certeza de quem ocupa uma posição, escreva "a confirmar" — jamais preencha com um nome vindo de memória, mesmo que pareça plausível pelo estilo do time; jogadores se aposentam da seleção, saem de convocações e mudam de status entre temporadas, e a memória do treino pode estar desatualizada ou simplesmente errada.\n'
     +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — "jogadores_chave" é uma LISTA DE OBJETOS: um objeto por jogador citado (mire nos 3-5 titulares mais decisivos de cada seleção). Cada objeto tem o CONJUNTO FUNDAMENTAL OBRIGATÓRIO de campos, preenchidos com números REAIS da Copa 2026 vindos da busca: "nome", "posicao", "jogos", "minutos", "gols", "assistencias", "finalizacoes_por_jogo", "finalizacoes_no_gol_por_jogo", "grandes_chances_ou_passes_decisivos_por_jogo", "cartoes_amarelos", "cartoes_vermelhos", "a_um_amarelo_da_suspensao" (true/false), "faltas_cometidas_por_jogo", "faltas_sofridas_por_jogo", "desarmes_por_jogo", "cobra_penaltis_ou_faltas" (ex.: "pênaltis e faltas"/"faltas"/"não"), "rating_medio", e "observacao" (texto livre p/ o que não couber acima — p/ goleiros use aqui: defesas/jogo, clean sheets, gols sofridos; e sequências/lesões relevantes). Esses dados fundamentam os mercados de jogador e são PÚBLICOS e quase sempre encontráveis — deixar os campos-chave (gols, finalizacoes_no_gol_por_jogo, cartoes_amarelos, rating_medio) vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. Use null (não invente) só quando a busca realmente não trouxer aquele número; SÓ use valores da busca, nunca de memória, e descarte implausíveis (máx. 7 jogos num Mundial).\n'
     +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
@@ -5460,6 +5506,13 @@ async function runAnalysis(){
     // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
     // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
     try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
+    // Marca de recurso (não de dado): sinaliza que esta análise passou pela versão do app que
+    // já sabe gerar cartões/faltas e escalação — usada no render para diferenciar "análise
+    // antiga, recurso nem existia" de "análise nova, mas a coleta não achou o dado".
+    parsed._featCartoes=true; parsed._featLineups=true;
+    // Rede de segurança: garante os 7 eventos disciplinares mesmo se o modelo entregar menos
+    // por prudência com dados escassos — sem reenviar ao modelo, só completando via código.
+    try{if(parsed.cartoes_faltas)parsed.cartoes_faltas.eventos=_padCartoesEventos(parsed.cartoes_faltas.eventos);}catch(_){}
     // Escalações → _lineups (mapa de campo). Fonte: onze_provavel estruturado da Fase 1
     // se veio; senão as linhas são DERIVADAS do texto de escalação (via _lineupRowsFromText).
     // Puxa da Fase 1 (rawFacts) OU, como fallback, da própria saída da Fase 2 (formação do

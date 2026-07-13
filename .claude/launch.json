@@ -5,13 +5,15 @@
       "name": "WorldCupAgent",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["${workspaceFolder}\\serve.js"],
-      "port": 3456
+      "port": 3456,
+      "autoPort": true
     },
     {
       "name": "WorldCupAgent (fallback PowerShell)",
       "runtimeExecutable": "powershell",
       "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\serve.ps1"],
-      "port": 3456
+      "port": 3456,
+      "autoPort": true
     }
   ]
 }

@@ -1,8 +1,9 @@
 $root = $PSScriptRoot
+$port = if ($env:PORT) { $env:PORT } else { 3456 }   # honra PORT (porta automática do preview)
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:3456/")
+$listener.Prefixes.Add("http://localhost:$port/")
 $listener.Start()
-Write-Host "Listening on http://localhost:3456/"
+Write-Host "Listening on http://localhost:$port/"
 while ($listener.IsListening) {
     $ctx = $listener.GetContext()
     $path = $ctx.Request.Url.LocalPath

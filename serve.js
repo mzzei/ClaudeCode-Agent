@@ -60,8 +60,9 @@ server.on('error', (e) => {
   console.error('Erro do servidor:', (e && e.message) || e);
 });
 
-// Uma exceção não capturada em qualquer lugar NÃO deve matar o servidor de dev.
+// Nada (exceção síncrona OU promessa rejeitada) deve matar o servidor de dev.
 process.on('uncaughtException', (e) => console.error('uncaught:', (e && e.message) || e));
+process.on('unhandledRejection', (e) => console.error('unhandledRejection:', (e && e.message) || e));
 
 server.listen(PORT, HOST, () => {
   console.log('Meridian dev server: http://' + HOST + ':' + PORT + '/  (raiz: ' + ROOT + ')');

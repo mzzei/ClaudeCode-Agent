@@ -2948,7 +2948,7 @@ function renderResults(d,opts){
       <p class="tab-body">${esc(textFrom(cf.analise))}</p>
     </div>`:''}
     ${cfEventos.length?`<div class="tab-s">
-      <div class="tab-h">2. Probabilidades · Cartões e Faltas</div>
+      <div class="tab-h">2. Eventos Prováveis</div>
       ${cfEventos.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="transform:scaleX(0)"></div></div><div class="ev-reason">${esc(textFrom(e.fundamento||''))}</div></div>`).join('')}
     </div>`:''}
     ${cfRisco.length?`<div class="tab-s">
@@ -3122,7 +3122,7 @@ METODOLOGIA:
 
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
-ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS coletados por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (3-5 mercados disciplinares com probabilidade e fundamento NOS NÚMEROS COLETADOS — ex.: "Mais de 4.5 cartões no jogo", "[Jogador] recebe cartão", "Mais de 24.5 faltas totais"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares coletados forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS coletados por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS COLETADOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares coletados forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
@@ -5019,7 +5019,7 @@ METODOLOGIA:
 
 FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "lacunas" são arrays de STRINGS (texto simples, uma frase por item) — NUNCA objetos.
 
-ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS presentes nos dados fornecidos por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (3-5 mercados disciplinares com probabilidade e fundamento NOS NÚMEROS FORNECIDOS — ex.: "Mais de 4.5 cartões no jogo", "[Jogador] recebe cartão", "Mais de 24.5 faltas totais"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares fornecidos forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS presentes nos dados fornecidos por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS FORNECIDOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares fornecidos forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 

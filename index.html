@@ -2702,22 +2702,21 @@ function _lineupRowsFromText(text,formacao){
   const fUse=(formacao||(fMatch?fMatch[0].replace(/\s/g,''):'')||'').trim();
   const clean=noBench.replace(/\b\d(?:\s*-\s*\d){1,3}\b\s*[:：\-–]?/,' ').trim();
   const groups=_formationGroups(fUse);
-  // Caso A (prioritário): a FORMAÇÃO REAL do time define o número/tamanho das linhas —
-  // nunca deixar a pontuação do texto livre "inventar" um shape que não é o formacional real.
+  // Caso A (prioritário): o texto separa as linhas por ';' num shape VÁLIDO de escalação
+  // (goleiro sozinho na 1ª linha, 10-11 no total). Essa segmentação é a formação real como
+  // a FONTE escreveu, jogador a jogador — mais confiável do que fatiar pelo campo "formacao"
+  // coletado à parte (os dois podem divergir e o fatiamento moveria jogador de linha).
+  const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
+  if(segs.length>=3){
+    const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
+    const total=rows.reduce((a,r)=>a+r.length,0);
+    if(total>=10&&total<=11&&rows[0].length===1)return _assignRoles(rows);
+  }
+  // Caso B (fallback): nomes corridos sem estrutura de linhas → fatia pela formação real.
   const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
   if(names.length>=10&&names.length<=11&&groups){
     let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(nm=>({nome:nm,posicao:''}));i+=g;return r;});
     return _assignRoles(rows);
-  }
-  // Caso B (fallback só quando a formação não é conhecida/parseável): o texto já separa
-  // linhas por ';' (convenção GK; DEF; MID; ATA) — aceito, mas sem inferir shape formacional.
-  if(!groups){
-    const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
-    if(segs.length>=3){
-      const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
-      const total=rows.reduce((a,r)=>a+r.length,0);
-      if(total>=10&&total<=11)return _assignRoles(rows);
-    }
   }
   return null;
 }
@@ -5510,9 +5509,6 @@ async function runAnalysis(){
     // já sabe gerar cartões/faltas e escalação — usada no render para diferenciar "análise
     // antiga, recurso nem existia" de "análise nova, mas a coleta não achou o dado".
     parsed._featCartoes=true; parsed._featLineups=true;
-    // Rede de segurança: garante os 7 eventos disciplinares mesmo se o modelo entregar menos
-    // por prudência com dados escassos — sem reenviar ao modelo, só completando via código.
-    try{if(parsed.cartoes_faltas)parsed.cartoes_faltas.eventos=_padCartoesEventos(parsed.cartoes_faltas.eventos);}catch(_){}
     // Escalações → _lineups (mapa de campo). Fonte: onze_provavel estruturado da Fase 1
     // se veio; senão as linhas são DERIVADAS do texto de escalação (via _lineupRowsFromText).
     // Puxa da Fase 1 (rawFacts) OU, como fallback, da própria saída da Fase 2 (formação do
@@ -5538,6 +5534,14 @@ async function runAnalysis(){
     // Falha do auditor nunca bloqueia a entrega (retorna null e a análise sai sem selo).
     const _va=await verifyAnalysis(parsed,rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:2}));
     if(_va){tokenState.sessionIn+=_va.inTokens;tokenState.sessionOut+=_va.outTokens;}
+    // Rede de segurança dos 7 eventos disciplinares — DEPOIS da auditoria (o auditor não
+    // deve avaliar mercados-modelo injetados por código) e SÓ quando o modelo produziu
+    // pelo menos 1 evento real: completa uma lista parcial, mas nunca fabrica uma aba
+    // inteira do zero — com zero eventos a aba mostra a mensagem honesta de coleta vazia.
+    try{
+      const _cfEv=parsed.cartoes_faltas&&Array.isArray(parsed.cartoes_faltas.eventos)?parsed.cartoes_faltas.eventos.filter(e=>e&&e.evento):[];
+      if(_cfEv.length>0)parsed.cartoes_faltas.eventos=_padCartoesEventos(parsed.cartoes_faltas.eventos);
+    }catch(_){}
     renderResults(parsed);
     // Memória: registra a análise estruturada no fio do chat para que perguntas de
     // acompanhamento ("e se a Bósnia abrir o placar?") sejam fundamentadas pela análise

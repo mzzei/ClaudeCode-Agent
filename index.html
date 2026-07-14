@@ -2652,10 +2652,13 @@ function _posBucket(p){
 }
 function _posShort(p){const s=String(p||'').trim().toUpperCase();return s?esc(s.slice(0,3)):'•';}
 function _pitchPlayer(p){return `<div class="p-player"><div class="p-dot">${_posShort(p.posicao)}</div><div class="p-name" title="${esc(p.nome)}">${esc(p.nome)}</div></div>`;}
+// Formação "n-n-n(-n)": aceita separadores -, :, – (en-dash). "/" fica DE FORA de
+// propósito — é o divisor de variações ("4-3-3 / 4-2-3-1") e, incluído, o match ganancioso
+// atravessaria as duas formações num shape inválido. Sem flag /g → seguro reusar com .match.
+const _FORM_RE=/\d(?:\s*[-:–]\s*\d){2,3}/;
 function _formationGroups(f){
-  // Usa só o PRIMEIRO padrão "n-n-n" do texto — times/técnicos costumam citar variações
-  // ("4-3-3 / 4-2-3-1 fluido"); pegar todos os dígitos misturaria duas formações num shape inválido.
-  const m=String(f||'').match(/\d(?:\s*-\s*\d){2,3}/);
+  // Usa só o PRIMEIRO padrão do texto — times/técnicos costumam citar variações.
+  const m=String(f||'').match(_FORM_RE);
   if(!m)return null;
   const nums=m[0].match(/\d+/g);
   if(!nums||nums.length<2||nums.length>4)return null;
@@ -2695,30 +2698,40 @@ function _assignRoles(rows){
 // Retorna linhas [GK, ...defesa→ataque] de objetos {nome,posicao} a partir do texto.
 function _lineupRowsFromText(text,formacao){
   if(!text)return null;
-  // Remove o rabo de banco/suplentes (o app já mostra "banco" à parte via t.banco) —
-  // do contrário nomes de reserva vazam pra dentro da última linha titular.
-  const noBench=text.replace(/\b(banco|bench|suplentes|reservas)\s*:.*/is,'').trim();
-  const fMatch=noBench.match(/\d(?:\s*-\s*\d){2,3}/);
-  const fUse=(formacao||(fMatch?fMatch[0].replace(/\s/g,''):'')||'').trim();
-  const clean=noBench.replace(/\b\d(?:\s*-\s*\d){1,3}\b\s*[:：\-–]?/,' ').trim();
-  const groups=_formationGroups(fUse);
-  // Caso A (prioritário): o texto separa as linhas por ';' num shape VÁLIDO de escalação
-  // (goleiro sozinho na 1ª linha, 10-11 no total). Essa segmentação é a formação real como
-  // a FONTE escreveu, jogador a jogador — mais confiável do que fatiar pelo campo "formacao"
-  // coletado à parte (os dois podem divergir e o fatiamento moveria jogador de linha).
-  const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
-  if(segs.length>=3){
-    const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(n=>({nome:n,posicao:''})));
-    const total=rows.reduce((a,r)=>a+r.length,0);
-    if(total>=10&&total<=11&&rows[0].length===1)return _assignRoles(rows);
-  }
-  // Caso B (fallback): nomes corridos sem estrutura de linhas → fatia pela formação real.
-  const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
-  if(names.length>=10&&names.length<=11&&groups){
-    let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(nm=>({nome:nm,posicao:''}));i+=g;return r;});
-    return _assignRoles(rows);
-  }
-  return null;
+  // Remove o segmento de banco/suplentes (o app já mostra "banco" à parte via t.banco, e nomes
+  // de reserva vazariam pra última linha titular). Limita a remoção ao PRÓPRIO segmento — até o
+  // próximo ';' — em vez de apagar até o fim: senão, se a fonte cita o banco ANTES do onze
+  // ("Reservas: X, Y; 4-3-3: ..."), a escalação inteira depois dele seria destruída.
+  const noBench=text.replace(/\b(banco|bench|suplentes|reservas)\s*:[^;]*/gi,'').trim();
+  // Segurança: se ainda assim a remoção esvaziou tudo, cai pro texto completo.
+  const base=noBench||text.trim();
+  const mkPlayer=nm=>({nome:nm,posicao:''});
+  const parse=(str)=>{
+    if(!str)return null;
+    const fMatch=str.match(_FORM_RE);
+    const fUse=(formacao||(fMatch?fMatch[0].replace(/\s/g,''):'')||'').trim();
+    // Tira a formação do corpo (com o ':'/'–' que costuma segui-la) pra não virar "nome".
+    const clean=str.replace(new RegExp(_FORM_RE.source+'\\s*[:：\\-–]?'),' ').trim();
+    const groups=_formationGroups(fUse);
+    // Caso A (prioritário): o texto separa as linhas por ';' num shape VÁLIDO de escalação
+    // (goleiro sozinho na 1ª linha, 10-11 no total). Essa segmentação é a formação real como
+    // a FONTE escreveu, jogador a jogador — mais confiável do que fatiar pelo campo "formacao"
+    // coletado à parte (os dois podem divergir e o fatiamento moveria jogador de linha).
+    const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
+    if(segs.length>=3){
+      const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(mkPlayer));
+      const total=rows.reduce((a,r)=>a+r.length,0);
+      if(total>=10&&total<=11&&rows[0].length===1)return _assignRoles(rows);
+    }
+    // Caso B (fallback): nomes corridos sem estrutura de linhas → fatia pela formação real.
+    const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
+    if(names.length>=10&&names.length<=11&&groups){
+      let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(mkPlayer);i+=g;return r;});
+      return _assignRoles(rows);
+    }
+    return null;
+  };
+  return parse(base)||(base!==text.trim()?parse(text.trim()):null);
 }
 function _pitchRows(rows){ // rows em ordem GK→ataque; exibe ataque em cima
   return `<div class="pitch">${[...rows].reverse().map(r=>(r&&r.length)?`<div class="p-row">${r.map(_pitchPlayer).join('')}</div>`:'').join('')}</div>`;
@@ -2773,7 +2786,10 @@ function _cfStatsChips(nome,arr){
 function _padCartoesEventos(eventos){
   const list=(Array.isArray(eventos)?eventos:[]).filter(e=>e&&e.evento);
   if(list.length>=7)return list;
-  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9À-ú]+/g,'');
+  // NFD + strip de diacríticos (mesmo idioma de _mergeKnownFixtures/_afMatchIds) e pontuação
+  // COLAPSADA em espaço (não removida) — senão "3.5" e "35" viram a mesma chave e um mercado
+  // distinto seria descartado como duplicado.
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   const have=new Set(list.map(e=>norm(e.evento)));
   const EST='Estimativa conservadora — dados de cartões/faltas coletados foram insuficientes para fundamentar mais mercados com precisão.';
   const pool=[
@@ -2793,6 +2809,13 @@ function _padCartoesEventos(eventos){
     out.push(cand);have.add(norm(cand.evento));
   }
   return out;
+}
+// Mensagem de aba vazia, escolhida por (1) recurso existia na análise, (2) a coleta rodou.
+// Centraliza a lógica 3-vias que as abas Cartões e Escalação repetiam idêntica.
+function _abaVaziaMsg(temRecurso,coletaOk,preRecurso,coletaFalhou,semDado){
+  if(!temRecurso)return preRecurso;
+  if(coletaOk===false)return coletaFalhou;
+  return semDado;
 }
 
 // ─── Card genérico com abas (design universal de resposta do chat) ─────────
@@ -3008,7 +3031,7 @@ function renderResults(d,opts){
       <div class="tab-h">Síntese</div>
       <p class="ct-diag">${esc(textFrom(cf.conclusao))}</p>
     </div>`:''}`
-  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${d._featCartoes?'Dados de cartões e faltas não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.':'Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.'}</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featCartoes,d._coletaOk,'Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar cartões e faltas.','Dados de cartões e faltas não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
 
   // ── Tab: Escalação (mapa de campo — dados da Fase 1 via _lineups, sem re-digitação) ──
   const lu=d._lineups;
@@ -3018,7 +3041,7 @@ function renderResults(d,opts){
       <div class="teams-full">${_pitchTeam(lu.mandante)}${_pitchTeam(lu.visitante)}</div>
       <div class="pstat-src">Escalações prováveis coletadas na pesquisa — podem mudar até o apito inicial</div>
     </div>`
-  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${d._featLineups?'Dados de escalação não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.':'Escalações não disponíveis — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-las.'}</p></div>`;
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featLineups,d._coletaOk,'Escalações não disponíveis — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-las.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar as escalações.','Dados de escalação não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>`;
 
   // ── Tab: Avançado ──
   const tabAvancado=`
@@ -5509,6 +5532,9 @@ async function runAnalysis(){
     // já sabe gerar cartões/faltas e escalação — usada no render para diferenciar "análise
     // antiga, recurso nem existia" de "análise nova, mas a coleta não achou o dado".
     parsed._featCartoes=true; parsed._featLineups=true;
+    // _coletaOk distingue os dois modos de falha na mensagem de fallback: coleta RODOU e não
+    // achou o dado (rawFacts presente) vs. a pesquisa da Fase 1 falhou inteira (rawFacts null).
+    parsed._coletaOk=!!rawFacts;
     // Escalações → _lineups (mapa de campo). Fonte: onze_provavel estruturado da Fase 1
     // se veio; senão as linhas são DERIVADAS do texto de escalação (via _lineupRowsFromText).
     // Puxa da Fase 1 (rawFacts) OU, como fallback, da própria saída da Fase 2 (formação do

@@ -2706,6 +2706,9 @@ function _lineupRowsFromText(text,formacao){
   // Segurança: se ainda assim a remoção esvaziou tudo, cai pro texto completo.
   const base=noBench||text.trim();
   const mkPlayer=nm=>({nome:nm,posicao:''});
+  // Nomes numa linha são separados por vírgula E, com frequência na imprensa pt/es, pelo
+  // conectivo " e "/" y " antes do último ("Romero, Lisandro Martínez e Tagliafico") ou por "&".
+  const NAME_SEP=/,|\s+[ey]\s+|\s*&\s*/i;
   const parse=(str)=>{
     if(!str)return null;
     const fMatch=str.match(_FORM_RE);
@@ -2719,12 +2722,12 @@ function _lineupRowsFromText(text,formacao){
     // coletado à parte (os dois podem divergir e o fatiamento moveria jogador de linha).
     const segs=clean.split(/[;\n|]/).map(s=>s.trim()).filter(Boolean);
     if(segs.length>=3){
-      const rows=segs.map(s=>s.split(',').map(_cleanName).filter(Boolean).map(mkPlayer));
+      const rows=segs.map(s=>s.split(NAME_SEP).map(_cleanName).filter(Boolean).map(mkPlayer));
       const total=rows.reduce((a,r)=>a+r.length,0);
       if(total>=10&&total<=11&&rows[0].length===1)return _assignRoles(rows);
     }
     // Caso B (fallback): nomes corridos sem estrutura de linhas → fatia pela formação real.
-    const names=clean.split(/[;,]/).map(_cleanName).filter(Boolean);
+    const names=clean.split(new RegExp('[;]|'+NAME_SEP.source,'i')).map(_cleanName).filter(Boolean);
     if(names.length>=10&&names.length<=11&&groups){
       let i=0;const rows=groups.map(g=>{const r=names.slice(i,i+g).map(mkPlayer);i+=g;return r;});
       return _assignRoles(rows);

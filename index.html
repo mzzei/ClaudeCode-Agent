@@ -4848,6 +4848,10 @@ ${_coverNote}
 Extraia placares, classificação do grupo, xG e estilo diretamente das páginas. RESPONDA APENAS COM O JSON.`;
   const msgs=[{role:'user',content:hasFd?`${query}\n\nDADOS DA API:\n${fdCtx}`:query}];
   let accIn=0,accOut=0; // acumula uso por todas as iterações (busca + resposta)
+  // Evidência de busca em TEXTO-CLARO (títulos + URLs dos resultados). O CORPO das páginas
+  // vem cifrado/opaco no web_search (usado só p/ citação), então guardamos o que é legível —
+  // serve de corpus para o portão anti-alucinação cruzar nomes de jogadores antes de renderizar.
+  const _evi=[];
   // Filtragem dinâmica (opt-in): Sonnet + web_search_20260209 filtra as páginas antes de
   // entrarem no contexto. Auto-cura: se o acesso não suportar (400), desliga e cai pro
   // Haiku + web_search básico (caminho provado) sem quebrar a coleta.
@@ -4877,11 +4881,19 @@ Extraia placares, classificação do grupo, xG e estilo diretamente das páginas
     parseRateLimitHeaders(res);if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`Erro ${res.status}`);}
     const data=await res.json();
     const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
+    // Colhe títulos/URLs dos resultados de busca desta iteração (texto-claro).
+    try{(data.content||[]).forEach(b=>{
+      if(b&&b.type==='web_search_tool_result'&&Array.isArray(b.content))
+        b.content.forEach(r=>{if(r&&r.title)_evi.push(r.title);if(r&&r.url)_evi.push(r.url);});
+    });}catch(_){}
     onUpdate({inTokens:accIn,outTokens:accOut,status:'Pesquisando dados…',phase:1});
     if(data.stop_reason==='end_turn'){
       const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
       const m=txt.match(/\{[\s\S]*\}/);
       let rawFacts=null;try{if(m)rawFacts=JSON.parse(m[0]);}catch{}
+      // Anexa o corpus de evidência (dados da API + títulos/URLs de busca), minúsculo, p/ o
+      // portão anti-alucinação. Não-enumerável: não polui o JSON exibido nem a persistência.
+      if(rawFacts&&typeof rawFacts==='object'){try{Object.defineProperty(rawFacts,'_evidence',{value:((hasFd?fdCtx:'')+'\n'+_evi.join('\n')).toLowerCase(),enumerable:false,configurable:true});}catch(_){}}
       return{rawFacts,inTokens:accIn,outTokens:accOut};
     }
     if(data.stop_reason==='tool_use'){
@@ -5006,6 +5018,87 @@ async function fillDataGaps(rawFacts,apiKey,signal,onUpdate){
         msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
       }else if(data.stop_reason==='pause_turn'){msgs.push({role:'assistant',content:data.content});}
       else break;
+    }
+    return{inTokens:accIn,outTokens:accOut};
+  }catch(e){if(e&&(e.name==='AbortError'||e.message==='cancelled'))throw e;return{inTokens:0,outTokens:0};}
+}
+
+// ─── Portão anti-alucinação de nome (garantia por CÓDIGO, não por prompt) ──────
+// A instrução de prompt (GROUNDING_RULE) já pedia para não inventar jogador, e mesmo assim
+// escapou (ex.: Di María "convocado" mesmo já fora da seleção). Aqui o CÓDIGO cruza cada
+// nome da escalação contra uma verificação com busca fresca — e ESCOVA os comprovadamente
+// fora do elenco atual ANTES da Fase 2 usar o nome. Só marca inválido quem a busca confirma
+// que NÃO está no elenco (aposentado/cortado/inexistente); "não achei nada" NÃO invalida
+// (evita falso-positivo que apagaria titular real). Mesmo racional/estrutura do fillDataGaps.
+function _lvKey(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
+function _lvCollectNames(tm){
+  if(!tm)return[];
+  const out=[],push=n=>{const c=_cleanName(n);if(c&&c.length>1&&!/^a confirmar$/i.test(c))out.push(c);};
+  (Array.isArray(tm.onze_provavel)?tm.onze_provavel:[]).forEach(p=>push(typeof p==='string'?p:(p&&p.nome)));
+  (Array.isArray(tm.banco)?tm.banco:[]).forEach(push);
+  const rows=_lineupRowsFromText(tm.escalacao_provavel||'',tm.formacao||'');
+  if(rows)rows.flat().forEach(p=>push(p.nome));
+  const seen=new Set(),ded=[];
+  out.forEach(n=>{const k=_lvKey(n);if(k&&!seen.has(k)){seen.add(k);ded.push(n);}});
+  return ded;
+}
+// Escova um time: onze_provavel inválido → "A confirmar" (mantém posição p/ não desalinhar o
+// mapa); banco inválido → removido; escalacao_provavel → nome trocado por "a confirmar".
+function _lvScrubTeam(tm,invalidKeys){
+  if(!tm||!invalidKeys.size)return[];
+  const removed=[];
+  if(Array.isArray(tm.onze_provavel))tm.onze_provavel.forEach(p=>{
+    const nm=typeof p==='string'?p:(p&&p.nome);if(!nm)return;
+    if(invalidKeys.has(_lvKey(nm))){removed.push(nm);if(typeof p==='object')p.nome='A confirmar';}
+  });
+  if(Array.isArray(tm.onze_provavel))tm.onze_provavel=tm.onze_provavel.map(p=>typeof p==='string'&&invalidKeys.has(_lvKey(p))?{nome:'A confirmar',posicao:''}:p);
+  if(Array.isArray(tm.banco))tm.banco=tm.banco.filter(n=>{const bad=invalidKeys.has(_lvKey(n));if(bad)removed.push(n);return!bad;});
+  if(tm.escalacao_provavel&&removed.length){
+    removed.forEach(nm=>{const re=new RegExp(nm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');tm.escalacao_provavel=tm.escalacao_provavel.replace(re,'a confirmar');});
+  }
+  return[...new Set(removed)];
+}
+async function verifyLineupNames(rawFacts,apiKey,signal,onUpdate){
+  try{
+    if(!rawFacts)return{inTokens:0,outTokens:0};
+    const mNames=_lvCollectNames(rawFacts.mandante),vNames=_lvCollectNames(rawFacts.visitante);
+    if(!mNames.length&&!vNames.length)return{inTokens:0,outTokens:0}; // sem escalação → nada a checar
+    const cap=a=>a.slice(0,16); // teto de nomes por time (mantém a chamada barata)
+    const mN=cap(mNames),vN=cap(vNames);
+    const mNome=(rawFacts.mandante&&rawFacts.mandante.nome)||'mandante',vNome=(rawFacts.visitante&&rawFacts.visitante.nome)||'visitante';
+    onUpdate&&onUpdate({status:'Verificando escalações…',phase:1});
+    const evi=(rawFacts._evidence||'').slice(0,3000);
+    const SP='Você VERIFICA elencos da Copa do Mundo 2026 com busca na web. Para CADA jogador listado, confirme se ele está ATUALMENTE na seleção indicada e disponível (convocado/no elenco) para a Copa 2026. Responda APENAS JSON: {"jogadores":[{"nome":"","time":"mandante|visitante","no_elenco":true|false|null}]}. '
+      +'no_elenco=false SOMENTE se a busca mostrar que ele NÃO está no elenco atual (aposentado da seleção, cortado, não convocado, ou nome que não corresponde a jogador real dessa seleção). no_elenco=true se achar o jogador no elenco/escalação atual. no_elenco=null se não achar evidência suficiente — NUNCA invalide por falta de evidência, só com evidência de ausência. Não invente jogadores nem substitutos.';
+    const lista=[...mN.map(n=>`- ${n} (${mNome})`),...vN.map(n=>`- ${n} (${vNome})`)].join('\n');
+    const msgs=[{role:'user',content:`DATA: ${currentDateFull()}. Jogo: ${mNome} x ${vNome}. Verifique no elenco atual da Copa 2026:\n${lista}${evi?`\n\nEVIDÊNCIA JÁ COLETADA (títulos/links de busca — use como pista, confirme com nova busca):\n${evi}`:''}`}];
+    let accIn=0,accOut=0,verif=null;
+    for(let i=0;i<3;i++){
+      if(signal.aborted)break;
+      const body=JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,system:SP,messages:msgs,tools:[{type:'web_search_20250305',name:'web_search',max_uses:3}]});
+      const res=await fetch(getApiBase()+'/v1/messages',{method:'POST',headers:getReqHeaders(apiKey),body,signal});
+      if(!res.ok)break;
+      const data=await res.json();const u=data.usage||{};accIn+=u.input_tokens||0;accOut+=u.output_tokens||0;
+      if(data.stop_reason==='end_turn'){
+        const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+        const m=txt.match(/\{[\s\S]*\}/);try{if(m)verif=JSON.parse(m[0]);}catch{}
+        break;
+      }
+      if(data.stop_reason==='tool_use'){
+        msgs.push({role:'assistant',content:data.content});
+        msgs.push({role:'user',content:data.content.filter(b=>b.type==='tool_use').map(b=>({type:'tool_result',tool_use_id:b.id,content:''}))});
+      }else if(data.stop_reason==='pause_turn'){msgs.push({role:'assistant',content:data.content});}
+      else break;
+    }
+    if(verif&&Array.isArray(verif.jogadores)){
+      const invalid=new Set(verif.jogadores.filter(j=>j&&j.no_elenco===false&&j.nome).map(j=>_lvKey(j.nome)));
+      if(invalid.size){
+        const rm=[..._lvScrubTeam(rawFacts.mandante,invalid),..._lvScrubTeam(rawFacts.visitante,invalid)];
+        if(rm.length){
+          rawFacts.lacunas=Array.isArray(rawFacts.lacunas)?rawFacts.lacunas:[];
+          rawFacts.lacunas.push(`Nome(s) retirado(s) da escalação por não constarem no elenco atual da Copa 2026 (verificação automática): ${rm.join(', ')}.`);
+        }
+      }
     }
     return{inTokens:accIn,outTokens:accOut};
   }catch(e){if(e&&(e.name==='AbortError'||e.message==='cancelled'))throw e;return{inTokens:0,outTokens:0};}
@@ -5464,6 +5557,12 @@ async function runAnalysis(){
       tokenState.sessionIn+=g.inTokens;tokenState.sessionOut+=g.outTokens;
       tokenState.sessionIn_p1+=g.inTokens;tokenState.sessionOut_p1+=g.outTokens;
       _thkP1Toks+=g.inTokens+g.outTokens;
+      // Portão anti-alucinação: cruza cada nome da escalação com busca fresca e escova os
+      // comprovadamente fora do elenco ANTES da Fase 2 — a escalação errada não chega ao render.
+      const lv=await verifyLineupNames(rawFacts,apiKey,_abort.signal,(upd)=>updateThinkingToks({...upd,phase:1}));
+      tokenState.sessionIn+=lv.inTokens;tokenState.sessionOut+=lv.outTokens;
+      tokenState.sessionIn_p1+=lv.inTokens;tokenState.sessionOut_p1+=lv.outTokens;
+      _thkP1Toks+=lv.inTokens+lv.outTokens;
     }
 
     // ── Fase 2: modelo escolhido analisa (sem ferramentas se fatos OK) ────

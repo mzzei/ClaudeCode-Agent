@@ -2754,7 +2754,10 @@ function _pitchTeam(t){
     }
     body=_pitchRows([rows.GK,rows.DEF,rows.MID,rows.ATA]);
   }else if(t.escalacao_str){
-    body=`<div class="pitch-fallback">${esc(t.escalacao_str)}</div>`;
+    // Deriva as linhas do texto NA HORA DE RENDERIZAR — assim melhorias no parser valem também
+    // para análises antigas/reabertas (o _lineups persistido pode ter rows:null do parser velho).
+    const derived=_lineupRowsFromText(t.escalacao_str,t.formacao||'');
+    body=derived?_pitchRows(derived):`<div class="pitch-fallback">${esc(t.escalacao_str)}</div>`;
   }else{
     body=`<div class="pitch-fallback" style="color:var(--muted)">Onze provável não coletado nesta análise.</div>`;
   }

@@ -61,7 +61,16 @@ export default {
         h.set('x-api-key', env.ANTHROPIC_KEY);
         if (!h.has('anthropic-version')) h.set('anthropic-version', '2023-06-01');
         h.delete('host');
-        h.delete('anthropic-dangerous-direct-browser-access'); // desnecessário fora do navegador
+        // O fetch() do Worker repassa 'origin'/'referer' do navegador original. A Anthropic
+        // vê isso e trata como requisição CORS de navegador — exigindo o cabeçalho abaixo.
+        // Bug anterior: apagávamos o cabeçalho aqui (achando "desnecessário fora do navegador"),
+        // mas como origin/referer continuavam presentes, a API recusava com "CORS requests
+        // must set 'anthropic-dangerous-direct-browser-access' header". Fix: remover origin/
+        // referer (é um proxy servidor-a-servidor de verdade) E manter o cabeçalho setado —
+        // assim funciona não importa o que o navegador tenha mandado.
+        h.delete('origin');
+        h.delete('referer');
+        h.set('anthropic-dangerous-direct-browser-access', 'true');
         const r = await fetch(upstream, {
           method: request.method,
           headers: h,

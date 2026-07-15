@@ -2485,7 +2485,7 @@ function showTab(cardId,tab){
   const tc=document.getElementById(`at-${tab}-${cardId}`);if(tc)tc.style.display='block';
   // Resolve o botão por data-tab (robusto a qualquer nº de abas; cards antigos sem
   // data-tab caem no fallback por ordem).
-  const _order=['resumo','tatica','individual','cartoes','escalacao','avancado'];
+  const _order=['resumo','tatica','individual','cartoes','escanteios','escalacao','avancado'];
   const btn=card.querySelector(`.a-tab[data-tab="${tab}"]`)||card.querySelectorAll('.a-tab')[_order.indexOf(tab)];
   if(btn){
     btn.classList.add('active');
@@ -2786,10 +2786,11 @@ function _cfStatsChips(nome,arr){
   }).filter(Boolean).join('')}</div></div>`;
 }
 // Rede de segurança determinística: a instrução de prompt pede EXATAMENTE 7 eventos, mas
-// isso não é uma trava — se os dados de cartão/falta coletados forem escassos, o modelo pode
-// entregar menos por prudência. Em vez de reenviar ao modelo (custo/latência), completa via
-// CÓDIGO com mercados-modelo genéricos e conservadores, sem inventar números novos.
-function _padCartoesEventos(eventos){
+// isso não é uma trava — se os dados coletados forem escassos, o modelo pode entregar menos
+// por prudência. Em vez de reenviar ao modelo (custo/latência), completa via CÓDIGO com
+// mercados-modelo genéricos e conservadores, sem inventar números novos. Compartilhado entre
+// as abas Cartões e Escanteios (cada uma passa seu próprio pool).
+function _padEventos(eventos,pool){
   const list=(Array.isArray(eventos)?eventos:[]).filter(e=>e&&e.evento);
   if(list.length>=7)return list;
   // NFD + strip de diacríticos (mesmo idioma de _mergeKnownFixtures/_afMatchIds) e pontuação
@@ -2797,17 +2798,6 @@ function _padCartoesEventos(eventos){
   // distinto seria descartado como duplicado.
   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   const have=new Set(list.map(e=>norm(e.evento)));
-  const EST='Estimativa conservadora — dados de cartões/faltas coletados foram insuficientes para fundamentar mais mercados com precisão.';
-  const pool=[
-    {evento:'Mais de 3.5 cartões amarelos totais no jogo',probabilidade:0.55,fundamento:EST},
-    {evento:'Mais de 5.5 cartões amarelos totais no jogo',probabilidade:0.35,fundamento:EST},
-    {evento:'Mais de 24.5 faltas totais no jogo',probabilidade:0.5,fundamento:EST},
-    {evento:'Ambas as equipes recebem cartão',probabilidade:0.65,fundamento:EST},
-    {evento:'Cartão no 1º tempo',probabilidade:0.55,fundamento:EST},
-    {evento:'Cartão vermelho no jogo',probabilidade:0.12,fundamento:EST},
-    {evento:'Mais de 1.5 cartões amarelos do time mandante',probabilidade:0.5,fundamento:EST},
-    {evento:'Mais de 1.5 cartões amarelos do time visitante',probabilidade:0.5,fundamento:EST}
-  ];
   const out=list.slice();
   for(const cand of pool){
     if(out.length>=7)break;
@@ -2816,6 +2806,30 @@ function _padCartoesEventos(eventos){
   }
   return out;
 }
+const _EST_CARTOES='Estimativa conservadora — dados de cartões/faltas coletados foram insuficientes para fundamentar mais mercados com precisão.';
+const _POOL_CARTOES=[
+  {evento:'Mais de 3.5 cartões amarelos totais no jogo',probabilidade:0.55,fundamento:_EST_CARTOES},
+  {evento:'Mais de 5.5 cartões amarelos totais no jogo',probabilidade:0.35,fundamento:_EST_CARTOES},
+  {evento:'Mais de 24.5 faltas totais no jogo',probabilidade:0.5,fundamento:_EST_CARTOES},
+  {evento:'Ambas as equipes recebem cartão',probabilidade:0.65,fundamento:_EST_CARTOES},
+  {evento:'Cartão no 1º tempo',probabilidade:0.55,fundamento:_EST_CARTOES},
+  {evento:'Cartão vermelho no jogo',probabilidade:0.12,fundamento:_EST_CARTOES},
+  {evento:'Mais de 1.5 cartões amarelos do time mandante',probabilidade:0.5,fundamento:_EST_CARTOES},
+  {evento:'Mais de 1.5 cartões amarelos do time visitante',probabilidade:0.5,fundamento:_EST_CARTOES}
+];
+const _EST_ESCANTEIOS='Estimativa conservadora — estatísticas de escanteios coletadas foram insuficientes para fundamentar mais mercados com precisão.';
+const _POOL_ESCANTEIOS=[
+  {evento:'Mais de 8.5 escanteios no jogo',probabilidade:0.55,fundamento:_EST_ESCANTEIOS},
+  {evento:'Mais de 10.5 escanteios no jogo',probabilidade:0.35,fundamento:_EST_ESCANTEIOS},
+  {evento:'Menos de 9.5 escanteios no jogo',probabilidade:0.5,fundamento:_EST_ESCANTEIOS},
+  {evento:'Mais de 4.5 escanteios no 1º tempo',probabilidade:0.5,fundamento:_EST_ESCANTEIOS},
+  {evento:'Ambos os times batem ao menos 1 escanteio',probabilidade:0.82,fundamento:_EST_ESCANTEIOS},
+  {evento:'Mais de 4.5 escanteios do time mandante',probabilidade:0.5,fundamento:_EST_ESCANTEIOS},
+  {evento:'Mais de 4.5 escanteios do time visitante',probabilidade:0.5,fundamento:_EST_ESCANTEIOS},
+  {evento:'Time mandante com mais escanteios',probabilidade:0.5,fundamento:_EST_ESCANTEIOS}
+];
+function _padCartoesEventos(eventos){return _padEventos(eventos,_POOL_CARTOES);}
+function _padEscanteiosEventos(eventos){return _padEventos(eventos,_POOL_ESCANTEIOS);}
 // Mensagem de aba vazia, escolhida por (1) recurso existia na análise, (2) a coleta rodou.
 // Centraliza a lógica 3-vias que as abas Cartões e Escalação repetiam idêntica.
 function _abaVaziaMsg(temRecurso,coletaOk,preRecurso,coletaFalhou,semDado){
@@ -3039,6 +3053,24 @@ function renderResults(d,opts){
     </div>`:''}`
   :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featCartoes,d._coletaOk,'Análise disciplinar não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar cartões e faltas.','Dados de cartões e faltas não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>${cfStats?`<div class="tab-s"><div class="tab-h">Cartões e Faltas Acumulados · Coletados</div><div class="teams-full">${cfStats}</div></div>`:''}`;
 
+  // ── Tab: Escanteios ──
+  const ec=d.escanteios;
+  const ecEventos=Array.isArray(ec?.eventos)?ec.eventos.filter(e=>e&&e.evento):[];
+  const tabEscanteios=(ec&&(ecEventos.length||ec.analise))?`
+    ${ec.analise?`<div class="tab-s">
+      <div class="tab-h">1. Leitura de Escanteios</div>
+      <p class="tab-body">${esc(textFrom(ec.analise))}</p>
+    </div>`:''}
+    ${ecEventos.length?`<div class="tab-s">
+      <div class="tab-h">2. Eventos Prováveis</div>
+      ${ecEventos.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="transform:scaleX(0)"></div></div><div class="ev-reason">${esc(textFrom(e.fundamento||''))}</div></div>`).join('')}
+    </div>`:''}
+    ${ec.conclusao?`<div class="tab-s">
+      <div class="tab-h">Síntese</div>
+      <p class="ct-diag">${esc(textFrom(ec.conclusao))}</p>
+    </div>`:''}`
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featEscanteios,d._coletaOk,'Análise de escanteios não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar escanteios.','Dados de escanteios não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>`;
+
   // ── Tab: Escalação (mapa de campo — dados da Fase 1 via _lineups, sem re-digitação) ──
   const lu=d._lineups;
   const tabEscalacao=(lu&&(lu.mandante||lu.visitante))?`
@@ -3090,6 +3122,7 @@ function renderResults(d,opts){
       <button class="a-tab" data-tab="tatica" onclick="showTab(${id},'tatica')">Tática</button>
       <button class="a-tab" data-tab="individual" onclick="showTab(${id},'individual')">Desempenho</button>
       <button class="a-tab" data-tab="cartoes" onclick="showTab(${id},'cartoes')">Cartões & Faltas</button>
+      <button class="a-tab" data-tab="escanteios" onclick="showTab(${id},'escanteios')">Escanteios</button>
       <button class="a-tab" data-tab="escalacao" onclick="showTab(${id},'escalacao')">Escalação</button>
       <button class="a-tab" data-tab="avancado" onclick="showTab(${id},'avancado')">Dados Avançados</button>
     </div>
@@ -3097,6 +3130,7 @@ function renderResults(d,opts){
     <div id="at-tatica-${id}" class="a-tc" style="display:none">${tabTatica}</div>
     <div id="at-individual-${id}" class="a-tc" style="display:none">${tabIndividual}</div>
     <div id="at-cartoes-${id}" class="a-tc" style="display:none">${tabCartoes}</div>
+    <div id="at-escanteios-${id}" class="a-tc" style="display:none">${tabEscanteios}</div>
     <div id="at-escalacao-${id}" class="a-tc" style="display:none">${tabEscalacao}</div>
     <div id="at-avancado-${id}" class="a-tc" style="display:none">${tabAvancado}</div>
   </div>`;
@@ -3197,6 +3231,8 @@ FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "
 
 ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS coletados por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS COLETADOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares coletados forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
+ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios coletadas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (EXATAMENTE 7 mercados de escanteios, cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios coletada, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
 VALIDAÇÃO CRUZADA DE CONFIANÇA: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) estejam CONSISTENTES entre 2+ fontes independentes das suas buscas; fato de fonte única sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre em "incerteza". Aplique o mesmo critério à "confianca" de cada ticket.
@@ -3211,7 +3247,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"escanteios":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Schedule loader (cache-first) ────────────────────────────────────────
 function _loadSchedCache(){
@@ -5216,6 +5252,8 @@ FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "
 
 ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS presentes nos dados fornecidos por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS FORNECIDOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares fornecidos forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
+ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios fornecidas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (EXATAMENTE 7 mercados de escanteios, cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios fornecida, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 
 VALIDAÇÃO CRUZADA DE CONFIANÇA: os dados fornecidos vêm de fontes INDEPENDENTES (bloco da API/ESPN, bloco TheSportsDB e fatos da pesquisa web). Pondere a corroboração entre elas: "confianca_geral":"alto" exige que os fatos centrais (placares/forma, técnico, escalação, xG) sejam CONSISTENTES entre 2+ fontes; um fato presente em UMA única fonte sustenta no máximo "medio" para as conclusões que dependem dele; conflito entre fontes → prevalece a mais recente/oficial, rebaixe a confiança e registre o conflito em "incerteza" (fator + impacto). Aplique o mesmo critério à "confianca" de cada sugestão de ticket: "alta" só com fundamento corroborado por 2+ fontes.
@@ -5230,7 +5268,7 @@ LINGUAGEM E ESCRITA:
 
 RESPONDA APENAS COM JSON VÁLIDO, sem texto antes/depois, sem blocos markdown.
 
-{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"lacunas":[]}`;}
+{"partida":"","fase":"","grupo":null,"data_hora":"","sede":"","contexto_fase":"","confianca_geral":"alto|medio|baixo","mandante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"visitante":{"nome":"","ranking_fifa":"","forma_recente":"","xg_marcado":0.0,"xg_sofrido":0.0,"desfalques":[],"escalacao_status":"provavel|confirmada","escalacao":"","jogadores_chave":[]},"tecnico_mandante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"tecnico_visitante":{"nome":"","formacao":"","filosofia":"","ajustes_copa":"","impacto_mercados":""},"lambda":{"home_low":0.0,"home_mid":0.0,"home_high":0.0,"home_logic":"","away_low":0.0,"away_mid":0.0,"away_high":0.0,"away_logic":""},"eventos_provaveis":[{"evento":"","probabilidade":0.0,"fundamento":""}],"sugestoes_ticket":[{"descricao":"","probabilidade":0.0,"fundamento":"","confianca":"alta|media|baixa"}],"tendencias":[],"fatores_decisivos":[],"incerteza":[{"fator":"","impacto":""}],"confronto_tatico":{"atq_mand_def_vis":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"atq_vis_def_mand":{"diagnostico":"","vantagem":"mandante|visitante|equilibrado","pontos_exploracao":[],"bloqueios":[]},"duelos_chave":[{"confronto":"","setor":"","favorito":"","impacto":""}],"conclusao":""},"cartoes_faltas":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"jogadores_risco":[{"nome":"","time":"","motivo":""}],"conclusao":""},"escanteios":{"analise":"","eventos":[{"evento":"","probabilidade":0.0,"fundamento":""}],"conclusao":""},"lacunas":[]}`;}
 
 // ─── Conversational chat ─────────────────────────────────────────────────
 // Detecta se a pergunta pede dados REAIS (resultado/placar/classificação/estado atual).
@@ -5664,7 +5702,7 @@ async function runAnalysis(){
     // Marca de recurso (não de dado): sinaliza que esta análise passou pela versão do app que
     // já sabe gerar cartões/faltas e escalação — usada no render para diferenciar "análise
     // antiga, recurso nem existia" de "análise nova, mas a coleta não achou o dado".
-    parsed._featCartoes=true; parsed._featLineups=true;
+    parsed._featCartoes=true; parsed._featLineups=true; parsed._featEscanteios=true;
     // _coletaOk distingue os dois modos de falha na mensagem de fallback: coleta RODOU e não
     // achou o dado (rawFacts presente) vs. a pesquisa da Fase 1 falhou inteira (rawFacts null).
     parsed._coletaOk=!!rawFacts;
@@ -5700,6 +5738,11 @@ async function runAnalysis(){
     try{
       const _cfEv=parsed.cartoes_faltas&&Array.isArray(parsed.cartoes_faltas.eventos)?parsed.cartoes_faltas.eventos.filter(e=>e&&e.evento):[];
       if(_cfEv.length>0)parsed.cartoes_faltas.eventos=_padCartoesEventos(parsed.cartoes_faltas.eventos);
+    }catch(_){}
+    // Mesma rede de segurança dos 7 eventos para a aba de Escanteios.
+    try{
+      const _ecEv=parsed.escanteios&&Array.isArray(parsed.escanteios.eventos)?parsed.escanteios.eventos.filter(e=>e&&e.evento):[];
+      if(_ecEv.length>0)parsed.escanteios.eventos=_padEscanteiosEventos(parsed.escanteios.eventos);
     }catch(_){}
     renderResults(parsed);
     // Memória: registra a análise estruturada no fio do chat para que perguntas de

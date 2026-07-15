@@ -2803,9 +2803,10 @@ function _cornerChips(corners){
 // por prudência. Em vez de reenviar ao modelo (custo/latência), completa via CÓDIGO com
 // mercados-modelo genéricos e conservadores, sem inventar números novos. Compartilhado entre
 // as abas Cartões e Escanteios (cada uma passa seu próprio pool).
-function _padEventos(eventos,pool){
+function _padEventos(eventos,pool,target){
+  target=target||7;
   const list=(Array.isArray(eventos)?eventos:[]).filter(e=>e&&e.evento);
-  if(list.length>=7)return list;
+  if(list.length>=target)return list;
   // NFD + strip de diacríticos (mesmo idioma de _mergeKnownFixtures/_afMatchIds) e pontuação
   // COLAPSADA em espaço (não removida) — senão "3.5" e "35" viram a mesma chave e um mercado
   // distinto seria descartado como duplicado.
@@ -2813,7 +2814,7 @@ function _padEventos(eventos,pool){
   const have=new Set(list.map(e=>norm(e.evento)));
   const out=list.slice();
   for(const cand of pool){
-    if(out.length>=7)break;
+    if(out.length>=target)break;
     if(have.has(norm(cand.evento)))continue;
     out.push(cand);have.add(norm(cand.evento));
   }
@@ -2841,8 +2842,10 @@ const _POOL_ESCANTEIOS=[
   {evento:'Mais de 4.5 escanteios do time visitante',probabilidade:0.5,fundamento:_EST_ESCANTEIOS},
   {evento:'Time mandante com mais escanteios',probabilidade:0.5,fundamento:_EST_ESCANTEIOS}
 ];
-function _padCartoesEventos(eventos){return _padEventos(eventos,_POOL_CARTOES);}
-function _padEscanteiosEventos(eventos){return _padEventos(eventos,_POOL_ESCANTEIOS);}
+function _padCartoesEventos(eventos){return _padEventos(eventos,_POOL_CARTOES,7);}
+// Escanteios têm menos mercados distintos que cartões — piso menor (5), teto 7 fica a cargo
+// do modelo. Não força até 7 pra não fabricar mercado fraco/repetido.
+function _padEscanteiosEventos(eventos){return _padEventos(eventos,_POOL_ESCANTEIOS,5);}
 // Mensagem de aba vazia, escolhida por (1) recurso existia na análise, (2) a coleta rodou.
 // Centraliza a lógica 3-vias que as abas Cartões e Escalação repetiam idêntica.
 function _abaVaziaMsg(temRecurso,coletaOk,preRecurso,coletaFalhou,semDado){
@@ -3250,7 +3253,7 @@ FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "
 
 ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS coletados por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS COLETADOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares coletados forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
-ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios coletadas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (EXATAMENTE 7 mercados de escanteios, cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios coletada, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios coletadas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (de 5 a 7 mercados de escanteios — PRIORIZE QUALIDADE: escanteios têm menos mercados distintos que cartões, então NÃO force um mercado fraco/repetido só para chegar a 7; prefira 5 sólidos a 7 forçados. Cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios coletada, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
 PRIORIDADE: fatos confirmados > xG histórico > tendências > suposições. Declare lacunas.
 
@@ -5272,7 +5275,7 @@ FORMATO: "tendencias", "fatores_decisivos", "pontos_exploracao", "bloqueios" e "
 
 ANÁLISE DISCIPLINAR ("cartoes_faltas"): a partir dos CARTÕES e FALTAS presentes nos dados fornecidos por jogador (cartoes_amarelos/vermelhos acumulados, a_um_amarelo_da_suspensao, faltas_cometidas/sofridas_por_jogo) e do contexto (fase, rivalidade, arbitragem se conhecida, estilo dos times), produza: "analise" (leitura disciplinar do confronto em 2-4 frases), "eventos" (EXATAMENTE 7 mercados disciplinares, cada um com probabilidade e fundamento NOS NÚMEROS FORNECIDOS — varie os tipos: over/under de cartões em linhas diferentes ("Mais de 3.5 cartões", "Mais de 5.5 cartões"), over/under de faltas ("Mais de 24.5 faltas totais"), cartão de jogador específico ("[Jogador] recebe cartão"), "Ambas as equipes recebem cartão", "Cartão no 1º tempo", e — se plausível — "Cartão vermelho no jogo"), "jogadores_risco" (pendurados a 1 amarelo da suspensão, marcadores de pontas velozes, histórico de faltas alto) e "conclusao". Mata-mata tende a MAIS cartões (pressão, desperdício de tempo). Se os dados disciplinares fornecidos forem escassos, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
-ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios fornecidas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (EXATAMENTE 7 mercados de escanteios, cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios fornecida, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
+ANÁLISE DE ESCANTEIOS ("escanteios"): com base nas estatísticas de escanteios fornecidas (se houver), no estilo ofensivo, uso de flancos/cruzamentos e volume de finalizações de cada time, e no contexto (fase, favoritismo, necessidade de gol), produza: "analise" (leitura do jogo quanto a escanteios em 2-4 frases), "eventos" (de 5 a 7 mercados de escanteios — PRIORIZE QUALIDADE: escanteios têm menos mercados distintos que cartões, então NÃO force um mercado fraco/repetido só para chegar a 7; prefira 5 sólidos a 7 forçados. Cada um com probabilidade e fundamento — varie os tipos: over/under do total em linhas diferentes ("Mais de 8.5 escanteios", "Mais de 10.5 escanteios"), over/under por time ("Mais de 4.5 escanteios do mandante"), "Time com mais escanteios", escanteios no 1º tempo ("Mais de 4.5 escanteios no 1º tempo"), "Ambos os times batem ao menos 1 escanteio", e — se plausível — corrida ao 1º escanteio) e "conclusao". Times mais dominantes e que jogam pelas pontas/cruzam mais tendem a MAIS escanteios. Se não houver estatística de escanteios fornecida, diga isso em "analise" e use probabilidades conservadoras rotuladas como estimativa.
 
 PRIORIDADE: fatos fornecidos > xG histórico > tendências > suposições. Declare lacunas.
 

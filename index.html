@@ -2785,6 +2785,19 @@ function _cfStatsChips(nome,arr){
     return `<span class="cf-chip"><b>${esc(p.nome)}</b> ${parts.join(' · ')}${susp}</span>`;
   }).filter(Boolean).join('')}</div></div>`;
 }
+// Escanteios/jogo por time (dados REAIS da Fase 1 via _corners): média a favor e sofrida.
+function _cornerChips(corners){
+  if(!corners)return '';
+  const has=v=>v!==null&&v!==undefined&&v!=='';
+  const one=t=>{
+    if(!t||(!has(t.feitos)&&!has(t.sofridos)))return '';
+    const parts=[];
+    if(has(t.feitos))parts.push(`<span class="cf-chip">🚩 ${esc(t.feitos)} a favor/jogo</span>`);
+    if(has(t.sofridos))parts.push(`<span class="cf-chip">🛡️ ${esc(t.sofridos)} sofridos/jogo</span>`);
+    return `<div class="pstat-team"><div class="tname">${esc(t.nome||'—')}</div><div>${parts.join('')}</div></div>`;
+  };
+  return one(corners.mandante)+one(corners.visitante);
+}
 // Rede de segurança determinística: a instrução de prompt pede EXATAMENTE 7 eventos, mas
 // isso não é uma trava — se os dados coletados forem escassos, o modelo pode entregar menos
 // por prudência. Em vez de reenviar ao modelo (custo/latência), completa via CÓDIGO com
@@ -3056,6 +3069,7 @@ function renderResults(d,opts){
   // ── Tab: Escanteios ──
   const ec=d.escanteios;
   const ecEventos=Array.isArray(ec?.eventos)?ec.eventos.filter(e=>e&&e.evento):[];
+  const ecStats=_cornerChips(d._corners);
   const tabEscanteios=(ec&&(ecEventos.length||ec.analise))?`
     ${ec.analise?`<div class="tab-s">
       <div class="tab-h">1. Leitura de Escanteios</div>
@@ -3065,11 +3079,16 @@ function renderResults(d,opts){
       <div class="tab-h">2. Eventos Prováveis</div>
       ${ecEventos.map(e=>`<div class="ev-row"><div class="ev-head"><span class="ev-nome">${esc(e.evento)}</span><span class="ev-pct">${Math.round((e.probabilidade||0)*100)}%</span></div><div class="ev-bar-track"><div class="ev-bar-fill" data-w="${Math.round((e.probabilidade||0)*100)}" style="transform:scaleX(0)"></div></div><div class="ev-reason">${esc(textFrom(e.fundamento||''))}</div></div>`).join('')}
     </div>`:''}
+    ${ecStats?`<div class="tab-s">
+      <div class="tab-h">Escanteios por Jogo · Coletados</div>
+      <div class="teams-full">${ecStats}</div>
+      <div class="pstat-src">Médias reais da competição (pesquisa Sofascore/FotMob)</div>
+    </div>`:''}
     ${ec.conclusao?`<div class="tab-s">
       <div class="tab-h">Síntese</div>
       <p class="ct-diag">${esc(textFrom(ec.conclusao))}</p>
     </div>`:''}`
-  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featEscanteios,d._coletaOk,'Análise de escanteios não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar escanteios.','Dados de escanteios não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>`;
+  :`<div class="tab-s"><p class="tab-body" style="color:var(--muted)">${_abaVaziaMsg(d._featEscanteios,d._coletaOk,'Análise de escanteios não disponível — esta análise foi gerada antes do recurso. Rode uma nova análise para obtê-la.','A pesquisa de dados desta partida não pôde ser concluída — a análise saiu direto do modelo. Rode novamente para tentar coletar escanteios.','Dados de escanteios não encontrados na coleta desta partida — pode ser um confronto com pouca cobertura de imprensa. Rode uma nova análise para tentar novamente.')}</p></div>${ecStats?`<div class="tab-s"><div class="tab-h">Escanteios por Jogo · Coletados</div><div class="teams-full">${ecStats}</div></div>`:''}`;
 
   // ── Tab: Escalação (mapa de campo — dados da Fase 1 via _lineups, sem re-digitação) ──
   const lu=d._lineups;
@@ -4838,7 +4857,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
   // conjunto fundamental de stats da competição — assim os mercados de jogador ficam cobertos
   // já na coleta e o portão de completude consegue checar campo a campo depois.
   const _pStat='{"nome":"","posicao":"","jogos":null,"minutos":null,"gols":null,"assistencias":null,"finalizacoes_por_jogo":null,"finalizacoes_no_gol_por_jogo":null,"grandes_chances_ou_passes_decisivos_por_jogo":null,"cartoes_amarelos":null,"cartoes_vermelhos":null,"a_um_amarelo_da_suspensao":null,"faltas_cometidas_por_jogo":null,"faltas_sofridas_por_jogo":null,"desarmes_por_jogo":null,"cobra_penaltis_ou_faltas":"","rating_medio":null,"observacao":""}';
-  const _teamTpl='{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"desfalques":[],"escalacao_provavel":"","formacao":"","onze_provavel":[{"nome":"","posicao":""}],"banco":[],"jogadores_chave":['+_pStat+'],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]}';
+  const _teamTpl='{"nome":"","tecnico":"","ranking_fifa":"","resultados_copa":[],"xg_marcado":null,"xg_sofrido":null,"escanteios_por_jogo":null,"escanteios_sofridos_por_jogo":null,"desfalques":[],"escalacao_provavel":"","formacao":"","onze_provavel":[{"nome":"","posicao":""}],"banco":[],"jogadores_chave":['+_pStat+'],"estilo_ofensivo":"","vulnerabilidades_defensivas":[]}';
   const SCHEMA='{"mandante":'+_teamTpl+',"visitante":'+_teamTpl+',"contexto_fase":"","grupo_classificacao":"","lacunas":[]}';
   // web_search é o maior consumidor de tokens (cada resultado traz o conteúdo das páginas).
   // TODAS as dimensões (lesões/escalação, xG, tática, forma) são cobertas em QUALQUER
@@ -4870,6 +4889,7 @@ async function gatherFacts(query,apiKey,signal,onUpdate,maxSearches){
     +'PRIORIDADE MÁXIMA DE COLETA — técnico atual e escalação/onze provável: são informação PÚBLICA e quase sempre encontrável (imprensa esportiva, escalações prováveis pré-jogo, Sofascore/FotMob, federações). BUSQUE ativamente e preencha "tecnico" e "escalacao_provavel" a partir do que a busca retornar. Deixá-los vazios é FALHA DE BUSCA, não uma lacuna legítima — se a sua busca não trouxe, refine a busca (ex.: "[Seleção] técnico atual 2026", "[Seleção] escalação provável [adversário]"). Só deixe vazio se a busca realmente não retornar NADA sobre eles. NUNCA preencha de memória (pode estar desatualizado) — o valor tem de vir dos resultados da busca.\n'
     +'ESCALAÇÃO ESTRUTURADA (alimenta o mapa de campo do app): além do texto em "escalacao_provavel", preencha "formacao" (ex.: "4-3-3"), "onze_provavel" como LISTA DE 11 OBJETOS {nome, posicao} na ordem goleiro→defesa→meio→ataque, com posicao abreviada (GOL, ZAG, LAD, LAE, VOL, MEI, PON, ATA), e "banco" com os suplentes prováveis que a fonte citar (lista de nomes; vazio se a fonte não trouxer). As páginas de escalação provável (Sofascore/imprensa) publicam onze + banco — extraia dos resultados, nunca de memória.\n'
     +'PROIBIDO INVENTAR NOME DE JOGADOR (erro gravíssimo, nunca aceitável): cada nome em "onze_provavel", "banco" e "escalacao_provavel" TEM de aparecer literalmente nos resultados de busca. Nunca escreva um jogador "como opção/alternativa" (ex.: "X ou Y") a menos que AMBOS os nomes venham da mesma fonte para aquele slot. Se não tiver certeza de quem ocupa uma posição, escreva "a confirmar" — jamais preencha com um nome vindo de memória, mesmo que pareça plausível pelo estilo do time; jogadores se aposentam da seleção, saem de convocações e mudam de status entre temporadas, e a memória do treino pode estar desatualizada ou simplesmente errada.\n'
+    +'ESCANTEIOS POR TIME (alimenta a aba de Escanteios) — preencha "escanteios_por_jogo" (média de escanteios a FAVOR por jogo) e "escanteios_sofridos_por_jogo" (média CONTRA por jogo) de cada seleção, com números REAIS da Copa 2026 (Sofascore/FotMob publicam "corners per match"). Ex.: 6.2 e 3.8. Deixe null só se a busca realmente não trouxer; nunca invente de memória.\n'
     +'MÉTRICAS POR JOGADOR (Sofascore/FotMob) — "jogadores_chave" é uma LISTA DE OBJETOS: um objeto por jogador citado (mire nos 3-5 titulares mais decisivos de cada seleção). Cada objeto tem o CONJUNTO FUNDAMENTAL OBRIGATÓRIO de campos, preenchidos com números REAIS da Copa 2026 vindos da busca: "nome", "posicao", "jogos", "minutos", "gols", "assistencias", "finalizacoes_por_jogo", "finalizacoes_no_gol_por_jogo", "grandes_chances_ou_passes_decisivos_por_jogo", "cartoes_amarelos", "cartoes_vermelhos", "a_um_amarelo_da_suspensao" (true/false), "faltas_cometidas_por_jogo", "faltas_sofridas_por_jogo", "desarmes_por_jogo", "cobra_penaltis_ou_faltas" (ex.: "pênaltis e faltas"/"faltas"/"não"), "rating_medio", e "observacao" (texto livre p/ o que não couber acima — p/ goleiros use aqui: defesas/jogo, clean sheets, gols sofridos; e sequências/lesões relevantes). Esses dados fundamentam os mercados de jogador e são PÚBLICOS e quase sempre encontráveis — deixar os campos-chave (gols, finalizacoes_no_gol_por_jogo, cartoes_amarelos, rating_medio) vazios para um titular citado é FALHA DE BUSCA, não lacuna legítima: refine a busca (ex.: "[Jogador] cartões Copa 2026 Sofascore", "[Jogador] finalizações por jogo FotMob") antes de desistir. Use null (não invente) só quando a busca realmente não trouxer aquele número; SÓ use valores da busca, nunca de memória, e descarte implausíveis (máx. 7 jogos num Mundial).\n'
     +'VALIDAÇÃO CRUZADA NA COLETA: quando um mesmo fato (técnico, escalação, xG, placar) aparecer em 2+ fontes independentes, cite as fontes juntas no próprio valor (ex.: "4-3-3 (Sofascore, FBref)"); quando vier de UMA única fonte, cite só ela — a etapa de análise usa essa marcação para calibrar a confiança. Se duas fontes CONFLITAREM, registre o conflito em "lacunas" com ambas as versões.\n'
     +_srcNote+'\n'+SOURCE_RULE+'\n'+GROUNDING_RULE;
@@ -5200,7 +5220,7 @@ function _soObj(props){return{type:'object',properties:props,required:Object.key
 // jogadores_chave agora é uma lista de objetos estruturados (15 stats fundamentais + nome/posição/observação).
 const _soN=()=>_soNullable('number');
 const _soPlayer=()=>_soObj({nome:_soStr,posicao:_soStr,jogos:_soN(),minutos:_soN(),gols:_soN(),assistencias:_soN(),finalizacoes_por_jogo:_soN(),finalizacoes_no_gol_por_jogo:_soN(),grandes_chances_ou_passes_decisivos_por_jogo:_soN(),cartoes_amarelos:_soN(),cartoes_vermelhos:_soN(),a_um_amarelo_da_suspensao:_soNullable('boolean'),faltas_cometidas_por_jogo:_soN(),faltas_sofridas_por_jogo:_soN(),desarmes_por_jogo:_soN(),cobra_penaltis_ou_faltas:_soStr,rating_medio:_soN(),observacao:_soStr});
-const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,formacao:_soStr,onze_provavel:{type:'array',items:_soObj({nome:_soStr,posicao:_soStr})},banco:_soStrArr,jogadores_chave:{type:'array',items:_soPlayer()},estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
+const _soTeamP1=()=>_soObj({nome:_soStr,tecnico:_soStr,ranking_fifa:_soStr,resultados_copa:_soStrArr,xg_marcado:_soNullable('number'),xg_sofrido:_soNullable('number'),escanteios_por_jogo:_soNullable('number'),escanteios_sofridos_por_jogo:_soNullable('number'),desfalques:_soStrArr,escalacao_provavel:_soStr,formacao:_soStr,onze_provavel:{type:'array',items:_soObj({nome:_soStr,posicao:_soStr})},banco:_soStrArr,jogadores_chave:{type:'array',items:_soPlayer()},estilo_ofensivo:_soStr,vulnerabilidades_defensivas:_soStrArr});
 const FACTS_SCHEMA=_soObj({mandante:_soTeamP1(),visitante:_soTeamP1(),contexto_fase:_soStr,grupo_classificacao:_soStr,lacunas:_soStrArr});
 // Fase 2 (análise): structured outputs NÃO é usado. Testado ao vivo (07/2026):
 // o schema completo da análise (19 campos, confronto_tatico aninhado etc.) excede
@@ -5699,6 +5719,9 @@ async function runAnalysis(){
     // Leva os stats fundamentais por jogador (coletados na Fase 1) para o render/persistência,
     // SEM o modelo re-digitar os números — só anexa se vieram estruturados (lista de objetos).
     try{if(rawFacts){const objArr=a=>Array.isArray(a)&&a.some(x=>x&&typeof x==='object')?a.filter(x=>x&&typeof x==='object'):null;const mm=objArr(rawFacts.mandante?.jogadores_chave),vv=objArr(rawFacts.visitante?.jogadores_chave);if(mm||vv)parsed._pstats={mandante:mm||[],visitante:vv||[]};}}catch(_){}
+    // Escanteios/jogo por time coletados na Fase 1 → _corners (lastro numérico da aba
+    // Escanteios), anexado por CÓDIGO sem o modelo re-digitar. Só anexa se veio ao menos um.
+    try{if(rawFacts){const cn=t=>{const f=t&&t.escanteios_por_jogo,s=t&&t.escanteios_sofridos_por_jogo;return (f!=null&&f!=='')||(s!=null&&s!=='')?{nome:(t&&t.nome)||'',feitos:f,sofridos:s}:null;};const cm=cn(rawFacts.mandante),cv=cn(rawFacts.visitante);if(cm||cv)parsed._corners={mandante:cm,visitante:cv};}}catch(_){}
     // Marca de recurso (não de dado): sinaliza que esta análise passou pela versão do app que
     // já sabe gerar cartões/faltas e escalação — usada no render para diferenciar "análise
     // antiga, recurso nem existia" de "análise nova, mas a coleta não achou o dado".

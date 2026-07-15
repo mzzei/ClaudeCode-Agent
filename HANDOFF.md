@@ -1,6 +1,6 @@
-# Handoff — trocar de máquina
+# Handoff — trocar de máquina ou de conta
 
-Checklist para trabalhar neste projeto (Meridian / WorldCupAgent) de forma segura em mais de um computador.
+Checklist para trabalhar neste projeto (Meridian / WorldCupAgent) de forma segura em mais de um computador — ou de conta Claude.
 
 ## Antes de sair de uma máquina (terminar a sessão)
 
@@ -21,6 +21,19 @@ Checklist para trabalhar neste projeto (Meridian / WorldCupAgent) de forma segur
 ## Regra de ouro
 
 Nunca deixar trabalho "pendurado" (editado mas não commitado/enviado) numa máquina antes de ir pra outra. Isso é o que causa divergência e conflito depois.
+
+## Trocando de CONTA Claude (não só de máquina)
+
+O código vive 100% no GitHub — clonar o repo já traz tudo isso. O que **não** viaja com o `git clone` é a memória do Claude Code (decisões, lições, regras de comportamento), que fica fora do repositório, em:
+
+```
+~/.claude/projects/<pasta-do-projeto>/memory/
+```
+
+- [ ] Copiar essa pasta `memory/` (contém `MEMORY.md` + os arquivos de memória individuais) para o caminho equivalente na conta/máquina nova
+- [ ] Clonar o repo para um caminho de pasta igual ou parecido ao original — o Claude Code identifica o projeto pelo caminho da pasta de trabalho, então isso ajuda a memória "bater" no lugar certo
+- [ ] Se não copiar a memória, recontar ao menos as regras de comportamento fixas ao novo Claude logo na primeira mensagem — a principal delas: **nunca rodar uma análise real no preview (botão "Analisar") sem pedir autorização antes, pois gasta créditos da chave Anthropic do usuário.** Verificação por `node --check`/testes unitários e por `renderResults(dados, {save:false})` injetado no navegador é livre (não chama a API) e não precisa de autorização.
+- [ ] Ao chegar na conta nova, pedir um resumo de handoff completo (este arquivo + `git log` + confirmação de que está sincronizado com `origin/main`) antes de continuar o trabalho
 
 ## Referência rápida do projeto
 
